@@ -2,8 +2,7 @@ from random import shuffle
 
 import streamlit as st
 
-from entry_point import DahuPages
-from tools.db_schema import Experimenter, Library, CharacMethod
+from logic.db_schema import Experimenter, Library, CharacMethod
 
 st.title('New library')
 
@@ -30,23 +29,23 @@ valid_form = (
 
 if st.button("Submit", disabled=not valid_form):
     experimenter_kwargs = {
-        Experimenter.full_name.name: full_name,
-        Experimenter.email_address.name: email,
+        Experimenter.full_name.target_name: full_name,
+        Experimenter.email_address.target_name: email,
     }
     # We use that instead of "Experimenter(full_name=full_name, [...]" to have IDE auto-completion and refactorization.
     experimenter = Experimenter(**experimenter_kwargs)
 
     library_kwargs = {
-        Library.name.name: lib_name,
-        Library.comment.name: comment,
-        Library.made_at.name: made_at,
+        Library.name.target_name: lib_name,
+        Library.comment.target_name: comment,
+        Library.made_at.target_name: made_at,
     }
     library = Library(**library_kwargs)
 
     charac_kwargs = {
-        CharacMethod.name.name: method,
-        CharacMethod.experimenter.name: experimenter,
-        CharacMethod.library.name: library,
+        CharacMethod.name.target_name: method,
+        CharacMethod.experimenter.target_name: experimenter,
+        CharacMethod.library.target_name: library,
     }
     charac = CharacMethod(**charac_kwargs)
 
@@ -54,4 +53,4 @@ if st.button("Submit", disabled=not valid_form):
     library.save()
     charac.save()
 
-    st.switch_page(DahuPages.library_added)
+    st.switch_page('library_added.py')

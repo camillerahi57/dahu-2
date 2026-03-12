@@ -1,18 +1,16 @@
 import streamlit as st
-from streamlit.navigation.page import StreamlitPage
+# Don't import anything from this file, as it will load it again and re-run the pages.
 
 
-dahu_host = 'localhost:8501'
+page = st.navigation([
+    st.Page('browse_libs.py', title='Browse Libraries', icon=":material/edit:"),
+    st.Page('browse_targets.py', title='Browse Targets', icon=":material/edit:"),
+    st.Page('browse_substrates.py', title='Browse Substrates', icon=":material/edit:"),
+    st.Page('new_lib.py', title='Add a New Library', icon=":material/edit:"),
+    st.Page('new_target.py', title='Add a New Target', icon=":material/edit:"),
+    st.Page('inspect_lib.py', title='Inspect a Library', icon=":material/edit:"),
+    st.Page('library_added.py', title='New Library Added', icon=":material/edit:"),
+    st.Page('test.py', title='Test Page', icon=":material/edit:"),
+])
 
-class DahuPages:
-    browse = st.Page('browse.py', title='Browse Libraries', icon=":material/edit:")
-    add_new = st.Page('add_new.py', title='Add a New Library', icon=":material/edit:")
-    inspect = st.Page('inspect.py', title='Inspect a Library', icon=":material/edit:")
-    library_added = st.Page('library_added.py', title='New Library Added', icon=":material/edit:")
-
-    @classmethod
-    def all_pages(cls):
-        return [v for k, v in vars(cls).items() if isinstance(v, StreamlitPage)]
-
-page = st.navigation(DahuPages.all_pages())
 page.run()
