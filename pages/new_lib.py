@@ -2,7 +2,7 @@ from random import shuffle
 
 import streamlit as st
 
-from logic.db_schema import Experimenter, Library, CharacMethod
+from logic.db_schema import Experimenter, Library, Characterization
 
 st.title('New library')
 
@@ -11,7 +11,7 @@ shuffle(possible_methods)
 possible_makers = ["William", "Pierre"]
 shuffle(possible_makers)
 
-lib_name = st.text_input("Library name:", value='Nd|Ce|Br')
+lib_name = st.text_input("Library name:", value='Nd|Ce|B')
 made_at = st.datetime_input("Made at:")
 method = st.selectbox("Characterisation Method:", possible_methods)
 comment = st.text_input("Comment:", value='Sample made with love.')
@@ -28,26 +28,10 @@ valid_form = (
 )
 
 if st.button("Submit", disabled=not valid_form):
-    experimenter_kwargs = {
-        Experimenter.full_name.target_name: full_name,
-        Experimenter.email_address.target_name: email,
-    }
     # We use that instead of "Experimenter(full_name=full_name, [...]" to have IDE auto-completion and refactorization.
-    experimenter = Experimenter(**experimenter_kwargs)
-
-    library_kwargs = {
-        Library.name.target_name: lib_name,
-        Library.comment.target_name: comment,
-        Library.made_at.target_name: made_at,
-    }
-    library = Library(**library_kwargs)
-
-    charac_kwargs = {
-        CharacMethod.name.target_name: method,
-        CharacMethod.experimenter.target_name: experimenter,
-        CharacMethod.library.target_name: library,
-    }
-    charac = CharacMethod(**charac_kwargs)
+    experimenter = Experimenter.new(full_name=full_name, email_address=email)
+    library = Library.new(name=lib_name, comment=comment, made_at=made_at)
+    charac = Characterization(name=method, experimenter=experimenter, library=library)
 
     experimenter.save()
     library.save()

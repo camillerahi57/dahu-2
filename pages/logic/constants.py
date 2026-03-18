@@ -4,6 +4,10 @@ from typing import Self
 
 LIB_ID_URL_KEY = 'lib_id'
 DOMAIN = 'localhost:8501'
+PAGE_NAME_KEY = 'page_name_key'
+PATCH_FORMS_KEY = 'patch_forms_key'
+TARGET_FORM_STAGING_KEY = 'target_form_save_key'  # Where we store the list of object
+# that will be saved when the new target form is submitted.
 
 
 class ShapeType(StrEnum):
@@ -12,8 +16,8 @@ class ShapeType(StrEnum):
 
 
 class StorageKeys(StrEnum):
-    """Keys are hard coded random strings, so that if we rename the variable during an
-    update, we still access the value from old version with the same key."""
+    """Keys are hard coded random strings, so that if we rename the variable for an
+    update, we'll still access the value from old version with the same key."""
 
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
     LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'

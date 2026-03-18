@@ -1,5 +1,5 @@
 import streamlit as st
-# Don't import anything from this file, as it will load it again and re-run the pages.
+# Don't import anything from this file, as it will run it again and re-run the current page.
 
 
 page = st.navigation([

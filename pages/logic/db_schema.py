@@ -1,10 +1,12 @@
+from abc import abstractmethod
+from datetime import datetime
 from random import Random
 
 import chemparse
 import numpy as np
 from chemparse import parse_formula
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, ForeignKeyField, FloatField, IntegerField
-from plotly.graph_objs import Scatter, Figure
+from plotly.graph_objs import Scatter
 # from peewee import *
 from pyparsing import alphanums
 
@@ -26,11 +28,15 @@ db = PostgresqlDatabase(
 
 
 class BaseModel(Model):
-    # def save(self, force_insert: bool = False, only = None) -> Self:
-    #     """Modifies the default behavior of the Peewee's "save" method.
-    #     Instead of returning None, it returns the object itself."""
-    #     super().save(force_insert, only)
-    #     return self
+    @classmethod
+    @abstractmethod
+    def new(cls, *args, **kwargs):
+        """This just creates an instance of the object and returns it.
+        So instead of doing: obj = Class()
+        We do: obj = Class.new()
+        It's useless, but it allows us to have PyCharm/VSCode warnings on have the correct
+        arguments."""
+        raise NotImplementedError  # Implement it in every subclass.
 
     class Meta:
         database = db
@@ -41,29 +47,39 @@ class Experimenter(BaseModel):
     full_name = CharField()
     email_address = CharField()
 
+    @classmethod
+    def new(cls, full_name: str, email_address: str):
+        return cls(full_name=full_name, email_address=email_address)
+
 
 class Library(BaseModel):
     name = CharField()
     comment = CharField()
     made_at = DateTimeField()
 
+    @classmethod
+    def new(cls, name: str, comment: str, made_at: datetime):
+        return cls(name=name, comment=comment, made_at=made_at)
 
-class CharacMethod(BaseModel):
+
+class Characterization(BaseModel):
     name = CharField()
     experimenter = ForeignKeyField(Experimenter, on_delete='CASCADE')
     library = ForeignKeyField(Library, on_delete='CASCADE')
 
+    @classmethod
+    def new(cls, name: str, experimenter: Experimenter, library: Library):
+        return cls(name=name, experimenter=experimenter, library=library)
+
 
 class Stoichiometry(BaseModel):
     @classmethod
-    def create(cls):
-        return super().create()
-
-    elements: list[StoichiometryElement]
+    def new(cls):
+        return cls()
 
     def __str__(self):
         str_ = ''
-        for e in self.elements:
+        for e in self.elements:  # noqa for PyCharm.
             str_ += e.chemical_element_short
             if e.ratio_num != 1:
                 str_ += f'{e.ratio_num:g}'
@@ -92,7 +108,7 @@ class Stoichiometry(BaseModel):
             return False, f"Invalid syntax."
         if letter_count(str(stoichio_str)) == 0:
             return False, f"Requires at least one chemical element."
-        return True, "Valid stoichiometry."
+        return True, ''
 
     def rgb_color(self) -> tuple[int, int, int]:
         rng = Random(str(self))
@@ -117,8 +133,8 @@ class StoichiometryElement(BaseModel):
     stoichio = ForeignKeyField(Stoichiometry, on_delete='CASCADE', backref='elements')
 
     @classmethod
-    def create(cls, chemical_element_short: str, ratio_num: float, stoichio: Stoichiometry):
-        return super().create(chemical_element_short=chemical_element_short,
+    def new(cls, chemical_element_short: str, ratio_num: float, stoichio: Stoichiometry):
+        return cls(chemical_element_short=chemical_element_short,
                    ratio_num=ratio_num, stoichio=stoichio)
 
     def __str__(self):
@@ -131,8 +147,8 @@ class Disc(BaseModel):
     radius = FloatField()
 
     @classmethod
-    def create(cls, center_x: float, center_y: float, radius: float):
-        return super().create(center_x=center_x, center_y=center_y, radius=radius)
+    def new(cls, center_x: float, center_y: float, radius: float):
+        return cls(center_x=center_x, center_y=center_y, radius=radius)
 
     def __str__(self):
         return (f"Center: ({self.center_x:g}, {self.center_y:g})"
@@ -161,8 +177,8 @@ class Disc(BaseModel):
 
 class Polygon(BaseModel):
     @classmethod
-    def create(cls):
-        return super().create()
+    def new(cls):
+        return cls()
 
     vertices: list[Vertex]  # backref of a foreign key in Vertex (see Vertex).
 
@@ -189,50 +205,71 @@ class Polygon(BaseModel):
             fill='toself',
             fillcolor=color,
             opacity=1,
-            line=dict(width=2, color='red'),
+            line=dict(width=2, color='black'),
             showlegend=False,
             name=name,
         )
 
+    # @classmethod
+    # def from_text(cls, text: str) -> tuple[Polygon|None, str]:
+    #     """
+    #     The input must be a list of vertices, one on each line. Each vertex is an X,Y couple.
+    #     Example of a triangle:
+    #     12.3, 48.3
+    #     78, 15.6
+    #     6.1, 5
+    #     """
+    #     allowed_non_blank_symbols = '.,-'
+    #     digits = '0123456789'
+    #     allowed_blanks = ' \n'
+    #
+    #     allowed_non_blank = digits + allowed_non_blank_symbols
+    #     allowed_chars = allowed_non_blank_symbols + digits + allowed_blanks
+    #
+    #     for char in text:
+    #         if char not in allowed_chars:
+    #             msg = (f'Invalid character in polygons input. '
+    #                    f'Allowed characters are: {allowed_non_blank}')
+    #             return None, msg
+    #     text = (text
+    #             .replace(' ', '')  # Removes all white spaces.
+    #             .strip(',\n')  # Allow dots at the start or end.
+    #             )
+    #     vertex_lines = filter(None, text.split('\n'))  # Removes empty as well.
+    #     vertex_tuples: list[tuple[float, float]] = []
+    #     for vertex_line in vertex_lines:
+    #         try:
+    #             x, y = vertex_line.removesuffix(',').split(',')
+    #         except ValueError:
+    #             msg = (f'All vertices must have 2 elements, '
+    #                    f'got {len(vertex_line.split(','))}.')
+    #             return None, msg
+    #         vertex_tuples.append((float(x), float(y)))
+    #     polygon = Polygon.from_ordered_vertices(vertex_tuples)
+    #     return polygon, 'Success.'
+
+# TODO Handle the replacement of create to new.
+
     @classmethod
-    def from_text(cls, text: str) -> tuple[Polygon|None, str]:
-        """
-        The input must be a list of vertices, one on each line. Each vertex is an X,Y couple.
-        Example of a triangle:
-        12.3, 48.3
-        78, 15.6
-        6.1, 5
-        """
-        allowed_non_blank_symbols = '.,-'
-        digits = '0123456789'
-        allowed_blanks = ' \n'
+    def from_ordered_vertices(cls, ordered_vertices: list[tuple[float, float]]) -> tuple[Polygon, list[Vertex]]:
+        polygon = cls.new()
+        vertices = []
+        for i, (x, y) in enumerate(ordered_vertices):
+            vertices.append(Vertex.new(x_pos=x, y_pos=y, clockwise_rank=i, polygon=polygon))
+        return polygon, vertices
 
-        allowed_non_blank = digits + allowed_non_blank_symbols
-        allowed_chars = allowed_non_blank_symbols + digits + allowed_blanks
 
-        for char in text:
-            if char not in allowed_chars:
-                msg = (f'Invalid character in polygons input. '
-                       f'Allowed characters are: {allowed_non_blank}')
-                return None, msg
-        text = (text
-                .replace(' ', '')  # Removes all white spaces.
-                .strip(',\n')  # Allow dots at the start or end.
-                )
-        vertex_lines = filter(None, text.split('\n'))  # Removes empty as well.
-        vertex_tuples: list[tuple[float, float]] = []
-        for vertex_line in vertex_lines:
-            try:
-                x, y = vertex_line.removesuffix(',').split(',')
-            except ValueError:
-                msg = (f'All vertices must have 2 elements, '
-                       f'got {len(vertex_line.split(','))}.')
-                return None, msg
-            vertex_tuples.append((float(x), float(y)))
-        polygon = cls.create()
-        for i, (x, y) in enumerate(vertex_tuples):
-            Vertex.create(x_pos=x, y_pos=y, clockwise_rank=i, polygon=polygon)
-        return polygon, 'Success.'
+    @classmethod
+    def from_aligned_rectangle_data(cls, first_vertex: tuple[float, float],
+                                    opposite_vertex: tuple[float, float]) -> tuple[Polygon, list[Vertex]]:
+        return Polygon.from_ordered_vertices(
+            [
+                (first_vertex[0], first_vertex[1]),
+                (first_vertex[0], opposite_vertex[1]),
+                (opposite_vertex[0], opposite_vertex[1]),
+                (opposite_vertex[0], first_vertex[1]),
+            ]
+        )
 
 
 class Vertex(BaseModel):
@@ -242,8 +279,8 @@ class Vertex(BaseModel):
     polygon = ForeignKeyField(Polygon, on_delete='CASCADE', backref='vertices')
 
     @classmethod
-    def create(cls, x_pos: float, y_pos: float, clockwise_rank: int, polygon: Polygon):
-        return super().create(x_pos=x_pos, y_pos=y_pos, clockwise_rank=clockwise_rank,
+    def new(cls, x_pos: float, y_pos: float, clockwise_rank: int, polygon: Polygon):
+        return cls(x_pos=x_pos, y_pos=y_pos, clockwise_rank=clockwise_rank,
                               polygon=polygon)
 
     def __str__(self):
@@ -256,9 +293,9 @@ class Shape(BaseModel):
     disc = ForeignKeyField(Disc, on_delete='CASCADE', null=True)
 
     @classmethod
-    def create(cls, shape_type: ShapeType,
+    def new(cls, shape_type: ShapeType,
                polygon: Polygon=None, disc: Disc=None):
-        return super().create(shape_type=shape_type, polygon=polygon, disc=disc)
+        return cls(shape_type=shape_type, polygon=polygon, disc=disc)
 
     def __str__(self):
         return str(self.polygon) if self.shape_type == ShapeType.POLYGON else str(self.disc)
@@ -283,8 +320,8 @@ class Patch(BaseModel):
     # TODO Add target attribute here.
 
     @classmethod
-    def create(cls, shape: Shape, stoichiometry: Stoichiometry):
-        return super().create(shape=shape, stoichiometry=stoichiometry)
+    def new(cls, shape: Shape, stoichiometry: Stoichiometry):
+        return cls(shape=shape, stoichiometry=stoichiometry)
 
     def __str__(self):
         return f'Patch: {self.stoichiometry} of shape:\n{self.shape})'
@@ -302,3 +339,20 @@ class Patch(BaseModel):
         stoichio = Stoichiometry.from_str(stoichio)
         shape = Shape.new_polygon(clockwise_vertices=clockwise_vertices)
         return cls.create(stoichiometry=stoichio, shape=shape)
+
+
+class Target(BaseModel):
+    made_at = DateTimeField()
+    made_by_email: str = CharField()
+    target_name: str = CharField()
+    comment: str = CharField()
+
+    @classmethod
+    def new(cls, made_at: datetime, made_by_email: str, target_name: str, comment: str):
+        return cls(made_at=made_at, made_by_email=made_by_email, target_name=target_name,
+                   comment=comment)
+
+    @classmethod
+    def already_taken_names(cls):
+        # TODO
+        return []

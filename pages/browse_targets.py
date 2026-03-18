@@ -5,9 +5,9 @@ import streamlit as st
 from logic.components import browser_side_bar
 from logic.constants import StorageKeys as Sk
 from logic.enums import TargetBrowserColumnName as ColName
-from logic.functions import load_session_state, session_to_cookies
+from logic.functions import load_session_state, save_session_state
 
-sess = load_session_state()
+sess = load_session_state('browse_targets.py')
 
 st.set_page_config(layout="wide")
 
@@ -37,4 +37,4 @@ dynamic_filters = DynamicFilters(df, filters=possible_filters, filters_name=Sk.T
 browser_side_bar(dynamic_filters, 'browse_targets.py')
 dynamic_filters.display_df(hide_index=True, column_config=column_config, height=550)
 
-session_to_cookies(sess)
+save_session_state(sess)

@@ -1,10 +1,11 @@
+from pathlib import Path
 from time import sleep
 import streamlit as st
 
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
 
-from logic.constants import StorageKeys
+from logic.constants import StorageKeys, PAGE_NAME_KEY
 
 
 def highlight_rows(row) -> list[str]:
@@ -122,9 +123,10 @@ def new_controller() -> CookieController:
     return controller
 
 
-def load_session_state() -> SessionStateProxy:
+def load_session_state(page_name: str|Path) -> SessionStateProxy:
     sess = st.session_state
     update_from_cookies(sess)
+    sess[PAGE_NAME_KEY] = page_name
     return sess
 
 
@@ -136,7 +138,7 @@ def update_from_cookies(sess: SessionStateProxy):
             sess[key] = stored_value
 
 
-def session_to_cookies(sess: SessionStateProxy):
+def save_session_state(sess: SessionStateProxy):
     controller = new_controller()
     for key in StorageKeys:
         if key in sess.keys():
