@@ -2,7 +2,7 @@ from random import shuffle
 
 import streamlit as st
 
-from logic.db_schema import Experimenter, Library, Characterization
+from logic.db_schema import Experimenter, Library, Characterization, db
 
 st.title('New library')
 
@@ -31,10 +31,11 @@ if st.button("Submit", disabled=not valid_form):
     # We use that instead of "Experimenter(full_name=full_name, [...]" to have IDE auto-completion and refactorization.
     experimenter = Experimenter.new(full_name=full_name, email_address=email)
     library = Library.new(name=lib_name, comment=comment, made_at=made_at)
-    charac = Characterization(name=method, experimenter=experimenter, library=library)
+    charac = Characterization.new(name=method, experimenter=experimenter, library=library)
 
-    experimenter.save()
-    library.save()
-    charac.save()
+    with db.atomic():
+        experimenter.save()
+        library.save()
+        charac.save()
 
     st.switch_page('library_added.py')

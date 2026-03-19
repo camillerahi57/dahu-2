@@ -23,6 +23,9 @@ class StorageKeys(StrEnum):
     LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'
     TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq4<3q1dz'
 
+    # Put last used email here and implement it.
+    # Also, is deletion cascading?
+
 
 class ChemicalElement(StrEnum):
     ASTATINE = 'At'

@@ -1,7 +1,7 @@
 import re
-from email.utils import parseaddr
 
-from logic.db_schema import Target, Stoichiometry
+from logic.constants import StorageKeys as Sk
+from logic.db_schema import Target, Patch
 from logic.forms.shared import FormField
 import streamlit as st
 
@@ -17,13 +17,17 @@ class MadeAtField(FormField):
 
 
 class ExperimenterEmailField(FormField):
-    default_value = ''
+    def default_value(self):
+        if Sk.LAST_EMAIL_USED in st.session_state:
+            return st.session_state[Sk.LAST_EMAIL_USED]
+        else:
+            return ''
 
     def _streamlit_input(self):
         return st.text_input(
             "Made by (email address)",
             on_change=self.on_change,
-            value='default email here'
+            value=self.default_value()
         )
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -66,7 +70,7 @@ class StoichiometryField(FormField):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
-        return Stoichiometry.is_valid_stoichio(self.value)
+        return Patch.is_valid_stoichio(self.value)
 
 
 class DiscCenterX(FormField):

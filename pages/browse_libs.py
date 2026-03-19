@@ -5,7 +5,7 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from logic.components import browser_side_bar
 from logic.constants import LIB_ID_URL_KEY, DOMAIN, StorageKeys as Sk
-from logic.db_schema import Library, Characterization, Experimenter
+# from logic.db_schema import Library, Characterization, Experimenter
 from logic.enums import LibraryBrowserColumnName as ColName
 from logic.functions import save_session_state, load_session_state
 
@@ -16,16 +16,17 @@ st.set_page_config(layout="wide")
 if st.button("➕ Add a new library"):
     st.switch_page('new_lib.py')
 
-query = Characterization.select(
-    Characterization.name.alias(ColName.characs),
-    Library.made_at.alias(ColName.made_on),
-    Library.name.alias(ColName.lib_name),
-    Library.id.alias(LIB_ID_URL_KEY),  # noqa, id is not declared in the project but is in Peewee.
-    Experimenter.full_name.alias(ColName.experimenter),
-    Library.comment.alias(ColName.comment),
-).join(Experimenter).switch(Characterization).join(Library).dicts()
+# query = Characterization.select(
+#     Characterization.name.alias(ColName.characs),
+#     Library.made_at.alias(ColName.made_on),
+#     Library.name.alias(ColName.lib_name),
+#     Library.id.alias(LIB_ID_URL_KEY),  # noqa, id is not declared in the project but is in Peewee.
+#     Experimenter.full_name.alias(ColName.experimenter),
+#     Library.comment.alias(ColName.comment),
+# ).join(Experimenter).switch(Characterization).join(Library).dicts()
 
-rows = [row for row in query]
+# rows = [row for row in query]
+rows = []
 
 df = pd.DataFrame(rows)
 

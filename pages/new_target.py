@@ -1,23 +1,27 @@
+from time import sleep
+
+import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.graph_objs import Scatter
 
-from logic.constants import PATCH_FORMS_KEY, TARGET_FORM_STAGING_KEY
-from logic.db_schema import Disc, Polygon, Vertex, Stoichiometry
+from logic.constants import PATCH_FORMS_KEY, TARGET_FORM_STAGING_KEY, StorageKeys as Sk
+from logic.db_schema import Disc, Polygon, Vertex, Target, db, Patch
 from logic.forms.new_target import MadeAtField, ExperimenterEmailField, TargetNameField, CommentField, \
     StoichiometryField, DiscCenterX, DiscCenterY, RadiusField, RectangleFirstVertexX, RectangleFirstVertexY, \
     RectangleOppositeVertexX, RectangleOppositeVertexY
 from logic.functions import save_session_state, load_session_state
+
 
 sess = load_session_state('new_target.py')
 
 if TARGET_FORM_STAGING_KEY not in sess:
     sess[TARGET_FORM_STAGING_KEY] = []
 
-made_at = MadeAtField.input()
+made_at_fld = MadeAtField.input()
 email_fld = ExperimenterEmailField.input()
-target_name = TargetNameField.input()
-comment = CommentField.input()
+target_name_fld = TargetNameField.input()
+comment_fld = CommentField.input()
 
 col1, col2 = st.columns([100, 90])
 
@@ -35,11 +39,11 @@ class DiscForm:
         with col3_:
             radius_fld = RadiusField.input()
 
-        fields = [stoichio_fld, x_pos_fld, y_pos_fld, radius_fld]
-        all_fields_valid = all([fld.is_valid for fld in fields])
+        fields_ = [stoichio_fld, x_pos_fld, y_pos_fld, radius_fld]
+        all_fields_valid = all([fld.is_valid for fld in fields_])
 
         if st.button("Add Disc", disabled=not all_fields_valid):
-            for fld in fields:
+            for fld in fields_:
                 fld.remove_from_session()  # To have a new one in the next pop-up.
             self.stoichio = stoichio_fld.value
             self.x_pos = x_pos_fld.value
@@ -48,11 +52,23 @@ class DiscForm:
             sess_[PATCH_FORMS_KEY].append(self)
             st.rerun()
 
-    def to_disc(self) -> Disc:
-        return Disc.new(self.x_pos, self.y_pos, self.radius)
-
     def to_scatter(self, color_: str, name_: str):
-        return self.to_disc().to_scatter(color_, name_)
+        cx, cy, r = self.x_pos, self.y_pos, self.radius
+        # Parametric circle as a closed Scatter trace
+        theta = np.linspace(0, 2 * np.pi, 360)
+        x = cx + r * np.cos(theta)
+        y = cy + r * np.sin(theta)
+        return Scatter(
+            x=x,
+            y=y,
+            mode='lines',
+            fill='toself',
+            fillcolor=color_,
+            opacity=1,
+            line=dict(width=2, color='black'),
+            showlegend=False,
+            name=name_
+        )
 
 
 class AlignedRectangleForm:
@@ -70,11 +86,11 @@ class AlignedRectangleForm:
         with col2_:
             vertex_2_y_fld = RectangleOppositeVertexY.input()
 
-        fields = [stoichio_fld, vertex_1_x_fld, vertex_1_y_fld, vertex_2_x_fld, vertex_2_y_fld]
-        all_fields_valid = all([fld.is_valid for fld in fields])
+        fields_ = [stoichio_fld, vertex_1_x_fld, vertex_1_y_fld, vertex_2_x_fld, vertex_2_y_fld]
+        all_fields_valid = all([fld.is_valid for fld in fields_])
 
         if st.button("Add Aligned Rectangle", disabled=not all_fields_valid):
-            for fld in fields:
+            for fld in fields_:
                 fld.remove_from_session()
             self.stoichio = stoichio_fld.value
             self.vertex_1_x = vertex_1_x_fld.value
@@ -92,17 +108,11 @@ class AlignedRectangleForm:
             (self.vertex_2_x, self.vertex_1_y),
         ]
 
-    def to_polygon(self) -> tuple[Polygon, list[Vertex]]:
-        return Polygon.from_aligned_rectangle_data(
-            first_vertex=(self.vertex_1_x, self.vertex_1_y),
-            opposite_vertex=(self.vertex_2_x, self.vertex_2_y),
-        )
-
     def to_scatter(self, color_: str, name_: str):
-        vertices = self.vertices()
+        vertices_ = self.vertices()
         # Closing the rectangle:
-        vertices.append(vertices[0])
-        x_coords, y_coords = zip(*vertices)
+        vertices_.append(vertices_[0])
+        x_coords, y_coords = zip(*vertices_)
         return Scatter(
             x=x_coords, y=y_coords,
             mode='lines',
@@ -120,10 +130,10 @@ with col1:
     if PATCH_FORMS_KEY not in sess:
         sess[PATCH_FORMS_KEY] = []
 
-    for i, form in enumerate(sess[PATCH_FORMS_KEY]):
+    for patch_number, form in enumerate(sess[PATCH_FORMS_KEY]):
         col11, col12 = st.columns([85, 15])
         with col11:
-            rectangle = Stoichiometry.from_str(form.stoichio).colored_rectangle_html()
+            rectangle = Patch.colored_rectangle_html(form.stoichio)
             if form.__class__.__name__ == DiscForm.__name__:
                 patch_str =  (f"**Disc**  |  *{form.stoichio}*  |  "
                               f"Center: ({form.x_pos:g}, {form.y_pos:g}) · Radius: {form.radius:g}")
@@ -133,8 +143,8 @@ with col1:
                              f"Opposite vertex: ({form.vertex_2_x:g}, {form.vertex_2_y:g})")
             st.write(rectangle + ' ' + patch_str, unsafe_allow_html=True)
         with col12:
-            if st.button("❌", key=f"patch_{i}"):
-                sess[PATCH_FORMS_KEY].pop(i)
+            if st.button("❌", key=f"patch_{patch_number}"):
+                sess[PATCH_FORMS_KEY].pop(patch_number)
                 st.rerun()
     if len(sess[PATCH_FORMS_KEY]) == 0:
         st.write("Start with the patches at the back, working towards the front.")
@@ -155,10 +165,49 @@ with col2:
     )
     for form in sess[PATCH_FORMS_KEY]:
         form: DiscForm|AlignedRectangleForm
-        color = Stoichiometry.from_str(form.stoichio).plotly_color()
+        color = Patch.plotly_color(form.stoichio)
         scatter = form.to_scatter(color, form.stoichio)
         fig.add_trace(scatter)
     st.plotly_chart(fig)
+
+
+fields = [made_at_fld, email_fld, target_name_fld, comment_fld]
+all_flds_valid = all([fld.is_valid for fld in fields])
+can_submit = all_flds_valid and len(sess[PATCH_FORMS_KEY]) > 0
+
+if st.button("Submit", disabled=not can_submit):
+    sess[Sk.LAST_EMAIL_USED] = email_fld.value
+    target = Target.new(
+        made_at=made_at_fld.value,
+        made_by_email=email_fld.value,
+        target_name=target_name_fld.value,
+        comment=comment_fld.value,
+    )
+    with db.atomic():
+        target.save()
+        for patch_number, form in enumerate(sess[PATCH_FORMS_KEY]):
+            if form.__class__.__name__ == DiscForm.__name__:
+                x_y_radius = form.x_pos, form.y_pos, form.radius
+                patch, disc = Patch.new_disc_patch(
+                    form.stoichio, x_y_radius, target, patch_number
+                )
+                # Save the patch (order matters):
+                patch.save()
+                # disc.patch = patch
+                disc.save()
+
+            if form.__class__.__name__ == AlignedRectangleForm.__name__:
+                vertices = form.vertices()
+                patch, polygon, vertices = Patch.new_polygon_patch(
+                    form.stoichio, vertices, patch_number, target
+                )
+                # Save the patch (order matters):
+                patch.save()
+                polygon.save()
+                for v in vertices:
+                    v.save()
+
+    st.switch_page('target_added.py')
 
 
 save_session_state(sess)
