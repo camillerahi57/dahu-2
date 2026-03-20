@@ -1,27 +1,35 @@
-from time import sleep
+from uuid import uuid4
 
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.graph_objs import Scatter
 
-from logic.constants import PATCH_FORMS_KEY, TARGET_FORM_STAGING_KEY, StorageKeys as Sk
-from logic.db_schema import Disc, Polygon, Vertex, Target, db, Patch
+from logic.constants import PATCH_FORMS_KEY, TARGET_FORM_STAGING_KEY, StorageKeys as Sk, FILE_STORAGE_PATH
+from logic.db_schema import Target, db, Patch
 from logic.forms.new_target import MadeAtField, ExperimenterEmailField, TargetNameField, CommentField, \
     StoichiometryField, DiscCenterX, DiscCenterY, RadiusField, RectangleFirstVertexX, RectangleFirstVertexY, \
-    RectangleOppositeVertexX, RectangleOppositeVertexY
-from logic.functions import save_session_state, load_session_state
-
+    RectangleOppositeVertexX, RectangleOppositeVertexY, PhotoUploadField
+from logic.functions import save_session_state, load_session_state, save_uploaded_file
 
 sess = load_session_state('new_target.py')
 
 if TARGET_FORM_STAGING_KEY not in sess:
     sess[TARGET_FORM_STAGING_KEY] = []
 
-made_at_fld = MadeAtField.input()
-email_fld = ExperimenterEmailField.input()
+col1, col2 = st.columns(2)
+with col1:
+    made_at_fld = MadeAtField.input()
+with col2:
+    email_fld = ExperimenterEmailField.input()
 target_name_fld = TargetNameField.input()
 comment_fld = CommentField.input()
+col1, col2 = st.columns(2)
+with col1:
+    photo_upload_fld = PhotoUploadField.input()
+with col2:
+    if photo_upload_fld.value:
+        st.image(photo_upload_fld.value, width=200)
 
 col1, col2 = st.columns([100, 90])
 
@@ -171,21 +179,26 @@ with col2:
     st.plotly_chart(fig)
 
 
-fields = [made_at_fld, email_fld, target_name_fld, comment_fld]
+fields = [made_at_fld, email_fld, target_name_fld, comment_fld, photo_upload_fld]
 all_flds_valid = all([fld.is_valid for fld in fields])
-can_submit = all_flds_valid and len(sess[PATCH_FORMS_KEY]) > 0
+at_least_one_patch = len(sess[PATCH_FORMS_KEY]) > 0
+can_submit = all_flds_valid and at_least_one_patch
 
 if st.button("Submit", disabled=not can_submit):
-    sess[Sk.LAST_EMAIL_USED] = email_fld.value
+    sess[Sk.LAST_EMAIL_USED] = email_fld.value  # Save last used email for future autofill.
+    photo_file_path = save_uploaded_file(photo_upload_fld)
     target = Target.new(
         made_at=made_at_fld.value,
         made_by_email=email_fld.value,
         target_name=target_name_fld.value,
         comment=comment_fld.value,
+        photo_path=photo_file_path,
     )
+
     with db.atomic():
         target.save()
         for patch_number, form in enumerate(sess[PATCH_FORMS_KEY]):
+            # If disc:
             if form.__class__.__name__ == DiscForm.__name__:
                 x_y_radius = form.x_pos, form.y_pos, form.radius
                 patch, disc = Patch.new_disc_patch(
@@ -193,9 +206,8 @@ if st.button("Submit", disabled=not can_submit):
                 )
                 # Save the patch (order matters):
                 patch.save()
-                # disc.patch = patch
                 disc.save()
-
+            # If polygon:
             if form.__class__.__name__ == AlignedRectangleForm.__name__:
                 vertices = form.vertices()
                 patch, polygon, vertices = Patch.new_polygon_patch(

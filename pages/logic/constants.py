@@ -1,4 +1,5 @@
 from enum import StrEnum
+from pathlib import Path
 from typing import Self
 
 
@@ -8,6 +9,7 @@ PAGE_NAME_KEY = 'page_name_key'
 PATCH_FORMS_KEY = 'patch_forms_key'
 TARGET_FORM_STAGING_KEY = 'target_form_save_key'  # Where we store the list of object
 # that will be saved when the new target form is submitted.
+FILE_STORAGE_PATH = Path(r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 
 
 class ShapeType(StrEnum):

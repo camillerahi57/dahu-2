@@ -1,6 +1,8 @@
 import re
 
-from logic.constants import StorageKeys as Sk
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+from logic.constants import StorageKeys as Sk, FILE_STORAGE_PATH
 from logic.db_schema import Target, Patch
 from logic.forms.shared import FormField
 import streamlit as st
@@ -57,7 +59,7 @@ class CommentField(FormField):
     default_value = ''
 
     def _streamlit_input(self):
-        return st.text_input("Comment (optional)", on_change=self.on_change)
+        return st.text_area("Comment (optional)", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -146,3 +148,16 @@ class RectangleOppositeVertexY(FormField[float]):
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
+
+
+class PhotoUploadField(FormField):
+    default_value = ""
+
+    def _streamlit_input(self):
+        return st.file_uploader("Select target photo", on_change=self.on_change, type=["jpg", "png"])
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value is None:
+            return False, 'Please upload an image file.'
+        else:
+            return True, ''

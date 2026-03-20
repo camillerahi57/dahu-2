@@ -1,12 +1,14 @@
 import re
 from pathlib import Path
 from time import sleep
+from uuid import uuid4
+
 import streamlit as st
 
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
 
-from logic.constants import StorageKeys, PAGE_NAME_KEY
+from logic.constants import StorageKeys, PAGE_NAME_KEY, FILE_STORAGE_PATH
 
 
 def highlight_rows(row) -> list[str]:
@@ -59,3 +61,11 @@ def save_session_state(sess: SessionStateProxy):
 
 def email_user_name(email_address: str) -> str:
     return re.match(r'[^@]+', email_address)[0]
+
+
+def save_uploaded_file(photo_upload_fld) -> Path:
+    photo_file_path = FILE_STORAGE_PATH / str(uuid4())
+    bytes_ = photo_upload_fld.value.getvalue()
+    with open(photo_file_path, "wb") as f:
+        f.write(bytes_)
+    return photo_file_path

@@ -1,10 +1,10 @@
 from abc import abstractmethod
 from datetime import datetime
+from pathlib import Path
 from random import Random
 from uuid import uuid4
 
 import chemparse
-import numpy as np
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, ForeignKeyField, FloatField, IntegerField, \
     UUIDField
 from plotly.graph_objs import Scatter
@@ -41,6 +41,12 @@ class BaseModel(Model):
         raise NotImplementedError  # Implement it in every subclass.
 
     def save(self, *args, **kwargs):
+        """As written on top of this, we use UUID4 instead of the default Peewee ID. This allows
+        us to instantiate a model with an id already set.
+
+        However, this creates a bug where Peewee .save() method is always updating, instead of saving a new
+        object in the database. That's why we have to override this .save() method and add 'force_insert'
+        in case get_or_none returns None (which means it's a new row, in which case it's an insert."""
         if not kwargs.get('force_insert') and not self.__class__.get_or_none(self.__class__.id == self.id):
             kwargs['force_insert'] = True
         return super().save(*args, **kwargs)
@@ -82,18 +88,23 @@ class BaseModel(Model):
 class Target(BaseModel):
     made_at = DateTimeField()
     made_by_email = CharField()
-    target_name = CharField()
+    target_name = CharField(unique=True)
     comment = CharField()
+    photo_path = CharField(unique=True)
 
     @classmethod
-    def new(cls, made_at: datetime, made_by_email: str, target_name: str, comment: str):
+    def new(cls, made_at: datetime, made_by_email: str, target_name: str, comment: str, photo_path: str|Path):
         return cls(made_at=made_at, made_by_email=made_by_email, target_name=target_name,
-                   comment=comment)
+                   comment=comment, photo_path=photo_path)
 
     @classmethod
     def already_taken_names(cls):
-        # TODO
-        return []
+        query = Target.select(
+            Target.target_name
+        ).dicts()
+        names = [row[Target.target_name.name]
+                 for row in query]
+        return names
 
 
 class Patch(BaseModel):
@@ -167,7 +178,7 @@ class Disc(BaseModel):
     center_x = FloatField()
     center_y = FloatField()
     radius = FloatField()
-    patch = ForeignKeyField(Patch, on_delete='CASCADE')
+    patch = ForeignKeyField(Patch, on_delete='CASCADE', unique=True)
 
     @classmethod
     def new(cls, center_x: float, center_y: float, radius: float, patch: Patch):
@@ -179,7 +190,7 @@ class Disc(BaseModel):
 
 
 class Polygon(BaseModel):
-    patch = ForeignKeyField(Patch, on_delete='CASCADE')
+    patch = ForeignKeyField(Patch, on_delete='CASCADE', unique=True)
 
     @classmethod
     def new(cls, patch: Patch):
@@ -253,7 +264,6 @@ class Polygon(BaseModel):
     #     polygon = Polygon.from_ordered_vertices(vertex_tuples)
     #     return polygon, 'Success.'
 
-# TODO Handle the replacement of create to new.
 
     @classmethod
     def from_ordered_vertices(cls, clockwise_vertices: list[tuple[float, float]], patch: Patch) \
