@@ -7,8 +7,6 @@ from logic.functions import is_valid_email_address
 
 
 class LibNameField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_input("Library Name", on_change=self.on_change)
 
@@ -21,8 +19,6 @@ class LibNameField(FormField):
 
 
 class FilmPhysicalNameField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_input("Film name as written on the sample",
                              on_change=self.on_change)
@@ -37,8 +33,6 @@ class FilmPhysicalNameField(FormField):
 
 
 class CommentField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_area("Comment (optional)", on_change=self.on_change)
 
@@ -47,8 +41,6 @@ class CommentField(FormField):
 
 
 class MadeOnField(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.date_input("Made on", on_change=self.on_change, max_value='today')
 
@@ -57,8 +49,6 @@ class MadeOnField(FormField):
 
 
 class MadeByField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_input("Made by (email address)", on_change=self.on_change)
 
@@ -69,8 +59,6 @@ class MadeByField(FormField):
 
 
 class ZipUploadField(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.file_uploader("Upload data as a zip file.", on_change=self.on_change,
                                 type=["zip"])
@@ -83,8 +71,6 @@ class ZipUploadField(FormField):
 
 
 class SputteringSystemField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         options = [s.value for s in SputteringSystem]
         return st.selectbox("Sputtering system", options=options, on_change=self.on_change,
@@ -97,8 +83,6 @@ class SputteringSystemField(FormField):
 
 
 class SubstrateField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         options = Substrate.already_taken_names()
         return st.selectbox("Substrate", options=options, on_change=self.on_change,
@@ -111,8 +95,6 @@ class SubstrateField(FormField):
 
 
 class TargetField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         options = Target.already_taken_names()
         return st.selectbox("Target", options=options, on_change=self.on_change, index=None)
@@ -124,7 +106,6 @@ class TargetField(FormField):
 
 
 class StoichiometryField(FormField):
-    default_value = ''
     def _streamlit_input(self):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
@@ -133,8 +114,6 @@ class StoichiometryField(FormField):
 
 
 class FilmLayerFunctionField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         function_options = [f.value for f in FilmLayerFunction]
         return st.selectbox("Layer function", options=function_options,
@@ -147,10 +126,9 @@ class FilmLayerFunctionField(FormField):
 
 
 class DepositDistanceField(FormField):
-    default_value = 100.
-
     def _streamlit_input(self):
-        return st.number_input("Deposit distance", min_value=0, on_change=self.on_change)
+        return st.number_input("Deposit distance", min_value=0, on_change=self.on_change,
+                               value=100.)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value == 0:
@@ -159,8 +137,6 @@ class DepositDistanceField(FormField):
 
 
 class DepositAngleField(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("Deposit angle", on_change=self.on_change)
 
@@ -169,8 +145,6 @@ class DepositAngleField(FormField):
 
 
 class SputteringGeneratorField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         options = [gen.value for gen in MagnetronSputteringGenerator]
         return st.selectbox("Sputtering generator", options=options,
@@ -183,11 +157,9 @@ class SputteringGeneratorField(FormField):
 
 
 class HasActiveCoolingField(FormField):
-    default_value = True
-
     def _streamlit_input(self):
         return st.radio("Has active cooling", on_change=self.on_change, index=None,
-                        options=[True, False], horizontal=True)
+                        options=[True, False], horizontal=True, )
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value == '' or self.value is None:
@@ -200,8 +172,6 @@ class HasActiveCoolingField(FormField):
 # filament_tension_F: num = 170
 
 class RotationField(FormField):
-    default_value = 0
-
     def _streamlit_input(self):
         return st.number_input("Rotation", on_change=self.on_change)
 
@@ -210,8 +180,6 @@ class RotationField(FormField):
 
 
 class FilamentTensionField(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("Filament tension", on_change=self.on_change)
 

@@ -40,11 +40,11 @@ class FormField(ABC):  # Generic type T.
     #     st.write(self.has_changed)
     #     st.write(self.error_msg)
 
-    @property
-    @abstractmethod
-    def default_value(self):  # TODO remove that?
-        """Abstract property (a property that has to be set in subclass)."""
-        pass
+    # @property
+    # @abstractmethod
+    # def default_value(self):  # TODO remove that?
+    #     """Abstract property (a property that has to be set in subclass)."""
+    #     pass
 
     @abstractmethod
     def _is_valid(self) -> tuple[bool, str]:
@@ -69,7 +69,7 @@ class FormField(ABC):  # Generic type T.
         sess = st.session_state
         key = cls.get_key(id_=id_)
         if key not in sess:
-            sess[key] = cls(value=cls.default_value, id_=id_)
+            sess[key] = cls(value=None, id_=id_)
         return sess[key]
 
     def remove_from_session(self):

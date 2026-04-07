@@ -197,6 +197,5 @@ if st.button("Submit Library", disabled=not can_submit):
         store_file(uploaded_file_data.getvalue(), user_uploaded_file.file_name)
         sess[Ck.LAST_EMAIL_USED] = made_by_fld.value
 
+    save_session_state(sess)
     st.switch_page('library_added.py')
-
-save_session_state(sess)

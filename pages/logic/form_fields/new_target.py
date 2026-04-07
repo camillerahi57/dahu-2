@@ -9,8 +9,6 @@ from logic.functions import is_valid_email_address
 
 
 class MadeAtField(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.date_input("Target made on", on_change=self.on_change)
 
@@ -19,18 +17,13 @@ class MadeAtField(FormField):
 
 
 class ExperimenterEmailField(FormField):
-    def default_value(self):
-        if Ck.LAST_EMAIL_USED in st.session_state:
-            return st.session_state[Ck.LAST_EMAIL_USED]
-        else:
-            return ''
-
     def _streamlit_input(self):
+        if Ck.LAST_EMAIL_USED in st.session_state:
+            default_email = st.session_state[Ck.LAST_EMAIL_USED]
+        else:
+            default_email = ''
         return st.text_input(
-            "Made by (email address)",
-            on_change=self.on_change,
-            value=self.default_value()
-        )
+            "Made by (email address)", on_change=self.on_change, value=default_email)
 
     def _is_valid(self) -> tuple[bool, str]:
         if not is_valid_email_address(self.value):
@@ -39,8 +32,6 @@ class ExperimenterEmailField(FormField):
 
 
 class TargetNameField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_input("Target name", on_change=self.on_change)
 
@@ -53,8 +44,6 @@ class TargetNameField(FormField):
 
 
 class CommentField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_area("Comment (optional)", on_change=self.on_change)
 
@@ -63,8 +52,6 @@ class CommentField(FormField):
 
 
 class StoichiometryField(FormField):
-    default_value = ''
-
     def _streamlit_input(self):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
@@ -73,8 +60,6 @@ class StoichiometryField(FormField):
 
 
 class DiscCenterX(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.number_input("Center X (in pixels)", on_change=self.on_change, step=1)
 
@@ -83,8 +68,6 @@ class DiscCenterX(FormField):
 
 
 class DiscCenterY(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.number_input("Center Y (in pixels)", on_change=self.on_change, step=1)
 
@@ -93,11 +76,9 @@ class DiscCenterY(FormField):
 
 
 class RadiusField(FormField):
-    default_value = 0
-
     def _streamlit_input(self):
         return st.number_input(
-            "Radius (in pixels)", on_change=self.on_change, value=self.default_value, step=1
+            "Radius (in pixels)", on_change=self.on_change, step=1
         )
 
     def _is_valid(self):
@@ -108,8 +89,6 @@ class RadiusField(FormField):
 
 
 class RectangleFirstVertexX(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("X position (in pixels)", on_change=self.on_change, step=1)
 
@@ -118,8 +97,6 @@ class RectangleFirstVertexX(FormField):
 
 
 class RectangleFirstVertexY(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("Y position (in pixels)", on_change=self.on_change, step=1)
 
@@ -128,8 +105,6 @@ class RectangleFirstVertexY(FormField):
 
 
 class RectangleOppositeVertexX(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("X position (in pixels)", on_change=self.on_change, step=1, key='xpos')
 
@@ -138,8 +113,6 @@ class RectangleOppositeVertexX(FormField):
 
 
 class RectangleOppositeVertexY(FormField):
-    default_value = 0.
-
     def _streamlit_input(self):
         return st.number_input("Y position (in pixels)", on_change=self.on_change, step=1, key='ypos')
 
@@ -148,8 +121,6 @@ class RectangleOppositeVertexY(FormField):
 
 
 class TargetDiameterMillimeters(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         return st.number_input("Target diameter (in millimeters):", on_change=self.on_change,
                                width=200)
@@ -165,8 +136,6 @@ class TargetDiameterMillimeters(FormField):
 
 
 class PolygonDataText(FormField):
-    default_value = None
-
     def _streamlit_input(self):
         instructions = """The input must be a list of vertices, one on each line. Each vertex is an X,Y couple.
     \nTriangle example:
@@ -203,8 +172,6 @@ class PolygonDataText(FormField):
 
 
 class PhotoUploadField(FormField):
-    default_value = ""
-
     def _streamlit_input(self):
         return st.file_uploader("Select target photo", on_change=self.on_change, type=["jpg", "png"])
 

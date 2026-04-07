@@ -237,6 +237,6 @@ if st.button("Submit", disabled=not can_submit, type="primary"):
         # If the transaction has not failed at this point:
         store_file(photo_upload_fld.value.getvalue(), target.photo_file_name)
 
+    save_session_state(sess)
     st.switch_page('target_added.py')
 
-save_session_state(sess)
