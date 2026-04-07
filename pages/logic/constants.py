@@ -4,29 +4,29 @@ from typing import Self
 
 
 LIB_ID_URL_KEY = 'lib_id'
+TARGET_ID_URL_KEY = 'target_id'
 DOMAIN = 'localhost:8501'
-PAGE_NAME_KEY = 'page_name_key'
-PATCH_FORMS_KEY = 'patch_forms_key'
-TARGET_FORM_STAGING_KEY = 'target_form_save_key'  # Where we store the list of object
-# that will be saved when the new target form is submitted.
 FILE_STORAGE_PATH = Path(r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 
 
-class ShapeType(StrEnum):
-    POLYGON = 'polygon'
-    DISC = 'disc'
-
-
-class StorageKeys(StrEnum):
+class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable for an
     update, we'll still access the value from old version with the same key."""
 
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
     LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'
     TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq4<3q1dz'
+    SUBSTRATE_FILTERS = 'e46vsq98f4z5618af9ez4sxdq4658f4s'
 
-    # Put last used email here and implement it.
-    # Also, is deletion cascading?
+
+class SessionKeys(StrEnum):
+    PATCH_FORMS = 'patch_forms_key'
+    PAGE_FILE_NAME = 'page_name_key'
+    SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
+    FILM_LAYERS = 'film_layers_key'
+    SPUTTERING_SYSTEM = 'sputter_system_key'
+    ADDITIONAL_LAYER_DATA = 'additional_layer_data_key'
+    CURRENTLY_FILLED_LAYER_POSITION = 'currently_filled_layer_key'
 
 
 class ChemicalElement(StrEnum):
