@@ -15,9 +15,9 @@ class FormField(ABC):  # Generic type T.
     error_msg: str = ''
     has_changed: bool = False
 
-    # def __init__(self, field_name: str = ''):
-    #     """We can give the field a name in case two form_fields of the same type are on the
-    #     same page. Otherwise, both form_fields would always have the same value."""
+    # def __init__(self, field_name: str = ''): """We can give the field a
+    # name in case two form_fields of the same type are on the same page.
+    # Otherwise, both form_fields would always have the same value."""
     #
     #     # If the field already exists in the current session:
     #     sess = st.session_state
@@ -55,8 +55,8 @@ class FormField(ABC):  # Generic type T.
         self.is_valid, self.error_msg = self._is_valid()
 
     def on_change(self):
-        """MUST be called to trigger validation. Usually called by Streamlit, when passed
-        to the 'on_change='argument of a Streamlit input field."""
+        """MUST be called to trigger validation. Usually called by Streamlit,
+        when passed to the 'on_change='argument of a Streamlit input field."""
         self.has_changed = True
 
     def show_error(self):
@@ -84,10 +84,10 @@ class FormField(ABC):  # Generic type T.
 
     @classmethod
     def input(cls, id_: str = '') -> Self:
-        """Add an id if multiple form_fields of the same type are on the same page.
-        This helps to avoid two problems:
-            - Two form_fields copying each other's value.
-            - A temporary field (like in a popup) being loaded as the one from the previous popup.
+        """Add an id if multiple form_fields of the same type are on the same
+        page. This helps to avoid two problems: - Two form_fields copying
+        each other's value. - A temporary field (like in a popup) being
+        loaded as the one from the previous popup.
         """
         field = cls.get_or_create(id_=id_)
         field.value = field._streamlit_input()
@@ -98,37 +98,9 @@ class FormField(ABC):  # Generic type T.
     def _streamlit_input(self):
         pass
 
-#
-# class PopupForm(ABC):
-#     @property
-#     @abstractmethod
-#     def popup_title(self) -> str:
-#         pass
-#
-#     def __init__(self):
-#         self.all_fields: list[FormField] = []
-#         # st.dialog is a decorator, which means it takes a function as an argument
-#         # and returns another function. Here, the decorator has a parameter, that's why there are two
-#         # bracket pairs. The first call returns the decorator, and the second one applies it to the
-#         # function:
-#         dialog_function = st.dialog(self.popup_title)(self.content)
-#         # We can then call the decorated function:
-#         dialog_function()
-#         assert len(self.all_fields) > 0, "Please fill self.all_fields during the content method."
-#
-#     @abstractmethod
-#     def content(self):
-#         """You must populate the self.all_fields list so the form_fields are validated and cleaned afterward."""
-#         pass
-#
-#     def clean_fields_and_rerun(self):
-#         for fld in self.all_fields:
-#             fld.remove_from_session()  # To have a new one in the next pop-up.
-#         st.rerun()
-
 
 @dataclass
-class PopupData(ABC):
+class DialogData(ABC):
     all_form_fields: list[FormField]
 
     def __post_init__(self):
@@ -145,7 +117,8 @@ class PopupData(ABC):
     #     st.rerun()
 
     def _assert_valid(self):
-        assert all(fld.is_valid for fld in self.all_form_fields), "Some form_fields are not valid."
+        assert all(fld.is_valid for fld in
+                   self.all_form_fields), "Some form_fields are not valid."
 
     def clear_and_add_to_session(self, session_key: str) -> None:
         for fld in self.all_form_fields:

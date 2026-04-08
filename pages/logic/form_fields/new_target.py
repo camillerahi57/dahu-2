@@ -23,7 +23,8 @@ class ExperimenterEmailField(FormField):
         else:
             default_email = ''
         return st.text_input(
-            "Made by (email address)", on_change=self.on_change, value=default_email)
+            "Made by (email address)", on_change=self.on_change,
+            value=default_email)
 
     def _is_valid(self) -> tuple[bool, str]:
         if not is_valid_email_address(self.value):
@@ -61,7 +62,8 @@ class StoichiometryField(FormField):
 
 class DiscCenterX(FormField):
     def _streamlit_input(self):
-        return st.number_input("Center X (in pixels)", on_change=self.on_change, step=1)
+        return st.number_input("Center X (in pixels)", on_change=self.on_change,
+                               step=1)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -69,7 +71,8 @@ class DiscCenterX(FormField):
 
 class DiscCenterY(FormField):
     def _streamlit_input(self):
-        return st.number_input("Center Y (in pixels)", on_change=self.on_change, step=1)
+        return st.number_input("Center Y (in pixels)", on_change=self.on_change,
+                               step=1)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -90,7 +93,8 @@ class RadiusField(FormField):
 
 class RectangleFirstVertexX(FormField):
     def _streamlit_input(self):
-        return st.number_input("X position (in pixels)", on_change=self.on_change, step=1)
+        return st.number_input("X position (in pixels)",
+                               on_change=self.on_change, step=1)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -98,7 +102,8 @@ class RectangleFirstVertexX(FormField):
 
 class RectangleFirstVertexY(FormField):
     def _streamlit_input(self):
-        return st.number_input("Y position (in pixels)", on_change=self.on_change, step=1)
+        return st.number_input("Y position (in pixels)",
+                               on_change=self.on_change, step=1)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -106,7 +111,8 @@ class RectangleFirstVertexY(FormField):
 
 class RectangleOppositeVertexX(FormField):
     def _streamlit_input(self):
-        return st.number_input("X position (in pixels)", on_change=self.on_change, step=1, key='xpos')
+        return st.number_input("X position (in pixels)",
+                               on_change=self.on_change, step=1, key='xpos')
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -114,7 +120,8 @@ class RectangleOppositeVertexX(FormField):
 
 class RectangleOppositeVertexY(FormField):
     def _streamlit_input(self):
-        return st.number_input("Y position (in pixels)", on_change=self.on_change, step=1, key='ypos')
+        return st.number_input("Y position (in pixels)",
+                               on_change=self.on_change, step=1, key='ypos')
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -122,7 +129,8 @@ class RectangleOppositeVertexY(FormField):
 
 class TargetDiameterMillimeters(FormField):
     def _streamlit_input(self):
-        return st.number_input("Target diameter (in millimeters):", on_change=self.on_change,
+        return st.number_input("Target diameter (in millimeters):",
+                               on_change=self.on_change,
                                width=200)
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -137,7 +145,8 @@ class TargetDiameterMillimeters(FormField):
 
 class PolygonDataText(FormField):
     def _streamlit_input(self):
-        instructions = """The input must be a list of vertices, one on each line. Each vertex is an X,Y couple.
+        instructions = """The input must be a list of vertices, 
+        one on each line. Each vertex is an X,Y couple.
     \nTriangle example:
     \n12.3, 48.3
     \n78, 15.6
@@ -161,7 +170,7 @@ class PolygonDataText(FormField):
         text = (text
                 .replace(' ', '')  # Removes all white spaces.
                 .strip(',\n')  # Allow dots at the start or end.
-         )
+                )
         vertex_lines = filter(None, text.split('\n'))  # Removes empty as well.
         for vertex_line in vertex_lines:
             try:
@@ -173,7 +182,8 @@ class PolygonDataText(FormField):
 
 class PhotoUploadField(FormField):
     def _streamlit_input(self):
-        return st.file_uploader("Select target photo", on_change=self.on_change, type=["jpg", "png"])
+        return st.file_uploader("Select target photo", on_change=self.on_change,
+                                type=["jpg", "png"])
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value is None:

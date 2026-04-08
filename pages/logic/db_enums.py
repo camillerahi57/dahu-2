@@ -3,12 +3,11 @@ from enum import StrEnum
 
 # BE CAREFUL:
 #
-# Modifying string values can cause DB mismatch. For example,
-# if you rename 'polygon' to 'Polygon', all [shape_type == 'polygon'] comparisons,
-# where shape_type is ShapeType.POLYGON (which is now 'Polygon'), could fail because
-# of this change.
-# That's why, if you rename an enum value (key is ok), you must rename it everywhere
-# in the DB
+# Modifying string values can cause DB mismatch. For example, if you rename
+# 'polygon' to 'Polygon', all [shape_type == 'polygon'] comparisons,
+# where shape_type is ShapeType.POLYGON (which is now 'Polygon'), could fail
+# because of this change. That's why, if you rename an enum value (key is
+# ok), you must rename it everywhere in the DB
 
 class ShapeType(StrEnum):
     POLYGON = 'polygon'

@@ -1,5 +1,6 @@
 import streamlit as st
-# Don't import anything from this file, as it will run it again and re-run the current page.
+# Don't import anything from this file, as it will run it again and re-run
+# the current page.
 
 
 page = st.navigation([
@@ -17,6 +18,9 @@ page = st.navigation([
     st.Page('library_added.py', title='New Library Added', icon="🐐"),
     st.Page('target_added.py', title='New Target Added', icon="🐐"),
     st.Page('substrate_added.py', title='New Substrate Added', icon="🐐"),
+
+    st.Page('deleted_lib.py', title='Library Deleted', icon="🐐"),
+    st.Page('deleted_target.py', title='Target Deleted', icon="🐐"),
 
     st.Page('test.py', title='Test Page', icon="🐐"),
 ])

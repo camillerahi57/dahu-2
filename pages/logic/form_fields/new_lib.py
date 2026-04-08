@@ -1,7 +1,8 @@
 import streamlit as st
 
 from logic.db_schema import Library, Film, Target, Patch, Substrate
-from logic.db_enums import SputteringSystem, FilmLayerFunction, MagnetronSputteringGenerator
+from logic.db_enums import SputteringSystem, FilmLayerFunction, \
+    MagnetronSputteringGenerator
 from logic.form_fields.shared import FormField
 from logic.functions import is_valid_email_address
 
@@ -25,8 +26,9 @@ class FilmPhysicalNameField(FormField):
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value in Film.already_taken_names():
-            return False, ("This name is already used. A library corresponding to this sample"
-                           "might have already been created.")
+            return False, (
+                "This name is already used. A library corresponding to this "
+                "sample might have already been created.")
         if self.value == '':
             return False, "Please enter a name."
         return True, ''
@@ -42,7 +44,8 @@ class CommentField(FormField):
 
 class MadeOnField(FormField):
     def _streamlit_input(self):
-        return st.date_input("Made on", on_change=self.on_change, max_value='today')
+        return st.date_input("Made on", on_change=self.on_change,
+                             max_value='today')
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -50,7 +53,8 @@ class MadeOnField(FormField):
 
 class MadeByField(FormField):
     def _streamlit_input(self):
-        return st.text_input("Made by (email address)", on_change=self.on_change)
+        return st.text_input("Made by (email address)",
+                             on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
         if not is_valid_email_address(self.value):
@@ -60,7 +64,8 @@ class MadeByField(FormField):
 
 class ZipUploadField(FormField):
     def _streamlit_input(self):
-        return st.file_uploader("Upload data as a zip file.", on_change=self.on_change,
+        return st.file_uploader("Upload data as a zip file.",
+                                on_change=self.on_change,
                                 type=["zip"])
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -73,8 +78,9 @@ class ZipUploadField(FormField):
 class SputteringSystemField(FormField):
     def _streamlit_input(self):
         options = [s.value for s in SputteringSystem]
-        return st.selectbox("Sputtering system", options=options, on_change=self.on_change,
-                     index=None)
+        return st.selectbox("Sputtering system", options=options,
+                            on_change=self.on_change,
+                            index=None)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value == '' or self.value is None:
@@ -85,7 +91,8 @@ class SputteringSystemField(FormField):
 class SubstrateField(FormField):
     def _streamlit_input(self):
         options = Substrate.already_taken_names()
-        return st.selectbox("Substrate", options=options, on_change=self.on_change,
+        return st.selectbox("Substrate", options=options,
+                            on_change=self.on_change,
                             index=None)
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -97,7 +104,8 @@ class SubstrateField(FormField):
 class TargetField(FormField):
     def _streamlit_input(self):
         options = Target.already_taken_names()
-        return st.selectbox("Target", options=options, on_change=self.on_change, index=None)
+        return st.selectbox("Target", options=options, on_change=self.on_change,
+                            index=None)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value == '' or self.value is None:
@@ -127,7 +135,8 @@ class FilmLayerFunctionField(FormField):
 
 class DepositDistanceField(FormField):
     def _streamlit_input(self):
-        return st.number_input("Deposit distance", min_value=0, on_change=self.on_change,
+        return st.number_input("Deposit distance", min_value=0.,
+                               on_change=self.on_change,
                                value=100.)
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -158,7 +167,8 @@ class SputteringGeneratorField(FormField):
 
 class HasActiveCoolingField(FormField):
     def _streamlit_input(self):
-        return st.radio("Has active cooling", on_change=self.on_change, index=None,
+        return st.radio("Has active cooling", on_change=self.on_change,
+                        index=None,
                         options=[True, False], horizontal=True, )
 
     def _is_valid(self) -> tuple[bool, str]:

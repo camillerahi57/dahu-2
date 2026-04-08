@@ -43,7 +43,8 @@ def new_controller() -> CookieController:
     return controller
 
 
-def disc_patch_to_scatter(x_y_radius: tuple[float, float, float], color_: str, name_: str):
+def disc_patch_to_scatter(x_y_radius: tuple[float, float, float], color_: str,
+                          name_: str):
     cx, cy, r = x_y_radius
     # Parametric circle as a closed Scatter trace
     theta = np.linspace(0, 2 * np.pi, 360)
@@ -62,7 +63,8 @@ def disc_patch_to_scatter(x_y_radius: tuple[float, float, float], color_: str, n
     )
 
 
-def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]], color_: str, name_: str):
+def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]],
+                             color_: str, name_: str):
     # return Scatter()
     vertices_ = clock_wise_vertices
     # Closing the rectangle:
@@ -80,7 +82,7 @@ def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]], col
     )
 
 
-def load_session_state(page_name: str|Path) -> SessionStateProxy:
+def load_session_state(page_name: str | Path) -> SessionStateProxy:
     sess = st.session_state
     if sess.get(Sk.PAGE_FILE_NAME) != page_name:  # Page has changed.
         reset_session(sess)
@@ -95,6 +97,7 @@ def add_cookie_data_to_session(sess: SessionStateProxy):
         stored_value = controller.get(key)
         if stored_value is not None:
             sess[key] = stored_value
+
 
 def reset_session(sess: SessionStateProxy):
     page_name = sess.get(Sk.PAGE_FILE_NAME)
@@ -148,12 +151,12 @@ def add_target_photo_to_fig(fig, uploaded_photo):
 
 def is_valid_email_address(email_address: str) -> bool:
     # From https://stackoverflow.com/a/201378:
-    email_regex = r"(?:[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+(?:\.[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9\x2d]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"
+    email_regex = r"(?:[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+(?:\.[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9\x2d]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"  # noqa Long line.
     match = re.fullmatch(email_regex, email_address)
     return match is not None
 
 
-def store_file(file_data: bytes, file_name: str=None) -> Path:
+def store_file(file_data: bytes, file_name: str = None) -> Path:
     if file_name is None:
         file_name = str(uuid4())
     file_path = FILE_STORAGE_PATH / file_name

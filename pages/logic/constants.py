@@ -6,12 +6,14 @@ from typing import Self
 LIB_ID_URL_KEY = 'lib_id'
 TARGET_ID_URL_KEY = 'target_id'
 DOMAIN = 'localhost:8501'
-FILE_STORAGE_PATH = Path(r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
+FILE_STORAGE_PATH = Path(
+    r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 
 
 class CookieKeys(StrEnum):
-    """Keys are hard coded random strings, so that if we rename the variable for an
-    update, we'll still access the value from old version with the same key."""
+    """Keys are hard coded random strings, so that if we rename the variable
+    for an update, we'll still access the value from old version with the
+    same key."""
 
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
     LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'
