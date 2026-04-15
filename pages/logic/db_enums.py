@@ -33,8 +33,8 @@ class MagnetronSputteringGenerator(StrEnum):
 class FilmModifType(StrEnum):
     ANNEALING = 'annealing'
     WET_ETCHING = 'wet_etching'
-    ION_ETCHING = 'ion_etching'
-    PATTERNED = 'patterned'
+    ION_BEAM_ETCHING = 'ion_etching'
+    PATTERNING = 'patterned'
 
 
 class Furnace(StrEnum):

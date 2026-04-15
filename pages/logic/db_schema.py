@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from datetime import datetime
+from pathlib import Path
 from random import Random
 from typing import Self
 from uuid import uuid4
@@ -8,15 +9,16 @@ import plotly.graph_objects as go
 import chemparse
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
-    UUIDField, BooleanField
+    UUIDField, BooleanField, DateField
+from playhouse.shortcuts import model_to_dict  # noqa
 from plotly.graph_objs import Scatter
 from pyparsing import alphanums
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from logic.constants import ChemicalElement, FILE_STORAGE_PATH, DOMAIN, \
-    LIB_ID_URL_KEY
+    LIB_ID_URL_KEY, SUB_ID_URL_KEY, TARGET_ID_URL_KEY, PATTERN_IMAGE_PATH
 from logic.db_enums import ShapeType, SputteringSystem, FilmLayerFunction, \
-    MagnetronSputteringGenerator
+    MagnetronSputteringGenerator, FilmModifType, Furnace
 from logic.functions import letter_count, disc_patch_to_scatter, \
     polygon_patch_to_scatter
 
@@ -61,23 +63,26 @@ class BaseModel(Model):
             kwargs['force_insert'] = True
         return super().save(*args, **kwargs)
 
+    def data_dict(self):
+        return model_to_dict(self, recurse=False)
+
     class Meta:
         database = db
         legacy_table_names = False
 
 
 class Target(BaseModel):
-    made_at = DateTimeField()
+    made_on = DateField()
     made_by_email = CharField()
     physical_name = CharField(unique=True)
     comment = CharField()
     photo_file_name = CharField(unique=True)
 
     @classmethod
-    def new(cls, made_at: datetime, made_by_email: str, physical_name: str,
+    def new(cls, made_on: datetime, made_by_email: str, physical_name: str,
             comment: str,
             photo_file_name: str):
-        return cls(made_at=made_at, made_by_email=made_by_email,
+        return cls(made_on=made_on, made_by_email=made_by_email,
                    physical_name=physical_name,
                    comment=comment, photo_file_name=photo_file_name)
 
@@ -118,6 +123,11 @@ class Target(BaseModel):
 
     def can_be_deleted(self):
         return FilmLayer.get_or_none(FilmLayer.target == self) is None
+
+    def url(self):
+        page_name = 'inspect_target.py'.removesuffix('.py')
+        # noinspection HttpUrlsUsage
+        return f"http://{DOMAIN}/{page_name}?{TARGET_ID_URL_KEY}={self.id}"
 
 
 class Patch(BaseModel):
@@ -164,7 +174,7 @@ class Patch(BaseModel):
         return patch, polygon, vertices
 
     @staticmethod
-    def is_valid_stoichio(stoichio_str: str) -> tuple[bool, str]:
+    def is_valid_formula(stoichio_str: str) -> tuple[bool, str]:
         for char in stoichio_str:
             if char not in alphanums + '.':
                 return False, f"Character '{char}' not allowed."
@@ -249,7 +259,9 @@ class Polygon(BaseModel):
         return str_
 
     def saved_ordered_vertices(self) -> list[Vertex]:
-        return sorted(self.vertices, key=lambda x: x.clockwise_rank)
+        def get_rank(v: Vertex):
+            return int(v.clockwise_rank)  # noqa I don't understand the warning.
+        return sorted(self.vertices, key=get_rank)
 
     def to_scatter(self, color: str, name: str) -> Scatter:
         vertex_list: list[tuple[float, float]] = [
@@ -341,6 +353,8 @@ class Substrate(BaseModel):
     name = CharField(unique=True)
     comment = CharField()
 
+    layers: list[SubstrateLayer]  # From backref.
+
     @classmethod
     def new(cls, name: str, comment: str) -> Substrate:
         return cls(name=name, comment=comment)
@@ -355,6 +369,21 @@ class Substrate(BaseModel):
                  # not the name itself.
                  for row in query]
         return names
+
+    def libraries(self) -> set[Library]:
+        libraries = (Library
+                     .select()
+                     .join(Film, on=(Film.library == Library.id))
+                     .where(Film.substrate == self))
+        return set(libraries)
+
+    def can_be_deleted(self):
+        return len(self.libraries()) == 0
+
+    def url(self):
+        page_name = 'inspect_substrate.py'.removesuffix('.py')
+        # noinspection HttpUrlsUsage
+        return f"http://{DOMAIN}/{page_name}?{SUB_ID_URL_KEY}={self.id}"
 
 
 class SubstrateLayer(BaseModel):
@@ -374,10 +403,13 @@ class SubstrateLayer(BaseModel):
                    stoichiometry=stoichiometry,
                    substrate=substrate)
 
+    def crystal_struct_str(self) -> str:
+        return f'({self.h} {self.k} {self.l})'
+
 
 class MokeCoilFactor(BaseModel):
-    validity_start = DateTimeField()
-    validity_end = DateTimeField()
+    validity_start = DateField()
+    validity_end = DateField()
     factor = FloatField()
 
     @classmethod
@@ -389,8 +421,8 @@ class MokeCoilFactor(BaseModel):
 
 
 class EsrfPoni(BaseModel):
-    validity_start = DateTimeField()
-    validity_end = DateTimeField()
+    validity_start = DateField()
+    validity_end = DateField()
     distance = FloatField()
     poni1 = FloatField()
     poni2 = FloatField()
@@ -447,16 +479,18 @@ class Library(BaseModel):
 
 class Film(BaseModel):
     physical_name = CharField(unique=True)
-    made_at = DateTimeField()
+    made_on = DateField()
     made_by_email = CharField()
     substrate = ForeignKeyField(Substrate)
     library = ForeignKeyField(Library, on_delete='CASCADE')
 
+    layers: list[FilmLayer]  # From backref.
+
     @classmethod
-    def new(cls, physical_name: str, made_at: datetime, made_by_email: str,
+    def new(cls, physical_name: str, made_on: datetime, made_by_email: str,
             substrate: Substrate, library: Library) -> Film:
         return cls(physical_name=physical_name,
-                   made_at=made_at,
+                   made_on=made_on,
                    made_by_email=made_by_email,
                    substrate=substrate,
                    library=library)
@@ -470,13 +504,18 @@ class Film(BaseModel):
                  for row in query]
         return names
 
+    def ordered_modifs(self) -> list[FilmModification]:
+        modifs = FilmModification.select().where(FilmModification.film == self)
+        def get_modif_nb(fm: FilmModification):
+            return int(fm.modif_number)  # noqa
+        return sorted(list(modifs), key=get_modif_nb)
+
 
 class FilmLayer(BaseModel):
     position_from_buffer = IntegerField()
     deposit_temp = FloatField()
     deposit_duration = FloatField()
     deposit_power = FloatField()
-    thickness = FloatField()
     stoichiometry = CharField()
     function: FilmLayerFunction = CharField()
     sputtering_system: SputteringSystem = CharField()
@@ -485,13 +524,13 @@ class FilmLayer(BaseModel):
 
     @classmethod
     def new(cls, position_from_buffer: int, deposit_temp: float,
-            deposit_duration: float, deposit_power: float, thickness: float,
+            deposit_duration: float, deposit_power: float,
             stoichiometry: str, function: FilmLayerFunction, film: Film,
             target: Target, sputtering_system: SputteringSystem) \
             -> FilmLayer:
         return cls(position_from_buffer=position_from_buffer,
                    deposit_temp=deposit_temp, deposit_duration=deposit_duration,
-                   deposit_power=deposit_power, thickness=thickness,
+                   deposit_power=deposit_power,
                    stoichiometry=stoichiometry, function=function, film=film,
                    target=target, sputtering_system=sputtering_system)
 
@@ -541,4 +580,141 @@ class UserUploadedFile(BaseModel):
         file_name = f'{uuid4()}.{extension}'
         return cls.new(file_name=file_name)
 
-# TODO DB integrity verification routine.
+
+class FilmModification(BaseModel):
+    made_on = DateField()
+    modif_number = IntegerField()
+    made_by_email = CharField()
+    modif_type: FilmModifType = CharField()
+    film = ForeignKeyField(Film, on_delete='CASCADE', backref='modifications')
+
+    @classmethod
+    def new(cls, made_on: datetime, modif_number: int, made_by_email: str,
+            modif_type: FilmModifType, film: Film) \
+            -> FilmModification:
+        return cls(made_on=made_on, modif_number=modif_number,
+                   made_by_email=made_by_email, modif_type=modif_type,
+                   film=film)
+
+    def save(self, shift_subsequent_modifs=True):
+        """Saves a film modification with its modif_number, and adds 1 to all
+        modif_number attributes of subsequent film modifications."""
+        if shift_subsequent_modifs:
+            for modif in FilmModification.select():
+                if modif.modif_number >= self.modif_number:
+                    modif.modif_number += 1
+                    modif.save(shift_subsequent_modifs=False)
+        super().save()
+
+    def delete_instance(self, recursive = ..., delete_nullable = ...):
+        """Saves a film modification with its modif_number, and adds 1 to all
+        modif_number attributes of subsequent film modifications."""
+        for modif in FilmModification.select():
+            if modif.modif_number >= self.modif_number:
+                modif.modif_number -= 1
+                modif.save(shift_subsequent_modifs=False)
+        super().delete_instance()
+
+    def modification_process(self) \
+            -> Annealing|WetEtching|Patterning|IonBeamEtching:
+        fmt = FilmModifType
+        match self.modif_type:
+            case fmt.ANNEALING:
+                return Annealing.get(Annealing.film_modif == self)
+            case fmt.PATTERNING:
+                return Patterning.get(Patterning.film_modif == self)
+            case fmt.WET_ETCHING:
+                return WetEtching.get(WetEtching.film_modif == self)
+            case fmt.ION_BEAM_ETCHING:
+                return IonBeamEtching.get(IonBeamEtching.film_modif == self)
+
+
+class Annealing(BaseModel):
+    temperature = FloatField()
+    duration = FloatField()
+    pressure = FloatField()
+    furnace: Furnace = CharField()
+    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+
+    @classmethod
+    def new(cls, temperature: float, duration: float, pressure: float,
+            furnace: Furnace, film_modif: FilmModification) -> Annealing:
+        return cls(temperature=temperature, duration=duration,
+                   pressure=pressure, furnace=furnace,
+                   film_modif=film_modif)
+
+
+class Patterning(BaseModel):
+    diagram_file_name = CharField()
+    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+
+    @classmethod
+    def new(cls, diagram_file_name: str, film_modif: FilmModification)\
+            -> Patterning:
+        return cls(diagram_file_name=diagram_file_name,
+                   film_modif=film_modif)
+
+    def image_path(self):
+        return Path(PATTERN_IMAGE_PATH) / str(self.diagram_file_name)
+
+
+class IonBeamEtching(BaseModel):
+    depth = FloatField()
+    duration = FloatField()
+    flow = FloatField()
+    incidence_angle = FloatField()
+    rotation = FloatField()
+    power = FloatField()
+    pressure = FloatField()
+    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+
+    constituents: list[PlasmaConstituent]  # Is a backref.
+
+    @classmethod
+    def new(cls, depth: float, duration: float, flow: float,
+            incidence_angle: float, rotation: float, power: float,
+            pressure: float, film_modif: FilmModification) -> IonBeamEtching:
+        return cls(depth=depth, duration=duration, flow=flow,
+                   incidence_angle=incidence_angle, rotation=rotation,
+                   power=power, pressure=pressure, film_modif=film_modif)
+
+
+class PlasmaConstituent(BaseModel):
+    proportion = FloatField()
+    formula = CharField()
+    etching = ForeignKeyField(IonBeamEtching, on_delete='CASCADE',
+                              backref='constituents')
+
+    @classmethod
+    def new(cls, proportion: float, formula: str, etching: IonBeamEtching)\
+            -> PlasmaConstituent:
+        return cls(proportion=proportion, formula=formula, etching=etching)
+
+
+class WetEtching(BaseModel):
+    depth = FloatField()
+    duration = FloatField()
+    temperature = FloatField()
+    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+
+    constituents: list[AcidConstituent]  # Is a backref.
+
+    @classmethod
+    def new(cls, depth: float, duration: float, temperature: float,
+            film_modif: FilmModification) -> WetEtching:
+        return cls(depth=depth, duration=duration, temperature=temperature,
+                   film_modif=film_modif)
+
+
+class AcidConstituent(BaseModel):
+    proportion = FloatField()
+    formula = CharField()
+    etching = ForeignKeyField(WetEtching, on_delete='CASCADE',
+                              backref='constituents')
+
+    @classmethod
+    def new(cls, proportion: float, formula: str, etching: WetEtching)\
+            -> AcidConstituent:
+        return cls(proportion=proportion, formula=formula, etching=etching)
+
+

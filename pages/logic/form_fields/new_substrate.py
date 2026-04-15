@@ -8,7 +8,7 @@ class StoichiometryField(FormField):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
-        return Patch.is_valid_stoichio(self.value)
+        return Patch.is_valid_formula(self.value)
 
 
 class CommentField(FormField):

@@ -12,8 +12,9 @@ page = st.navigation([
     st.Page('new_target.py', title='Add a New Target', icon="🐐"),
     st.Page('new_substrate.py', title='Add a New Substrate', icon="🐐"),
 
-    st.Page('inspect_lib.py', title='Inspect a Library', icon="🐐"),
-    st.Page('inspect_target.py', title='Inspect a Target', icon="🐐"),
+    st.Page('inspect_lib.py', title='Library', icon="🐐"),
+    st.Page('inspect_target.py', title='Target', icon="🐐"),
+    st.Page('inspect_substrate.py', title='Substrate', icon="🐐"),
 
     st.Page('library_added.py', title='New Library Added', icon="🐐"),
     st.Page('target_added.py', title='New Target Added', icon="🐐"),
@@ -21,6 +22,7 @@ page = st.navigation([
 
     st.Page('deleted_lib.py', title='Library Deleted', icon="🐐"),
     st.Page('deleted_target.py', title='Target Deleted', icon="🐐"),
+    st.Page('deleted_sub.py', title='Substrate Deleted', icon="🐐"),
 
     st.Page('test.py', title='Test Page', icon="🐐"),
 ])

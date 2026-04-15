@@ -14,7 +14,8 @@ from plotly.graph_objs import Scatter
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
 
-from logic.constants import CookieKeys, SessionKeys as Sk, FILE_STORAGE_PATH
+from logic.constants import (CookieKeys as Ck,
+                             SessionKeys as Sk, FILE_STORAGE_PATH)
 
 
 def highlight_rows(row) -> list[str]:
@@ -93,7 +94,7 @@ def load_session_state(page_name: str | Path) -> SessionStateProxy:
 
 def add_cookie_data_to_session(sess: SessionStateProxy):
     controller = new_controller()
-    for key in CookieKeys:
+    for key in Ck:
         stored_value = controller.get(key)
         if stored_value is not None:
             sess[key] = stored_value
@@ -102,7 +103,7 @@ def add_cookie_data_to_session(sess: SessionStateProxy):
 def reset_session(sess: SessionStateProxy):
     page_name = sess.get(Sk.PAGE_FILE_NAME)
     for key in sess:
-        if key in CookieKeys or key.startswith(page_name):
+        if key in Ck or key.startswith(page_name):
             del sess[key]
 
 
@@ -112,7 +113,7 @@ def refresh_page_in_browser():
 
 def save_session_state(sess: SessionStateProxy):
     controller = new_controller()
-    for key in CookieKeys:
+    for key in Ck:
         if key in sess:
             controller.set(key, sess[key])
 
@@ -163,3 +164,13 @@ def store_file(file_data: bytes, file_name: str = None) -> Path:
     with open(file_path, "wb") as f:
         f.write(file_data)
     return file_path
+
+
+def link_html(label: str, url: str):
+    return f"<a href=\"{url}\" target=\"_self\">{label}</a>"
+
+
+def email_html(email: str, label: str=None):
+    if label is None:
+        label = email
+    return f'<a href="mailto:{email}">{label}</a>'

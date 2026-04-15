@@ -5,15 +5,18 @@ from typing import Self
 
 LIB_ID_URL_KEY = 'lib_id'
 TARGET_ID_URL_KEY = 'target_id'
+SUB_ID_URL_KEY = 'substrate_id'
 DOMAIN = 'localhost:8501'
 FILE_STORAGE_PATH = Path(
     r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
+FILM_INIT_STATE = 'Film initial state'
+PATTERN_IMAGE_PATH = 'pages/logic/images'
 
 
 class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable
     for an update, we'll still access the value from old version with the
-    same key."""
+    same key in the cookie."""
 
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
     LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'
@@ -27,8 +30,8 @@ class SessionKeys(StrEnum):
     SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
     FILM_LAYERS = 'film_layers_key'
     SPUTTERING_SYSTEM = 'sputter_system_key'
-    ADDITIONAL_LAYER_DATA = 'additional_layer_data_key'
-    CURRENTLY_FILLED_LAYER_POSITION = 'currently_filled_layer_key'
+    LAYER_DATA = 'additional_layer_data_key'
+    CURRENT_FILM = 'current_film_key'
 
 
 class ChemicalElement(StrEnum):

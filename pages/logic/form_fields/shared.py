@@ -10,7 +10,8 @@ from logic.constants import SessionKeys as Sk
 @dataclass
 class FormField(ABC):  # Generic type T.
     value: Any
-    id_: str
+    field_key: str
+    input_key: str
     is_valid: bool = False
     error_msg: str = ''
     has_changed: bool = False
@@ -65,31 +66,36 @@ class FormField(ABC):  # Generic type T.
             st.warning(self.error_msg)
 
     @classmethod
-    def get_or_create(cls, id_: str) -> Self:
+    def get_or_create(cls, field_key: str, input_key: str) -> Self:
         sess = st.session_state
-        key = cls.get_key(id_=id_)
-        if key not in sess:
-            sess[key] = cls(value=None, id_=id_)
-        return sess[key]
+        if field_key not in sess:
+            sess[field_key] = cls(value=None, field_key=field_key, 
+                                   input_key=input_key)
+        return sess[field_key]
 
     def remove_from_session(self):
-        sess = st.session_state
-        key = self.get_key(id_=self.id_)
-        del sess[key]
+        del st.session_state[self.field_key]
 
     @classmethod
-    def get_key(cls, id_: str):
+    def get_field_key(cls, input_key: str):
         sess = st.session_state
-        return sess[Sk.PAGE_FILE_NAME] + cls.__name__ + id_
+        return 'field_' + sess[Sk.PAGE_FILE_NAME] + cls.__name__ + input_key
 
     @classmethod
-    def input(cls, id_: str = '') -> Self:
-        """Add an id if multiple form_fields of the same type are on the same
+    def get_input_key(cls, input_key: str):
+        sess = st.session_state
+        return 'widget_' + sess[Sk.PAGE_FILE_NAME] + cls.__name__ + input_key
+
+    @classmethod
+    def input(cls, key: str = '') -> Self:
+        """Add a key if multiple form_fields of the same type are on the same
         page. This helps to avoid two problems: - Two form_fields copying
         each other's value. - A temporary field (like in a popup) being
         loaded as the one from the previous popup.
         """
-        field = cls.get_or_create(id_=id_)
+        input_key = cls.get_input_key(key)
+        field_key = cls.get_field_key(key)
+        field = cls.get_or_create(field_key=field_key, input_key=input_key)
         field.value = field._streamlit_input()
         field.show_error()
         return field
@@ -108,21 +114,20 @@ class DialogData(ABC):
 
     @classmethod
     @abstractmethod
-    def form_to_session(cls):
+    def form(cls):
         pass
-
-    # def reset_form_and_rerun(self):
-    #     for fld in self.all_form_fields:
-    #         fld.remove_from_session()  # To have a new one in the next pop-up.
-    #     st.rerun()
 
     def _assert_valid(self):
         assert all(fld.is_valid for fld in
                    self.all_form_fields), "Some form_fields are not valid."
 
-    def clear_and_add_to_session(self, session_key: str) -> None:
+    def clear_all_fields(self):
+        """So that next time the dialog opens, all fields are empty."""
         for fld in self.all_form_fields:
             fld.remove_from_session()
+
+    def clear_and_add_to_session(self, session_key: str) -> None:
+        self.clear_all_fields()
         sess = st.session_state
         if session_key not in sess:
             sess[session_key] = []

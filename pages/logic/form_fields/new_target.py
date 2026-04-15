@@ -18,10 +18,7 @@ class MadeAtField(FormField):
 
 class ExperimenterEmailField(FormField):
     def _streamlit_input(self):
-        if Ck.LAST_EMAIL_USED in st.session_state:
-            default_email = st.session_state[Ck.LAST_EMAIL_USED]
-        else:
-            default_email = ''
+        default_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
         return st.text_input(
             "Made by (email address)", on_change=self.on_change,
             value=default_email)
@@ -29,6 +26,7 @@ class ExperimenterEmailField(FormField):
     def _is_valid(self) -> tuple[bool, str]:
         if not is_valid_email_address(self.value):
             return False, 'Please enter a valid email address.'
+        st.session_state[Ck.LAST_EMAIL_USED] = self.value
         return True, ''
 
 
@@ -57,7 +55,7 @@ class StoichiometryField(FormField):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
-        return Patch.is_valid_stoichio(self.value)
+        return Patch.is_valid_formula(self.value)
 
 
 class DiscCenterX(FormField):

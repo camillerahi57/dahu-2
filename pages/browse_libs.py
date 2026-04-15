@@ -20,7 +20,7 @@ query = Library.select(
     Library.id.alias(LIB_ID_URL_KEY),
     # noqa, id is not declared in the project but is in Peewee.
     Library.comment.alias(ColName.comment),
-    Film.made_at.alias(ColName.made_on),
+    Film.made_on.alias(ColName.made_on),
     Film.made_by_email.alias(ColName.experimenter)
 ).join(Film).dicts()
 

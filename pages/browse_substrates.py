@@ -3,7 +3,7 @@ import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
 from logic.components import browser_side_bar
-from logic.constants import CookieKeys as Ck
+from logic.constants import CookieKeys as Ck, DOMAIN, SUB_ID_URL_KEY
 from logic.db_schema import Substrate
 from logic.table_columns import SubstrateBrowserColumnName as ColName
 from logic.functions import load_session_state, save_session_state
@@ -21,13 +21,20 @@ query = Substrate.select(
     Substrate.id,
 ).dicts()
 
-page_name = 'inspect_target.py'.removesuffix('.py')  # Using the file name
+page_name = 'inspect_substrate.py'.removesuffix('.py')  # Using the file name
 # allows refactorization.
 
-rows = [row for row in query]
+rows = list(query)
+
+for row in rows:
+    # noinspection HttpUrlsUsage
+    row[ColName.inspect_link] = (f"http://{DOMAIN}/{page_name}?"
+                                 f"{SUB_ID_URL_KEY}={row['id']}")  # noqa
 
 column_config = {
     ColName.name: st.column_config.TextColumn(width='small'),
+    ColName.inspect_link: st.column_config.LinkColumn(display_text='Inspect',
+                                                      width='small'),
     ColName.comment: st.column_config.TextColumn(width='large'),
 }
 

@@ -1,5 +1,6 @@
 import streamlit as st
 
+from logic.constants import CookieKeys as Ck
 from logic.db_schema import Library, Film, Target, Patch, Substrate
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
@@ -53,8 +54,9 @@ class MadeOnField(FormField):
 
 class MadeByField(FormField):
     def _streamlit_input(self):
+        default = st.session_state.get(Ck.LAST_EMAIL_USED, '')
         return st.text_input("Made by (email address)",
-                             on_change=self.on_change)
+                             on_change=self.on_change, value=default)
 
     def _is_valid(self) -> tuple[bool, str]:
         if not is_valid_email_address(self.value):
@@ -118,7 +120,7 @@ class StoichiometryField(FormField):
         return st.text_input("Stoichiometry", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
-        return Patch.is_valid_stoichio(self.value)
+        return Patch.is_valid_formula(self.value)
 
 
 class FilmLayerFunctionField(FormField):
@@ -130,6 +132,39 @@ class FilmLayerFunctionField(FormField):
     def _is_valid(self) -> tuple[bool, str]:
         if self.value == '' or self.value is None:
             return False, 'Please select an option.'
+        return True, ''
+
+
+class DepositTempField(FormField):
+    def _streamlit_input(self):
+        return st.number_input("Deposit temperature", min_value=0.,
+                               on_change=self.on_change)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Deposit temperature must be strictly positive.'
+        return True, ''
+
+
+class DepositDurationField(FormField):
+    def _streamlit_input(self):
+        return st.number_input("Deposit duration", min_value=0.,
+                               on_change=self.on_change)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Deposit duration must be strictly positive.'
+        return True, ''
+
+
+class DepositPowerField(FormField):
+    def _streamlit_input(self):
+        return st.number_input("Deposit power", min_value=0.,
+                               on_change=self.on_change)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Deposit power must be strictly positive.'
         return True, ''
 
 
@@ -176,10 +211,6 @@ class HasActiveCoolingField(FormField):
             return False, 'Please select an option.'
         return True, ''
 
-
-# has_active_cooling_F: bool = True
-# rotation_F: num = 0
-# filament_tension_F: num = 170
 
 class RotationField(FormField):
     def _streamlit_input(self):

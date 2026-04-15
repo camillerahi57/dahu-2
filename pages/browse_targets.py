@@ -17,7 +17,7 @@ if st.button("➕ Add a new target"):
     st.switch_page('new_target.py')
 
 query = Target.select(
-    Target.made_at.alias(ColName.made_on),
+    Target.made_on.alias(ColName.made_on),
     Target.made_by_email.alias(ColName.made_by),
     Target.physical_name.alias(ColName.physical_name),
     Target.comment.alias(ColName.comment),

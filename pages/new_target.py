@@ -18,7 +18,7 @@ sess = load_session_state('new_target.py')
 
 col1, col2 = st.columns(2)
 with col1:
-    made_at_fld = MadeAtField.input()
+    made_on_fld = MadeAtField.input()
 with col2:
     email_fld = ExperimenterEmailField.input()
 target_name_fld = TargetNameField.input()
@@ -204,7 +204,7 @@ with col2:
 
 target_diameter = TargetDiameterMillimeters.input()
 st.divider()
-fields = [made_at_fld, email_fld, target_name_fld, comment_fld,
+fields = [made_on_fld, email_fld, target_name_fld, comment_fld,
           photo_upload_fld, target_diameter]
 all_flds_valid = all(fld.is_valid for fld in fields)
 at_least_one_patch = len(sess[Sk.PATCH_FORMS]) > 0
@@ -215,7 +215,7 @@ if st.button("Submit", disabled=not can_submit, type="primary"):
         Ck.LAST_EMAIL_USED] = email_fld.value  # Save last used email for
     # future autofill.
     target = Target.new(
-        made_at=made_at_fld.value,
+        made_on=made_on_fld.value,
         made_by_email=email_fld.value,
         physical_name=target_name_fld.value,
         comment=comment_fld.value,

@@ -6,7 +6,7 @@ from logic.form_fields.new_substrate import StoichiometryField, CommentField, \
     SubstrateNameField, ThicknessField, HField, \
     KField, LField
 from logic.form_fields.shared import DialogData
-from logic.functions import load_session_state
+from logic.functions import load_session_state, save_session_state
 import streamlit as st
 
 sess = load_session_state('new_substrate.py')
@@ -81,7 +81,7 @@ class LayerData(DialogData):
 
     @classmethod
     @st.dialog("New Layer")
-    def form_to_session(cls):
+    def form(cls):
         col1_, col2_ = st.columns(2)
         with col1_:
             stoichio_fld = StoichiometryField.input()
@@ -108,7 +108,7 @@ class LayerData(DialogData):
 
 
 if st.button("Add Layer"):
-    LayerData.form_to_session()
+    LayerData.form()
 
 all_fields = [name_fld, comment_fld]
 can_submit = name_fld.is_valid and comment_fld.is_valid and len(
@@ -123,4 +123,5 @@ if st.button("Submit", disabled=not can_submit, type='primary'):
             layer = SubstrateLayer.new(data.thickness, data.h, data.k, data.l,
                                        data.stoichio, substrate)
             layer.save()
+    save_session_state(sess)
     st.switch_page('substrate_added.py')

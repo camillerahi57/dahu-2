@@ -3,6 +3,7 @@ import datetime
 import streamlit as st
 from streamlit import columns
 
+from logic.components import inspect_page_header
 from logic.constants import TARGET_ID_URL_KEY
 from logic.db_schema import Target
 from logic.functions import get_email_user_name
@@ -32,20 +33,14 @@ target: Target = Target.get_by_id(target_id)
 
 st.set_page_config(layout="wide", page_title=target.physical_name)
 
-col1, col2 = st.columns(2)
-with col1:
-    with st.container(horizontal=True, vertical_alignment="center"):
-        st.write('**TARGET**')
-        st.subheader(target.physical_name)
-with col2:
-    with st.container(horizontal=True, horizontal_alignment='right'):
-        if st.button('Delete 🗑️'):
-            if target.can_be_deleted():
-                confirm_deletion_dialog(target)
-            else:
-                dependent_lib_error(target)
+def on_delete():
+    if target.can_be_deleted():
+        confirm_deletion_dialog(target)
+    else:
+        dependent_lib_error(target)
 
-# TODO vérifier que ça marche
+inspect_page_header('Target', target.physical_name, on_delete, lambda: None,
+                    'browse_targets.py')
 
 col1, col2 = columns([40, 60])
 
@@ -58,8 +53,8 @@ with col2:
     with st.container(border=True):
         email_html = (f'<a href="mailto:{target.made_by_email}">'
                       f'{target.made_by_email}</a>')
-        date_str = datetime.date(target.made_at.year, target.made_at.month,
-                                 target.made_at.day).strftime("%B %d, %Y")
+        date_str = datetime.date(target.made_on.year, target.made_on.month,
+                                 target.made_on.day).strftime("%B %d, %Y")
         experimenter = get_email_user_name(target.made_by_email)
         st.write(f"Made on **{date_str}** by **{email_html}**.",
                  unsafe_allow_html=True)
