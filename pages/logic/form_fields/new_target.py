@@ -144,11 +144,12 @@ class TargetDiameterMillimeters(FormField):
 class PolygonDataText(FormField):
     def _streamlit_input(self):
         instructions = """The input must be a list of vertices, 
-        one on each line. Each vertex is an X,Y couple.
+        one on each line. Each vertex is an X,Y couple, X and Y being pixel 
+        coordinates on the target photo.
     \nTriangle example:
-    \n12.3, 48.3
-    \n78, 15.6
-    \n6.1, 5"""
+    \n12, 48
+    \n78, 15
+    \n6, 5"""
         return st.text_area(instructions, on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:

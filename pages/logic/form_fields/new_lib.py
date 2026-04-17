@@ -225,4 +225,6 @@ class FilamentTensionField(FormField):
         return st.number_input("Filament tension", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Filament tension must be strictly positive.'
         return True, ''

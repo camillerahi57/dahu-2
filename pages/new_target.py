@@ -202,10 +202,10 @@ with col2:
 
     st.plotly_chart(fig)
 
-target_diameter = TargetDiameterMillimeters.input()
+target_diameter_fld = TargetDiameterMillimeters.input()
 st.divider()
 fields = [made_on_fld, email_fld, target_name_fld, comment_fld,
-          photo_upload_fld, target_diameter]
+          photo_upload_fld, target_diameter_fld]
 all_flds_valid = all(fld.is_valid for fld in fields)
 at_least_one_patch = len(sess[Sk.PATCH_FORMS]) > 0
 can_submit = all_flds_valid and at_least_one_patch
@@ -226,13 +226,11 @@ if st.button("Submit", disabled=not can_submit, type="primary"):
         # or nothing).
         target.save()
         for patch_number, form in enumerate(sess[Sk.PATCH_FORMS]):
-            is_target_base = patch_number == 0
             # If disc:
             if form.__class__.__name__ == DiscForm.__name__:
                 x_y_radius = form.x_pos, form.y_pos, form.radius
                 patch, disc = Patch.new_disc_patch(
                     form.stoichio, x_y_radius, target, patch_number,
-                    is_target_base
                 )
                 # Save the patch (order matters):
                 patch.save()
@@ -243,7 +241,6 @@ if st.button("Submit", disabled=not can_submit, type="primary"):
                 vertices = form.vertices()
                 patch, polygon, vertices = Patch.new_polygon_patch(
                     form.stoichio, vertices, patch_number, target,
-                    is_target_base
                 )
                 # Save the patch (order matters):
                 patch.save()

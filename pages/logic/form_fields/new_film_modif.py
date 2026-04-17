@@ -100,16 +100,6 @@ class PressureField(FormField):
         return True, ''
 
 
-class DepthField(FormField):
-    def _streamlit_input(self):
-        return st.number_input('Depth', min_value=0., on_change=self.on_change)
-
-    def _is_valid(self) -> tuple[bool, str]:
-        if self.value == 0:
-            return False, 'Depth must be strictly positive.'
-        return True, ''
-
-
 class FlowField(FormField):
     def _streamlit_input(self):
         return st.number_input('Flow', min_value=0., on_change=self.on_change)
@@ -170,10 +160,19 @@ class PowerField(FormField):
         return True, ''
 
 
-class FormulaField(FormField):
+class PlasmaFormulaField(FormField):
     def _streamlit_input(self):
         return st.text_input('Formula', on_change=self.on_change,
-                             key=self.input_key)
+                             key=self.input_key, value='Ar')
+
+    def _is_valid(self) -> tuple[bool, str]:
+        return Patch.is_valid_formula(self.value)
+
+
+class AcidFormulaField(FormField):
+    def _streamlit_input(self):
+        return st.text_input('Formula', on_change=self.on_change,
+                             key=self.input_key, placeholder='H2O')
 
     def _is_valid(self) -> tuple[bool, str]:
         return Patch.is_valid_formula(self.value)
@@ -192,10 +191,10 @@ class ProportionField(FormField):
 
 class NumberOfConstituentsField(FormField):
     def _streamlit_input(self):
-        return st.number_input('Number of constituents',
-                               on_change=self.on_change, step=1)
+        return st.number_input('Number of constituents', value=1,
+                               on_change=self.on_change, step=1, min_value=1)
 
     def _is_valid(self) -> tuple[bool, str]:
-        if self.value <= 0:
+        if self.value < 1:
             return False, 'There must be at least 1 constituent.'
         return True, ''

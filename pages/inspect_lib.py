@@ -104,7 +104,7 @@ def film_modif_info(modif_: FilmModification):
         constituents_str = ''
         for const in constituents:
             percent = const.proportion / proportion_sum * 100
-            constituents_str += f"{const.formula}: {percent:g}%\n\n"
+            constituents_str += f"- {const.formula}: {percent:g}%\n\n"
         st.write(f"**Acid constituents:**\n\n{constituents_str}")
 
     else:

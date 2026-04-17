@@ -37,6 +37,10 @@ class FilmModifType(StrEnum):
     PATTERNING = 'patterned'
 
 
+class PixelCoordinateSystem(StrEnum):
+    X_Y_EQ_W_H_ORIGIN_TOP_LEFT = "x,y=width,height;origin-top-left"
+
+
 class Furnace(StrEnum):
     FURNACE_1 = 'furnace_1'
     FURNACE_2 = 'furnace_2'  # TODO Replace names.

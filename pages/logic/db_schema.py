@@ -18,7 +18,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from logic.constants import ChemicalElement, FILE_STORAGE_PATH, DOMAIN, \
     LIB_ID_URL_KEY, SUB_ID_URL_KEY, TARGET_ID_URL_KEY, PATTERN_IMAGE_PATH
 from logic.db_enums import ShapeType, SputteringSystem, FilmLayerFunction, \
-    MagnetronSputteringGenerator, FilmModifType, Furnace
+    MagnetronSputteringGenerator, FilmModifType, Furnace, PixelCoordinateSystem
 from logic.functions import letter_count, disc_patch_to_scatter, \
     polygon_patch_to_scatter
 
@@ -77,11 +77,12 @@ class Target(BaseModel):
     physical_name = CharField(unique=True)
     comment = CharField()
     photo_file_name = CharField(unique=True)
+    pixel_coordinate_system: PixelCoordinateSystem = CharField(
+        default=PixelCoordinateSystem.X_Y_EQ_W_H_ORIGIN_TOP_LEFT)
 
     @classmethod
     def new(cls, made_on: datetime, made_by_email: str, physical_name: str,
-            comment: str,
-            photo_file_name: str):
+            comment: str, photo_file_name: str):
         return cls(made_on=made_on, made_by_email=made_by_email,
                    physical_name=physical_name,
                    comment=comment, photo_file_name=photo_file_name)
@@ -134,16 +135,14 @@ class Patch(BaseModel):
     rank_from_back_to_front = IntegerField()
     stoichio = CharField()
     shape_type: ShapeType = CharField()
-    is_target_base = BooleanField()
     target = ForeignKeyField(Target, on_delete='CASCADE')
 
     @classmethod
     def new(cls, rank_from_back_to_front: int, stoichio: str, target: Target,
-            shape_type: ShapeType, is_target_base: bool):
+            shape_type: ShapeType):
         return cls(rank_from_back_to_front=rank_from_back_to_front,
                    stoichio=stoichio,
-                   target=target, shape_type=shape_type,
-                   is_target_base=is_target_base)
+                   target=target, shape_type=shape_type)
 
     def __str__(self):
         return f'Patch of stoichiometry {self.stoichio}'
@@ -151,23 +150,22 @@ class Patch(BaseModel):
     @classmethod
     def new_disc_patch(cls, stoichio: str,
                        x_y_radius: tuple[float, float, float], target: Target,
-                       rank_from_back_to_front: int, is_target_base: bool) \
+                       rank_from_back_to_front: int) \
             -> tuple[Patch, Disc]:
         x, y, radius = x_y_radius
         patch = cls.new(rank_from_back_to_front, stoichio, target,
-                        ShapeType.DISC, is_target_base)
-        disc = Disc.new(center_x=x, center_y=y, radius=radius, patch=patch)
+                        ShapeType.DISC)
+        disc = Disc.new(center_px_x=x, center_px_y=y, radius_in_px=radius,
+                        patch=patch)
         return patch, disc
 
     @classmethod
     def new_polygon_patch(cls, stoichio: str,
                           clockwise_vertices: list[tuple[float, float]],
-                          rank_from_back_to_front: int, target: Target,
-                          is_target_base: bool) \
+                          rank_from_back_to_front: int, target: Target) \
             -> tuple[Patch, Polygon, list[Vertex]]:
         patch = cls.new(rank_from_back_to_front, stoichio, target,
-                        ShapeType.POLYGON,
-                        is_target_base)
+                        ShapeType.POLYGON)
         polygon, vertices = Polygon.from_ordered_vertices(
             clockwise_vertices=clockwise_vertices, patch=patch
         )
@@ -213,14 +211,15 @@ class Patch(BaseModel):
         if self.shape_type == ShapeType.DISC:
             disc = Disc.get(Disc.patch == self.id)
             return disc_patch_to_scatter(
-                x_y_radius=(disc.center_x, disc.center_y, disc.radius),
+                x_y_radius=(disc.center_px_x, disc.center_px_y,
+                            disc.radius_in_px),
                 color_=color,
                 name_=name,
             )
         elif self.shape_type == ShapeType.POLYGON:
             polygon = Polygon.get(Polygon.patch == self.id)
             vertices = polygon.saved_ordered_vertices()
-            vertex_coords = [(v.x_pos, v.y_pos) for v in vertices]
+            vertex_coords = [(v.pixel_x, v.pixel_y) for v in vertices]
             return polygon_patch_to_scatter(vertex_coords, color_=color,
                                             name_=name)
         else:
@@ -228,19 +227,20 @@ class Patch(BaseModel):
 
 
 class Disc(BaseModel):
-    center_x = FloatField()
-    center_y = FloatField()
-    radius = FloatField()
+    center_px_x = FloatField()
+    center_px_y = FloatField()
+    radius_in_px = FloatField()
     patch = ForeignKeyField(Patch, on_delete='CASCADE')
 
     @classmethod
-    def new(cls, center_x: float, center_y: float, radius: float, patch: Patch):
-        return cls(center_x=center_x, center_y=center_y, radius=radius,
-                   patch=patch)
+    def new(cls, center_px_x: float, center_px_y: float, radius_in_px: float,
+            patch: Patch):
+        return cls(center_px_x=center_px_x, center_px_y=center_px_y,
+                   radius_in_px=radius_in_px, patch=patch)
 
     def __str__(self):
-        return (f"Center: ({self.center_x:g}, {self.center_y:g})"
-                f"  |  Radius: {self.radius:g}")
+        return (f"Center: ({self.center_px_x:g}, {self.center_px_y:g})"
+                f"  |  Radius: {self.radius_in_px:g}")
 
 
 class Polygon(BaseModel):
@@ -265,7 +265,7 @@ class Polygon(BaseModel):
 
     def to_scatter(self, color: str, name: str) -> Scatter:
         vertex_list: list[tuple[float, float]] = [
-            (v.x_pos, v.y_pos)
+            (v.pixel_x, v.pixel_y)
             for v in self.saved_ordered_vertices()
         ]
         if vertex_list[-1] != vertex_list[0]:
@@ -314,7 +314,7 @@ class Polygon(BaseModel):
         vertices = []
         for i, (x, y) in enumerate(clockwise_vertices):
             vertices.append(
-                Vertex.new(x_pos=x, y_pos=y, clockwise_rank=i, polygon=polygon))
+                Vertex.new(pixel_x=x, pixel_y=y, clockwise_rank=i, polygon=polygon))
         return polygon, vertices
 
     @classmethod
@@ -334,19 +334,19 @@ class Polygon(BaseModel):
 
 
 class Vertex(BaseModel):
-    x_pos: float = FloatField()
-    y_pos: float = FloatField()
+    pixel_x: float = FloatField()
+    pixel_y: float = FloatField()
     clockwise_rank = IntegerField()
     polygon = ForeignKeyField(Polygon, on_delete='CASCADE', backref='vertices')
 
     @classmethod
-    def new(cls, x_pos: float, y_pos: float, clockwise_rank: int,
+    def new(cls, pixel_x: float, pixel_y: float, clockwise_rank: int,
             polygon: Polygon) -> Vertex:
-        return cls(x_pos=x_pos, y_pos=y_pos, clockwise_rank=clockwise_rank,
-                   polygon=polygon)
+        return cls(pixel_x=pixel_x, pixel_y=pixel_y,
+                   clockwise_rank=clockwise_rank, polygon=polygon)
 
     def __str__(self):
-        return f'({self.x_pos:g}, {self.y_pos:g})'
+        return f'({self.pixel_x:g}, {self.pixel_y:g})'
 
 
 class Substrate(BaseModel):
@@ -366,7 +366,7 @@ class Substrate(BaseModel):
         ).dicts()
         names = [row[Substrate.name.name]
                  # Name of the name field (which is 'name'),
-                 # not the name itself.
+                 # not the name of the substrate.
                  for row in query]
         return names
 
@@ -659,7 +659,7 @@ class Patterning(BaseModel):
 
 
 class IonBeamEtching(BaseModel):
-    depth = FloatField()
+    depth = FloatField(null=True, default=None)
     duration = FloatField()
     flow = FloatField()
     incidence_angle = FloatField()
@@ -671,9 +671,9 @@ class IonBeamEtching(BaseModel):
     constituents: list[PlasmaConstituent]  # Is a backref.
 
     @classmethod
-    def new(cls, depth: float, duration: float, flow: float,
-            incidence_angle: float, rotation: float, power: float,
-            pressure: float, film_modif: FilmModification) -> IonBeamEtching:
+    def new(cls, duration: float, flow: float, pressure: float, power: float,
+            incidence_angle: float, film_modif: FilmModification,
+            rotation: float, depth: float = None) -> IonBeamEtching:
         return cls(depth=depth, duration=duration, flow=flow,
                    incidence_angle=incidence_angle, rotation=rotation,
                    power=power, pressure=pressure, film_modif=film_modif)
@@ -692,7 +692,7 @@ class PlasmaConstituent(BaseModel):
 
 
 class WetEtching(BaseModel):
-    depth = FloatField()
+    depth = FloatField(null=True, default=None)
     duration = FloatField()
     temperature = FloatField()
     film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
@@ -700,8 +700,8 @@ class WetEtching(BaseModel):
     constituents: list[AcidConstituent]  # Is a backref.
 
     @classmethod
-    def new(cls, depth: float, duration: float, temperature: float,
-            film_modif: FilmModification) -> WetEtching:
+    def new(cls, duration: float, temperature: float,
+            film_modif: FilmModification, depth: float = None) -> WetEtching:
         return cls(depth=depth, duration=duration, temperature=temperature,
                    film_modif=film_modif)
 

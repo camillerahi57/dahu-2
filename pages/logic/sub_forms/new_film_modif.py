@@ -10,8 +10,9 @@ from logic.db_schema import FilmModification, Annealing, IonBeamEtching, \
     WetEtching, Patterning, PlasmaConstituent, AcidConstituent, db
 from logic.form_fields.new_film_modif import MadeByField, MadeOnField, \
     ModifTypeField, MadeAfterField, TemperatureField, DurationField, \
-    PressureField, FurnaceField, DepthField, FlowField, AngleField, \
-    RotationField, PowerField, PatternField, FormulaField, ProportionField
+    PressureField, FurnaceField, FlowField, AngleField, \
+    RotationField, PowerField, PatternField, ProportionField, \
+    NumberOfConstituentsField, PlasmaFormulaField, AcidFormulaField
 from logic.form_fields.shared import DialogData, FormField
 
 
@@ -78,7 +79,6 @@ class ModifData(DialogData):
                         annealing.save()
                     elif isinstance(type_data, IonBeamEtchingForm):
                         ion_etching = IonBeamEtching.new(
-                            depth=type_data.depth,
                             duration=type_data.duration,
                             flow=type_data.flow,
                             incidence_angle=type_data.angle,
@@ -100,7 +100,6 @@ class ModifData(DialogData):
                             constituent.save()
                     elif isinstance(type_data, WetEtchingForm):
                         wet_etching = WetEtching.new(
-                            depth=type_data.depth,
                             duration=type_data.duration,
                             temperature=type_data.temp,
                             film_modif=new_film_modif,
@@ -108,7 +107,8 @@ class ModifData(DialogData):
                         wet_etching.save()
                         proportion_sum = sum(
                             const.proportion
-                            for const in type_data.constituents)
+                            for const in type_data.constituents
+                        )
                         for const_data in type_data.constituents:
                             constituent = AcidConstituent.new(
                                 proportion=const_data.proportion/proportion_sum,
@@ -153,7 +153,6 @@ class ConstituentData:
 
 class IonBeamEtchingForm:
     def __init__(self, fields: list[FormField]):
-        depth_fld = DepthField.input()
         duration_fld = DurationField.input()
         flow_fld = FlowField.input()
         angle_fld = AngleField.input()
@@ -161,16 +160,16 @@ class IonBeamEtchingForm:
         power_fld = PowerField.input()
         pressure_fld = PressureField.input()
 
-        fields += [depth_fld, duration_fld, flow_fld, angle_fld,
+        fields += [duration_fld, flow_fld, angle_fld,
                    rotation_fld, power_fld, pressure_fld]
 
         st.subheader('Plasma constituents:')
-        constituent_nb = st.number_input('Number of plasma constituents',
-                                         step=1, width=200)
+        constituent_nb_fld = NumberOfConstituentsField.input()
+
         constituents = []
-        for i in range(constituent_nb):
+        for i in range(constituent_nb_fld.value):
             with st.container(horizontal=True, vertical_alignment='center'):
-                formula_fld = FormulaField.input(key=f'formula_{i}')
+                formula_fld = PlasmaFormulaField.input(key=f'formula_{i}')
                 proportion_fld = ProportionField.input(key=f'proportion_{i}')
                 data = ConstituentData(
                     formula=formula_fld.value,
@@ -179,7 +178,6 @@ class IonBeamEtchingForm:
                 constituents.append(data)
                 fields += [formula_fld, proportion_fld]
 
-        self.depth = depth_fld.value
         self.duration = duration_fld.value
         self.flow = flow_fld.value
         self.angle = angle_fld.value
@@ -191,20 +189,18 @@ class IonBeamEtchingForm:
 
 class WetEtchingForm:
     def __init__(self, fields: list[FormField]):
-        depth_fld = DepthField.input()
         duration_fld = DurationField.input()
         temp_fld = TemperatureField.input()
 
-        fields += [depth_fld, duration_fld, temp_fld]
+        fields += [duration_fld, temp_fld]
 
         st.subheader('Acid constituents:')
-        constituent_nb = st.number_input('Number of acid constituents',
-                                         step=1, width=200)
+        constituent_nb_fld = NumberOfConstituentsField.input()
 
         constituents = []
-        for i in range(constituent_nb):
+        for i in range(constituent_nb_fld.value):
             with st.container(horizontal=True, vertical_alignment='center'):
-                formula_fld = FormulaField.input(key=f'formula_{i}')
+                formula_fld = AcidFormulaField.input(key=f'formula_{i}')
                 proportion_fld = ProportionField.input(key=f'proportion_{i}')
                 data = ConstituentData(
                     formula=formula_fld.value,
@@ -213,7 +209,6 @@ class WetEtchingForm:
                 constituents.append(data)
                 fields += [formula_fld, proportion_fld]
 
-        self.depth = depth_fld.value
         self.duration = duration_fld.value
         self.temp = temp_fld.value
         self.constituents = constituents
