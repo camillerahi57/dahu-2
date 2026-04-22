@@ -1,12 +1,13 @@
 from abc import abstractmethod
+from ast import literal_eval as make_tuple
 from datetime import datetime
 from pathlib import Path
 from random import Random
 from typing import Self
 from uuid import uuid4
 
-import plotly.graph_objects as go
 import chemparse
+import plotly.graph_objects as go
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
     UUIDField, BooleanField, DateField
@@ -132,15 +133,15 @@ class Target(BaseModel):
 
 
 class Patch(BaseModel):
-    rank_from_back_to_front = IntegerField()
+    stack_idx = IntegerField()
     stoichio = CharField()
     shape_type: ShapeType = CharField()
     target = ForeignKeyField(Target, on_delete='CASCADE')
 
     @classmethod
-    def new(cls, rank_from_back_to_front: int, stoichio: str, target: Target,
+    def new(cls, stack_idx: int, stoichio: str, target: Target,
             shape_type: ShapeType):
-        return cls(rank_from_back_to_front=rank_from_back_to_front,
+        return cls(stack_idx=stack_idx,
                    stoichio=stoichio,
                    target=target, shape_type=shape_type)
 
@@ -150,10 +151,10 @@ class Patch(BaseModel):
     @classmethod
     def new_disc_patch(cls, stoichio: str,
                        x_y_radius: tuple[float, float, float], target: Target,
-                       rank_from_back_to_front: int) \
+                       stack_idx: int) \
             -> tuple[Patch, Disc]:
         x, y, radius = x_y_radius
-        patch = cls.new(rank_from_back_to_front, stoichio, target,
+        patch = cls.new(stack_idx, stoichio, target,
                         ShapeType.DISC)
         disc = Disc.new(center_px_x=x, center_px_y=y, radius_in_px=radius,
                         patch=patch)
@@ -162,9 +163,9 @@ class Patch(BaseModel):
     @classmethod
     def new_polygon_patch(cls, stoichio: str,
                           clockwise_vertices: list[tuple[float, float]],
-                          rank_from_back_to_front: int, target: Target) \
+                          stack_idx: int, target: Target) \
             -> tuple[Patch, Polygon, list[Vertex]]:
-        patch = cls.new(rank_from_back_to_front, stoichio, target,
+        patch = cls.new(stack_idx, stoichio, target,
                         ShapeType.POLYGON)
         polygon, vertices = Polygon.from_ordered_vertices(
             clockwise_vertices=clockwise_vertices, patch=patch
@@ -225,6 +226,50 @@ class Patch(BaseModel):
         else:
             raise ValueError(f"Unknown shape_type '{str(self.shape_type)}'.")
 
+    @classmethod
+    def from_patch_text(cls, text: str, target: Target) \
+            -> list[tuple[Patch, Disc|Polygon]]:
+        text = text.replace(' ', '')
+        lines = text.split('\n')
+        lines = [l for l in lines if l != '']  # Remove empty lines.
+        assert len(lines) >= 1, f"Patch data cannot be empty. Got '{lines}'."
+        return [cls.from_text_line(line, target, i)
+                for i, line in enumerate(lines)]
+
+    @classmethod
+    def from_text_line(cls, line: str, target: Target, stack_idx: int) \
+            -> tuple[Patch, Disc|Polygon]:
+        line = line.replace(' ', '').removesuffix('/')
+        text_elements = line.split('/')
+        assert len(text_elements) >= 5, f"Not enough info on the line: {line}"
+        shape_type = text_elements[0]
+        assert shape_type in ShapeType, \
+            (f"Each line must start with a valid shape name. "
+             f"Got '{shape_type}' instead.")
+        stoichio = text_elements[1]
+        is_valid, msg = cls.is_valid_formula(stoichio)
+        assert is_valid, msg
+        coord_strings = text_elements[2:]
+        coords: list[tuple[int, int]] = []
+        for s in coord_strings:
+            try:
+                x, y = make_tuple(s)
+            except (ValueError, SyntaxError):
+                raise RuntimeError(f"Invalid coordinates '{s}'.")
+            assert isinstance(x, int) and isinstance(y, int), \
+                f'Pixel coordinates must be integers. Got {x},{y} instead.'
+            assert x >= 0 and y >= 0, f"Coordinates must be positive."
+            coords.append((x, y))
+
+        patch = cls.new(stack_idx, stoichio, target, ShapeType(shape_type))
+        if shape_type == ShapeType.DISC:
+            shape = Disc.from_circumference_points(coords, patch)
+        elif shape_type == ShapeType.POLYGON:
+            shape = Polygon.from_ordered_vertices(coords, patch)
+        else:
+            raise ValueError(f"Unknown shape_type '{shape_type}'.")
+        return patch, shape
+
 
 class Disc(BaseModel):
     center_px_x = FloatField()
@@ -241,6 +286,46 @@ class Disc(BaseModel):
     def __str__(self):
         return (f"Center: ({self.center_px_x:g}, {self.center_px_y:g})"
                 f"  |  Radius: {self.radius_in_px:g}")
+
+    @classmethod
+    def from_circumference_points(cls, points: list[tuple[int, int]],
+                                  patch: Patch) -> Self:
+        assert len(points) == 3, \
+            f"Circumference must contain exactly 3 points. Got {len(points)}."
+        (cx, cy), r = cls.circumference_points_to_center_and_radius(*points)
+        return cls.new(cx, cy, r, patch)
+
+    Point = tuple[float, float]
+
+    @staticmethod
+    def circumference_points_to_center_and_radius(
+            p1: Disc.Point, p2: Disc.Point, p3: Disc.Point) \
+            -> tuple[Disc.Point, float]:
+        """
+        Given three (X, Y) points on a circle's circumference,
+        returns the (X, Y) center and radius of the circle.
+        """
+        ax, ay = p1
+        bx, by = p2
+        cx, cy = p3
+    
+        d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+        if d == 0:
+            raise ValueError("The three points are collinear "
+                             "— no unique circle exists.")
+        ux = (
+                (ax**2 + ay**2) * (by - cy) 
+              + (bx**2 + by**2) * (cy - ay) 
+              + (cx**2 + cy**2) * (ay - by)
+              ) / d
+        uy = (
+               (ax**2 + ay**2) * (cx - bx) 
+             + (bx**2 + by**2) * (ax - cx) 
+             + (cx**2 + cy**2) * (bx - ax)
+             ) / d
+    
+        radius = ((ax - ux)**2 + (ay - uy)**2) ** 0.5
+        return (ux, uy), radius
 
 
 class Polygon(BaseModel):
@@ -314,7 +399,8 @@ class Polygon(BaseModel):
         vertices = []
         for i, (x, y) in enumerate(clockwise_vertices):
             vertices.append(
-                Vertex.new(pixel_x=x, pixel_y=y, clockwise_rank=i, polygon=polygon))
+                Vertex.new(pixel_x=x, pixel_y=y, clockwise_rank=i,
+                           polygon=polygon))
         return polygon, vertices
 
     @classmethod
@@ -388,20 +474,21 @@ class Substrate(BaseModel):
 
 class SubstrateLayer(BaseModel):
     thickness = FloatField()
-    h = IntegerField()
-    k = IntegerField()
-    l = IntegerField()
+    h = IntegerField(null=True)
+    k = IntegerField(null=True)
+    l = IntegerField(null=True)
     stoichiometry = CharField()
+    position_from_back = IntegerField()
     substrate = ForeignKeyField(Substrate, on_delete='CASCADE',
                                 backref='layers')
 
     @classmethod
     def new(cls, thickness: float, h: int, k: int, l: int, stoichiometry: str,
-            substrate: Substrate) \
+            substrate: Substrate, position_from_back: int) \
             -> SubstrateLayer:
         return cls(thickness=thickness, h=h, k=k, l=l,
-                   stoichiometry=stoichiometry,
-                   substrate=substrate)
+                   stoichiometry=stoichiometry, substrate=substrate,
+                   position_from_back=position_from_back)
 
     def crystal_struct_str(self) -> str:
         return f'({self.h} {self.k} {self.l})'
@@ -550,20 +637,20 @@ class MagnetronSputtering(BaseModel):
                    film_layer=film_layer)
 
 
-class TriodeSputtering(BaseModel):  # TODO Add default values in front-end.
+class TriodeSputtering(BaseModel):
     has_active_cooling = BooleanField()
     rotation = FloatField()
-    filament_tension = FloatField()
+    filament_current = FloatField()
     film_layer = ForeignKeyField(FilmLayer, on_delete='CASCADE')
 
     @classmethod
     def new(cls,
             has_active_cooling: bool,
             rotation: float,
-            filament_tension: float,
+            filament_current: float,
             film_layer: FilmLayer) -> TriodeSputtering:
         return cls(has_active_cooling=has_active_cooling, rotation=rotation,
-                   filament_tension=filament_tension, film_layer=film_layer)
+                   filament_current=filament_current, film_layer=film_layer)
 
 
 class UserUploadedFile(BaseModel):
@@ -716,5 +803,3 @@ class AcidConstituent(BaseModel):
     def new(cls, proportion: float, formula: str, etching: WetEtching)\
             -> AcidConstituent:
         return cls(proportion=proportion, formula=formula, etching=etching)
-
-

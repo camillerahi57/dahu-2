@@ -61,7 +61,7 @@ class StoichiometryField(FormField):
 class DiscCenterX(FormField):
     def _streamlit_input(self):
         return st.number_input("Center X (in pixels)", on_change=self.on_change,
-                               step=1)
+                               step=1, min_value=0)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -70,7 +70,7 @@ class DiscCenterX(FormField):
 class DiscCenterY(FormField):
     def _streamlit_input(self):
         return st.number_input("Center Y (in pixels)", on_change=self.on_change,
-                               step=1)
+                               step=1, min_value=0)
 
     def _is_valid(self) -> tuple[bool, str]:
         return True, ''
@@ -79,15 +79,16 @@ class DiscCenterY(FormField):
 class RadiusField(FormField):
     def _streamlit_input(self):
         return st.number_input(
-            "Radius (in pixels)", on_change=self.on_change, step=1
+            "Radius (in pixels)", on_change=self.on_change, step=1,
+            min_value=0,
         )
 
     def _is_valid(self):
-        if self.value > 0:
-            return True, ''
-        else:
+        if self.value <= 0:
             return False, f'Radius must be strictly positive.'
+        return True, ''
 
+# TODO Forbid negative pixels everywhere.
 
 class RectangleFirstVertexX(FormField):
     def _streamlit_input(self):
@@ -125,9 +126,20 @@ class RectangleOppositeVertexY(FormField):
         return True, ''
 
 
+class TargetDiameterInPixels(FormField):
+    def _streamlit_input(self):
+        return st.number_input("Target diameter in pixels", width=200
+                               , on_change=self.on_change, min_value=0)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Target diameter must be strictly positive.'
+        return True, ''
+
+
 class TargetDiameterMillimeters(FormField):
     def _streamlit_input(self):
-        return st.number_input("Target diameter (in millimeters):",
+        return st.number_input("Real target diameter in millimeters:",
                                on_change=self.on_change,
                                width=200)
 
@@ -138,6 +150,17 @@ class TargetDiameterMillimeters(FormField):
             return False, 'The diameter must be in millimeters.'
         if not self.value > 0:
             return False, 'Please enter the target diameter.'
+        return True, ''
+
+
+class PatchText(FormField):
+    EXAMPLE = ""
+
+    def _streamlit_input(self):
+        return st.text_area("Patches:", on_change=self.on_change,
+                            placeholder=self.EXAMPLE)
+
+    def _is_valid(self) -> tuple[bool, str]:
         return True, ''
 
 

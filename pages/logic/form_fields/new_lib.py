@@ -137,8 +137,8 @@ class FilmLayerFunctionField(FormField):
 
 class DepositTempField(FormField):
     def _streamlit_input(self):
-        return st.number_input("Deposit temperature", min_value=0.,
-                               on_change=self.on_change)
+        return st.number_input("Deposit temperature (Kelvin)", min_value=0.,
+                               on_change=self.on_change, value=300)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value <= 0:
@@ -220,11 +220,11 @@ class RotationField(FormField):
         return True, ''
 
 
-class FilamentTensionField(FormField):
+class FilamentCurrentField(FormField):
     def _streamlit_input(self):
-        return st.number_input("Filament tension", on_change=self.on_change)
+        return st.number_input("Filament current", on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value <= 0:
-            return False, 'Filament tension must be strictly positive.'
+            return False, 'Filament current must be strictly positive.'
         return True, ''

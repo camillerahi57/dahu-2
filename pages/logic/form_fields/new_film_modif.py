@@ -1,6 +1,6 @@
 import streamlit as st
 
-from logic.constants import SessionKeys as Sk, CookieKeys as Ck
+from logic.constants import SessionKeys as Sk, CookieKeys as Ck, ChemicalElement
 from logic.db_enums import FilmModifType, Furnace
 from logic.db_schema import FilmModification, Patch
 from logic.form_fields.shared import FormField
@@ -163,7 +163,7 @@ class PowerField(FormField):
 class PlasmaFormulaField(FormField):
     def _streamlit_input(self):
         return st.text_input('Formula', on_change=self.on_change,
-                             key=self.input_key, value='Ar')
+                             key=self.input_key, value=ChemicalElement.ARGON)
 
     def _is_valid(self) -> tuple[bool, str]:
         return Patch.is_valid_formula(self.value)
@@ -178,10 +178,22 @@ class AcidFormulaField(FormField):
         return Patch.is_valid_formula(self.value)
 
 
-class ProportionField(FormField):
+class AcidProportionField(FormField):
     def _streamlit_input(self):
         return st.number_input('Proportion (will be normalized)', min_value=0.,
                                on_change=self.on_change, key=self.input_key)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value <= 0:
+            return False, 'Proportion must be strictly positive.'
+        return True, ''
+
+
+class PlasmaProportionField(FormField):
+    def _streamlit_input(self):
+        return st.number_input(
+            'Proportion (will be normalized)', min_value=0., value=1,
+            on_change=self.on_change, key=self.input_key)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value <= 0:

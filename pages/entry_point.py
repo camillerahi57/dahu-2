@@ -11,6 +11,7 @@ page = st.navigation([
     st.Page('new_lib.py', title='Add a New Library', icon="🐐"),
     st.Page('new_target.py', title='Add a New Target', icon="🐐"),
     st.Page('new_substrate.py', title='Add a New Substrate', icon="🐐"),
+    st.Page('new_charac.py', title='Add a New Characterization', icon="🐐"),
 
     st.Page('inspect_lib.py', title='Library', icon="🐐"),
     st.Page('inspect_target.py', title='Target', icon="🐐"),

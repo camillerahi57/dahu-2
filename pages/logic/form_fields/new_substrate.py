@@ -33,7 +33,9 @@ class SubstrateNameField(FormField):
 
 class ThicknessField(FormField):
     def _streamlit_input(self):
-        return st.number_input("Thickness", on_change=self.on_change)
+        return st.number_input(  # TODO more realistic example:
+            "Thickness (ex: 6e-3)", on_change=self.on_change,
+            step=1e-5, format="%.5f")
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value <= 0:
@@ -59,4 +61,14 @@ class LField(FormField):
         return st.number_input("L", step=1, on_change=self.on_change)
 
     def _is_valid(self) -> tuple[bool, str]:
+        return True, ''
+
+class HasCrystalOrientationField(FormField):
+    def _streamlit_input(self):
+        return st.radio("Has a crystal orientation", [True, False],
+                        index=None, on_change=self.on_change)
+
+    def _is_valid(self) -> tuple[bool, str]:
+        if self.value is None:
+            return False, "Please select an option."
         return True, ''

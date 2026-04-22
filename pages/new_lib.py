@@ -14,7 +14,7 @@ from logic.form_fields.new_lib import LibNameField, FilmPhysicalNameField, \
     StoichiometryField, \
     DepositDistanceField, DepositAngleField, SputteringGeneratorField, \
     HasActiveCoolingField, RotationField, \
-    FilamentTensionField, SubstrateField, DepositTempField, \
+    FilamentCurrentField, SubstrateField, DepositTempField, \
     DepositDurationField, DepositPowerField
 from logic.form_fields.shared import DialogData
 from logic.functions import load_session_state, save_session_state
@@ -58,7 +58,7 @@ class LayerData(DialogData):
     class Triode:
         has_active_cooling: bool
         rotation: float
-        filament_tension: float
+        filament_current: float
 
     @classmethod
     @st.dialog("Layer info")
@@ -84,11 +84,11 @@ class LayerData(DialogData):
         elif sputtering_sys == SputteringSystem.TRIODE:
             active_cooling_fld = HasActiveCoolingField.input()
             rotation_fld = RotationField.input()
-            filament_tension_fld = FilamentTensionField.input()
-            fields_ += [active_cooling_fld, rotation_fld, filament_tension_fld]
+            filament_current_fld = FilamentCurrentField.input()
+            fields_ += [active_cooling_fld, rotation_fld, filament_current_fld]
             sputtering_data = cls.Triode(active_cooling_fld.value,
                                          rotation_fld.value,
-                                         filament_tension_fld.value)
+                                         filament_current_fld.value)
         else:
             raise RuntimeError(f"Unknown sputtering system: {sputtering_sys}.")
 
@@ -120,9 +120,9 @@ if base_fields_valid:
         if flex.button("❌", key=i):
             layer_data_list.pop(i)
             st.rerun()
-    st.write("**To capping layer ⬆️**")
     if st.button("Add layer", key='add_btn'):
         LayerData.form()
+    st.write("**To capping layer ⬆️**")
 
     st.divider()
 
@@ -163,7 +163,7 @@ if st.button("Submit Library", disabled=not can_submit):
         TriodeSputtering.new(
             has_active_cooling=additional.sputtering.has_active_cooling,
             rotation=additional.sputtering.rotation,
-            filament_tension=additional.sputtering.filament_tension,
+            filament_current=additional.sputtering.filament_current,
             film_layer=film_layers[i],
         )
         for i, additional in enumerate(layer_data_list)

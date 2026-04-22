@@ -2,7 +2,7 @@ import streamlit as st
 from pandas import DataFrame
 
 from logic.components import inspect_page_header
-from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk
+from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
 from logic.db_enums import FilmModifType
 from logic.db_schema import Library, Film, Substrate, Target, FilmModification,\
     Annealing, Patterning, IonBeamEtching, WetEtching
@@ -80,8 +80,7 @@ def film_modif_info(modif_: FilmModification):
         st.image(process.image_path())
 
     elif isinstance(process, IonBeamEtching):
-        st.write(f"**Depth:** {process.depth}\n\n"
-                 f"**Duration:** {process.duration}\n\n"
+        st.write(f"**Duration:** {process.duration}\n\n"
                  f"**Flow:** {process.flow}\n\n"
                  f"**Incidence angle:** {process.incidence_angle}\n\n"
                  f"**Rotation:** {process.rotation}\n\n"
@@ -96,8 +95,7 @@ def film_modif_info(modif_: FilmModification):
         st.write(f"**Plasma constituents:**{constituents_str}")
 
     elif isinstance(process, WetEtching):
-        st.write(f"**Depth:** {process.depth}\n\n"
-                 f"**Duration:** {process.duration}\n\n"
+        st.write(f"**Duration:** {process.duration}\n\n"
                  f"**Temperature:** {process.temperature}")
         constituents = process.constituents
         proportion_sum = sum(const.proportion for const in constituents)
@@ -115,10 +113,10 @@ def film_modif_info(modif_: FilmModification):
         modif_.delete_instance()
         st.rerun()
 
-def card(label: str):
+def card(label_: str):
     with st.container(border=True, horizontal_alignment='center'):
         st.space()
-        st.subheader(label, text_alignment='center')
+        st.subheader(label_, text_alignment='center')
         st.space()
 
 
@@ -140,13 +138,19 @@ col1, col2 = st.columns([40, 60])
 
 with col1:
     with st.container(horizontal=True, vertical_alignment='center'):
-        card('EDX')
+        with st.container(border=True, horizontal_alignment='center'):
+            label = '➕**Add new characterization**'
+            url = f'http://{DOMAIN}/new_charac'  # noqa
+            st.space()
+            st.markdown(link_html(label, url), unsafe_allow_html=True,
+                        text_alignment='center')
+            st.space()
         card('MOKE')
         card('PROFILO')
     with st.container(horizontal=True, vertical_alignment='center'):
         card('X-RAY')
         card('MOKE-2')
-        card('EDX-2')
+        card('EDX')
 
 with col2:
     with st.container(border=True):

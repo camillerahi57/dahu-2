@@ -9,7 +9,7 @@ from logic.form_fields.new_target import MadeAtField, ExperimenterEmailField, \
     StoichiometryField, DiscCenterX, DiscCenterY, RadiusField, \
     RectangleFirstVertexX, RectangleFirstVertexY, \
     RectangleOppositeVertexX, RectangleOppositeVertexY, PhotoUploadField, \
-    TargetDiameterMillimeters, PolygonDataText
+    TargetDiameterMillimeters, PolygonDataText, TargetDiameterInPixels
 from logic.functions import save_session_state, load_session_state, \
     disc_patch_to_scatter, \
     polygon_patch_to_scatter, store_file
@@ -164,8 +164,8 @@ with col1:
                 sess[Sk.PATCH_FORMS].pop(patch_number)
                 st.rerun()
     if len(sess[Sk.PATCH_FORMS]) == 0:
-        st.markdown("- Start with the patches at the back.\n"
-                    "- The target base is the first patch.\n"
+        st.markdown("- If patches overlap, start with patches from the back, "
+                    "including the target it-self.\n"
                     "- Open the target photo with Microsoft Paint to get "
                     "pixel positions (on the bottom left).")
 
@@ -176,10 +176,9 @@ with col1:
                         vertical_alignment="center")
     if flex.button("Disc"):
         DiscForm()
-    if flex.button("Rectangle"):
-        AlignedRectangleForm()
     if flex.button("Polygon"):
         PolygonForm()
+
 
 with col2:
     fig = go.Figure(
@@ -202,10 +201,12 @@ with col2:
 
     st.plotly_chart(fig)
 
-target_diameter_fld = TargetDiameterMillimeters.input()
+pixel_diameter_dlf = TargetDiameterInPixels.input()
+# TODO Verify that it matches with the back patch.
+real_diameter_fld = TargetDiameterMillimeters.input()
 st.divider()
 fields = [made_on_fld, email_fld, target_name_fld, comment_fld,
-          photo_upload_fld, target_diameter_fld]
+          photo_upload_fld, real_diameter_fld]
 all_flds_valid = all(fld.is_valid for fld in fields)
 at_least_one_patch = len(sess[Sk.PATCH_FORMS]) > 0
 can_submit = all_flds_valid and at_least_one_patch

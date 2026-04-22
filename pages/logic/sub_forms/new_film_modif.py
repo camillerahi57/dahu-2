@@ -11,8 +11,9 @@ from logic.db_schema import FilmModification, Annealing, IonBeamEtching, \
 from logic.form_fields.new_film_modif import MadeByField, MadeOnField, \
     ModifTypeField, MadeAfterField, TemperatureField, DurationField, \
     PressureField, FurnaceField, FlowField, AngleField, \
-    RotationField, PowerField, PatternField, ProportionField, \
-    NumberOfConstituentsField, PlasmaFormulaField, AcidFormulaField
+    RotationField, PowerField, PatternField, AcidProportionField, \
+    NumberOfConstituentsField, PlasmaFormulaField, AcidFormulaField, \
+    PlasmaProportionField
 from logic.form_fields.shared import DialogData, FormField
 
 
@@ -170,7 +171,8 @@ class IonBeamEtchingForm:
         for i in range(constituent_nb_fld.value):
             with st.container(horizontal=True, vertical_alignment='center'):
                 formula_fld = PlasmaFormulaField.input(key=f'formula_{i}')
-                proportion_fld = ProportionField.input(key=f'proportion_{i}')
+                proportion_fld = PlasmaProportionField.input(
+                    key=f'proportion_{i}')
                 data = ConstituentData(
                     formula=formula_fld.value,
                     proportion=proportion_fld.value,
@@ -201,7 +203,8 @@ class WetEtchingForm:
         for i in range(constituent_nb_fld.value):
             with st.container(horizontal=True, vertical_alignment='center'):
                 formula_fld = AcidFormulaField.input(key=f'formula_{i}')
-                proportion_fld = ProportionField.input(key=f'proportion_{i}')
+                proportion_fld = AcidProportionField.input(
+                    key=f'proportion_{i}')
                 data = ConstituentData(
                     formula=formula_fld.value,
                     proportion=proportion_fld.value,
