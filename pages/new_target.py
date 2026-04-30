@@ -1,20 +1,50 @@
+import io
+
 import plotly.graph_objects as go
 import streamlit as st
+from PIL import Image
 from plotly.graph_objs import Scatter
+from streamlit_cropperjs import st_cropperjs
+from streamlit_image_coordinates import streamlit_image_coordinates
 
-from logic.constants import SessionKeys as Sk, CookieKeys as Ck
-from logic.db_schema import Target, db, Patch, Polygon
+from logic.constants import CookieKeys as Ck, SessionKeys as Sk
+from logic.db_enums import ShapeType
+from logic.db_schema import Target, db, Patch
 from logic.form_fields.new_target import MadeAtField, ExperimenterEmailField, \
     TargetNameField, CommentField, \
-    StoichiometryField, DiscCenterX, DiscCenterY, RadiusField, \
-    RectangleFirstVertexX, RectangleFirstVertexY, \
-    RectangleOppositeVertexX, RectangleOppositeVertexY, PhotoUploadField, \
-    TargetDiameterMillimeters, PolygonDataText, TargetDiameterInPixels
+    PhotoUploadField, \
+    TargetDiameterMillimeters, TargetDiameterInPixels, \
+    PatchText
 from logic.functions import save_session_state, load_session_state, \
-    disc_patch_to_scatter, \
-    polygon_patch_to_scatter, store_file
+    store_file
+
+
+@st.dialog("How to")
+def guide():
+    st.write(
+        "For each patch, write one line like:\n\n"
+        "**[disc or polygon]** / **[stoichiometry]** "
+        "/ **X1,Y1** / **X2,Y2** / ... / **XN,YN**")
+    st.subheader("What are these X,Y points?")
+    st.write(
+        "- **If it's a disc**, chose any 3 points on the circumference "
+        "that are pretty far from each other.")
+    st.write(
+        "- **If it's a polygon**, write down the X,Y coordinates of each "
+        "vertex of the polygon."
+    )
+    st.subheader("Example")
+    st.write(
+        "A target is always a disc with patches on it. "
+        "Let's say we have 2 patches. One Nd disc patch, and "
+        "one Fe rectangle patch. Here is the text you should "
+        "write:"
+    )
+    st.code(PatchText.EXAMPLE)
+
 
 sess = load_session_state('new_target.py')
+# st.set_page_config(layout="wide")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -27,194 +57,24 @@ col1, col2 = st.columns(2)
 with col1:
     photo_upload_fld = PhotoUploadField.input()
 with col2:
-    if photo_upload_fld.value:
-        st.image(photo_upload_fld.value, width=200)
+    if Sk.TARGET_IMG not in sess:
+        if photo_upload_fld.value:
+            photo = photo_upload_fld.value.read()
+            with st.container(width=300):
+                cropped_pic = st_cropperjs(pic=photo, btn_text="Select target",
+                                           key="foo")
+                if cropped_pic:
+                    target_img = Image.open(io.BytesIO(cropped_pic))
+                    sess[Sk.TARGET_IMG] = target_img
+    else:
+        target_img = sess[Sk.TARGET_IMG]
+        st.container(height=50, border=False)
+        st.write("**Target cropped ✅**")
 
-col1, col2 = st.columns([100, 90])
-
-
-class DiscForm:
-    @st.dialog("New Disc")
-    def __init__(self):
-        sess_ = st.session_state
-        stoichio_fld = StoichiometryField.input()
-        col1_, col2_, col3_ = st.columns(3)
-        with col1_:
-            x_pos_fld = DiscCenterX.input()
-        with col2_:
-            y_pos_fld = DiscCenterY.input()
-        with col3_:
-            radius_fld = RadiusField.input()
-
-        fields_ = [stoichio_fld, x_pos_fld, y_pos_fld, radius_fld]
-        all_fields_valid = all(fld.is_valid for fld in fields_)
-
-        if st.button("Add Disc", disabled=not all_fields_valid):
-            for fld in fields_:
-                fld.remove_from_session()  # To have a new one in the next
-                # pop-up.
-            self.stoichio = stoichio_fld.value
-            self.x_pos = x_pos_fld.value
-            self.y_pos = y_pos_fld.value
-            self.radius = radius_fld.value
-            sess_[Sk.PATCH_FORMS].append(self)
-            st.rerun()
-
-    def to_scatter(self, color_: str, name_: str):
-        x_y_radius_ = self.x_pos, self.y_pos, self.radius
-        return disc_patch_to_scatter(x_y_radius_, color_, name_)
-
-
-class PolygonForm:
-    @st.dialog("New Polygon")
-    def __init__(self):
-        sess_ = st.session_state
-        stoichio_fld = StoichiometryField.input()
-        polygon_text = PolygonDataText.input()
-        can_submit_ = stoichio_fld.is_valid and polygon_text.is_valid
-        if st.button("Add Polygon", disabled=not can_submit_):
-            stoichio_fld.remove_from_session()
-            polygon_text.remove_from_session()
-            self.stoichio = stoichio_fld.value
-            self.polygon_text = polygon_text.value
-            sess_[Sk.PATCH_FORMS].append(self)
-            st.rerun()
-
-    def vertices(self):
-        return Polygon.polygon_text_to_vertices(self.polygon_text)
-
-    def to_scatter(self, color_: str, name_: str):
-        vertices_ = self.vertices()
-        return polygon_patch_to_scatter(vertices_, color_, name_)
-
-
-class AlignedRectangleForm:
-    @st.dialog("New Aligned Rectangle")
-    def __init__(self):
-        sess_ = st.session_state
-        stoichio_fld = StoichiometryField.input()
-        st.subheader("First Vertex:")
-        col1_, col2_ = st.columns(2)
-        with col1_:
-            vertex_1_x_fld = RectangleFirstVertexX.input()
-        with col2_:
-            vertex_1_y_fld = RectangleFirstVertexY.input()
-        st.subheader("Opposite Vertex:")
-        col1_, col2_ = st.columns(2)
-        with col1_:
-            vertex_2_x_fld = RectangleOppositeVertexX.input()
-        with col2_:
-            vertex_2_y_fld = RectangleOppositeVertexY.input()
-
-        fields_ = [stoichio_fld, vertex_1_x_fld, vertex_1_y_fld, vertex_2_x_fld,
-                   vertex_2_y_fld]
-        all_fields_valid = all(fld.is_valid for fld in fields_)
-
-        if st.button("Add Aligned Rectangle", disabled=not all_fields_valid):
-            for fld in fields_:
-                fld.remove_from_session()
-            self.stoichio = stoichio_fld.value
-            self.vertex_1_x = vertex_1_x_fld.value
-            self.vertex_1_y = vertex_1_y_fld.value
-            self.vertex_2_x = vertex_2_x_fld.value
-            self.vertex_2_y = vertex_2_y_fld.value
-            sess_[Sk.PATCH_FORMS].append(self)
-            st.rerun()
-
-    def vertices(self) -> list[tuple[float, float]]:
-        return [
-            (self.vertex_1_x, self.vertex_1_y),
-            (self.vertex_1_x, self.vertex_2_y),
-            (self.vertex_2_x, self.vertex_2_y),
-            (self.vertex_2_x, self.vertex_1_y),
-        ]
-
-    def to_scatter(self, color_: str, name_: str):
-        vertices_ = self.vertices()
-        return polygon_patch_to_scatter(vertices_, color_, name_)
-
-
-with col1:
-    st.title('Patches')
-    if Sk.PATCH_FORMS not in sess:
-        sess[Sk.PATCH_FORMS] = []
-
-    for patch_number, form in enumerate(sess[Sk.PATCH_FORMS]):
-        col11, col12 = st.columns([85, 15])
-        with col11:
-            rectangle = Patch.colored_rectangle_html(form.stoichio)
-            if form.__class__.__name__ == DiscForm.__name__:
-                patch_str = (f"**Disc**  |  *{form.stoichio}*  |  "
-                             f"Center: ({form.x_pos:g}, {form.y_pos:g}) · "
-                             f"Radius: {form.radius:g}")
-            if form.__class__.__name__ == AlignedRectangleForm.__name__:
-                patch_str = (f"**Rectangle**  |  *{form.stoichio}*  |  "
-                             f"First vertex: ({form.vertex_1_x:g}, "
-                             f"{form.vertex_1_y:g}) · "
-                             f"Opposite vertex: ({form.vertex_2_x:g}, "
-                             f"{form.vertex_2_y:g})")
-            if form.__class__.__name__ == PolygonForm.__name__:
-                vertices_text = ' '.join(
-                    [f'({x}, {y})' for x, y in form.vertices()])
-                patch_str = (f"**Polygon**  |  *{form.stoichio}*  |  "
-                             f"{vertices_text}")
-            st.write(rectangle + ' ' + patch_str, unsafe_allow_html=True)
-        with col12:
-            if st.button("❌", key=f"patch_{patch_number}"):
-                sess[Sk.PATCH_FORMS].pop(patch_number)
-                st.rerun()
-    if len(sess[Sk.PATCH_FORMS]) == 0:
-        st.markdown("- If patches overlap, start with patches from the back, "
-                    "including the target it-self.\n"
-                    "- Open the target photo with Microsoft Paint to get "
-                    "pixel positions (on the bottom left).")
-
-    st.divider()
-
-    st.subheader("**Add a patch:**", anchor='False', width=180)
-    flex = st.container(horizontal=True, horizontal_alignment="left",
-                        vertical_alignment="center")
-    if flex.button("Disc"):
-        DiscForm()
-    if flex.button("Polygon"):
-        PolygonForm()
-
-
-with col2:
-    fig = go.Figure(
-        [Scatter()],
-        layout=go.Layout(
-            xaxis={'showgrid': True, 'side': 'top', 'range': [0, 100]},
-            yaxis={'scaleanchor': 'x', 'range': [100, 0]},
-        ),
-    )
-
-    for form in sess[Sk.PATCH_FORMS]:
-        form: DiscForm | AlignedRectangleForm
-        color = Patch.plotly_color(form.stoichio)
-        scatter = form.to_scatter(color, form.stoichio)
-        fig.add_trace(scatter)
-
-    # if photo_upload_fld.value: # Not working (not the right positions and
-    # orientation (André's image received on 2026-03-23)).
-    # add_target_photo_to_fig(fig, photo_upload_fld.value)
-
-    st.plotly_chart(fig)
-
-pixel_diameter_dlf = TargetDiameterInPixels.input()
-# TODO Verify that it matches with the back patch.
-real_diameter_fld = TargetDiameterMillimeters.input()
-st.divider()
 fields = [made_on_fld, email_fld, target_name_fld, comment_fld,
-          photo_upload_fld, real_diameter_fld]
-all_flds_valid = all(fld.is_valid for fld in fields)
-at_least_one_patch = len(sess[Sk.PATCH_FORMS]) > 0
-can_submit = all_flds_valid and at_least_one_patch
-
-if st.button("Submit", disabled=not can_submit, type="primary"):
-    sess[
-        Ck.LAST_EMAIL_USED] = email_fld.value  # Save last used email for
-    # future autofill.
+          photo_upload_fld]
+can_create_target = all(fld.is_valid for fld in fields)
+if can_create_target and Sk.TARGET_IMG in sess:
     target = Target.new(
         made_on=made_on_fld.value,
         made_by_email=email_fld.value,
@@ -223,33 +83,110 @@ if st.button("Submit", disabled=not can_submit, type="primary"):
         photo_file_name=photo_upload_fld.create_file_name(),
     )
 
-    with db.atomic():  # Save everything in a single transaction (everything
-        # or nothing).
-        target.save()
-        for patch_number, form in enumerate(sess[Sk.PATCH_FORMS]):
-            # If disc:
-            if form.__class__.__name__ == DiscForm.__name__:
-                x_y_radius = form.x_pos, form.y_pos, form.radius
-                patch, disc = Patch.new_disc_patch(
-                    form.stoichio, x_y_radius, target, patch_number,
-                )
-                # Save the patch (order matters):
-                patch.save()
-                disc.save()
-            # If polygon:
-            if form.__class__.__name__ in [AlignedRectangleForm.__name__,
-                                           PolygonForm.__name__]:
-                vertices = form.vertices()
-                patch, polygon, vertices = Patch.new_polygon_patch(
-                    form.stoichio, vertices, patch_number, target,
-                )
-                # Save the patch (order matters):
-                patch.save()
-                polygon.save()
-                for v in vertices:
-                    v.save()
-        # If the transaction has not failed at this point:
-        store_file(photo_upload_fld.value.getvalue(), target.photo_file_name)
+    coords = streamlit_image_coordinates(
+        target_img, use_column_width=True, cursor='crosshair',
+        image_format='PNG', png_compression_level=0)
 
-    save_session_state(sess)
-    st.switch_page('target_added.py')
+    st.write("**Click on the above image to get pixel coordinates.**")
+    if coords:
+        with st.container(border=True, width='content'):
+            st.write(f"Clicked at:   **{coords['x']},{coords['y']}**")
+
+    col1, col2 = st.columns([100, 40])
+    with col1:
+        st.title('Patches')
+        if st.button("How to write patch data"):
+            guide()
+        patch_txt_fld = PatchText.input()
+        try:
+            patches = Patch.from_patch_text(patch_txt_fld.value, target)
+            is_valid_text = True
+        except Exception as e:  # noqa
+            if patch_txt_fld.value != '':
+                st.warning(str(e))
+            patches = []
+            is_valid_text = False
+
+    with col2:
+        fig = go.Figure(
+            [Scatter()],
+            layout=go.Layout(
+                xaxis={'showgrid': True, 'side': 'top'},
+                yaxis={'scaleanchor': 'x', 'autorange': 'reversed'},
+            ),
+            # layout=go.Layout(
+            #     xaxis={'showgrid': True, 'side': 'top', 'range': [0, 100]},
+            #     yaxis={'scaleanchor': 'x', 'range': [100, 0]},
+            # ),
+        )
+
+        for patch in patches:
+            scatter = patch.to_scatter()
+            fig.add_trace(scatter)
+        st.plotly_chart(fig)
+
+
+    for patch in patches:
+        rectangle = Patch.colored_rectangle_html(patch.stoichio)
+        if patch.shape_type == ShapeType.DISC:
+            disc = patch.disc
+            x, y, r = disc.center_px_x, disc.center_px_y, disc.radius_in_px
+            patch_str = '  |  '.join([
+                '**Disc**',
+                f'*{patch.stoichio}*',
+                f"Center: **{x:.0f},{y:.0f}** · Radius: **{r:.0f}**"
+            ])
+        elif patch.shape_type == ShapeType.POLYGON:
+            poly = patch.polygon
+            vertices_text = ' — '.join(
+                [f'**{v.pixel_x},{v.pixel_y}**'
+                 for v in poly.ordered_vertices()])
+            patch_str = '  |  '.join([
+                "**Polygon**",
+                f"*{patch.stoichio}*",
+                f"Vertices: {vertices_text}"
+            ])
+        else:
+            raise RuntimeError(f'Unknown shape type: {patch.shape_type}')
+        st.write(rectangle + ' ' + patch_str, unsafe_allow_html=True)
+
+    # TODO Mettre target state proprement sur le schéma
+    st.divider()
+
+    fields += [patch_txt_fld]
+
+    if len(patches) > 0 and all(f.is_valid for f in fields):
+        with st.container(horizontal=True, vertical_alignment='center'):
+            pixel_diameter_fld = TargetDiameterInPixels.input()
+            real_diameter_fld = TargetDiameterMillimeters.input()
+        target_patch = patches[0]
+        has_coherent_diameter = (
+            pixel_diameter_fld.is_coherent_with_1st_patch(target_patch)
+        )
+        pixel_diameter_fld.show_coherence_warning(target_patch)
+        st.divider()
+        fields += [pixel_diameter_fld, real_diameter_fld]
+        all_flds_valid = all(fld.is_valid for fld in fields)
+        can_submit = all_flds_valid and has_coherent_diameter
+
+        if st.button("Submit", disabled=not can_submit, type="primary"):
+            sess[Ck.LAST_EMAIL_USED] = email_fld.value  # Save last used email for
+            # future autofill.
+
+            with db.atomic():  # Save everything in a single transaction
+                # (everything or nothing).
+                target.save()
+                for patch in patches:
+                    patch.save()
+                    if patch.shape_type == ShapeType.DISC:
+                        patch.disc.save()
+                    if patch.shape_type == ShapeType.POLYGON:
+                        patch.polygon.save()
+                        for v in patch.polygon.ordered_vertices():
+                            v.save()
+                # If the transaction has not failed at this point:
+                store_file(photo_upload_fld.value.getvalue(),
+                           target.photo_file_name)
+
+            save_session_state(sess)
+            st.switch_page('target_added.py')

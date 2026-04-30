@@ -138,6 +138,9 @@ class Patch(BaseModel):
     shape_type: ShapeType = CharField()
     target = ForeignKeyField(Target, on_delete='CASCADE')
 
+    disc: Disc
+    polygon: Polygon
+
     @classmethod
     def new(cls, stack_idx: int, stoichio: str, target: Target,
             shape_type: ShapeType):
@@ -210,16 +213,16 @@ class Patch(BaseModel):
         color = self.plotly_color(str(self.stoichio))
         name = str(self.stoichio)
         if self.shape_type == ShapeType.DISC:
-            disc = Disc.get(Disc.patch == self.id)
+            disc = self.disc
             return disc_patch_to_scatter(
-                x_y_radius=(disc.center_px_x, disc.center_px_y,
+                x_y_radius=(disc.center_px_x, disc.center_px_y,  # noqa
                             disc.radius_in_px),
                 color_=color,
                 name_=name,
             )
         elif self.shape_type == ShapeType.POLYGON:
-            polygon = Polygon.get(Polygon.patch == self.id)
-            vertices = polygon.saved_ordered_vertices()
+            polygon = self.polygon
+            vertices = polygon.ordered_vertices()
             vertex_coords = [(v.pixel_x, v.pixel_y) for v in vertices]
             return polygon_patch_to_scatter(vertex_coords, color_=color,
                                             name_=name)
@@ -228,27 +231,27 @@ class Patch(BaseModel):
 
     @classmethod
     def from_patch_text(cls, text: str, target: Target) \
-            -> list[tuple[Patch, Disc|Polygon]]:
+            -> list[Self]:
         text = text.replace(' ', '')
         lines = text.split('\n')
         lines = [l for l in lines if l != '']  # Remove empty lines.
         assert len(lines) >= 1, f"Patch data cannot be empty. Got '{lines}'."
-        return [cls.from_text_line(line, target, i)
+        return [cls._from_text_line(line, target, i)
                 for i, line in enumerate(lines)]
 
     @classmethod
-    def from_text_line(cls, line: str, target: Target, stack_idx: int) \
-            -> tuple[Patch, Disc|Polygon]:
+    def _from_text_line(cls, line: str, target: Target, stack_idx: int) \
+            -> Self:
         line = line.replace(' ', '').removesuffix('/')
-        text_elements = line.split('/')
+        text_elements: list[str] = line.split('/')
         assert len(text_elements) >= 5, f"Not enough info on the line: {line}"
-        shape_type = text_elements[0]
+        shape_type = text_elements[0].lower()
         assert shape_type in ShapeType, \
             (f"Each line must start with a valid shape name. "
              f"Got '{shape_type}' instead.")
         stoichio = text_elements[1]
         is_valid, msg = cls.is_valid_formula(stoichio)
-        assert is_valid, msg
+        assert is_valid, f"Invalid stoichiometry for line '{line}'."
         coord_strings = text_elements[2:]
         coords: list[tuple[int, int]] = []
         for s in coord_strings:
@@ -263,19 +266,17 @@ class Patch(BaseModel):
 
         patch = cls.new(stack_idx, stoichio, target, ShapeType(shape_type))
         if shape_type == ShapeType.DISC:
-            shape = Disc.from_circumference_points(coords, patch)
+            patch.disc = Disc.from_circumference_points(coords, patch)
         elif shape_type == ShapeType.POLYGON:
-            shape = Polygon.from_ordered_vertices(coords, patch)
-        else:
-            raise ValueError(f"Unknown shape_type '{shape_type}'.")
-        return patch, shape
+            patch.polygon = Polygon.from_ordered_vertices(coords, patch)
+        return patch
 
 
 class Disc(BaseModel):
     center_px_x = FloatField()
     center_px_y = FloatField()
     radius_in_px = FloatField()
-    patch = ForeignKeyField(Patch, on_delete='CASCADE')
+    patch = ForeignKeyField(Patch, on_delete='CASCADE', backref='disc')
 
     @classmethod
     def new(cls, center_px_x: float, center_px_y: float, radius_in_px: float,
@@ -329,21 +330,21 @@ class Disc(BaseModel):
 
 
 class Polygon(BaseModel):
-    patch = ForeignKeyField(Patch, on_delete='CASCADE')
+    patch = ForeignKeyField(Patch, on_delete='CASCADE', backref='polygon')
+
+    vertices: list[Vertex]
 
     @classmethod
     def new(cls, patch: Patch):
         return cls(patch=patch)
 
-    vertices: list[Vertex]  # backref of a foreign key in Vertex (see Vertex).
-
     def __str__(self):
         str_ = 'Vertices:'
-        for v in self.saved_ordered_vertices():
+        for v in self.ordered_vertices():
             str_ += f' {v}'
         return str_
 
-    def saved_ordered_vertices(self) -> list[Vertex]:
+    def ordered_vertices(self) -> list[Vertex]:
         def get_rank(v: Vertex):
             return int(v.clockwise_rank)  # noqa I don't understand the warning.
         return sorted(self.vertices, key=get_rank)
@@ -351,7 +352,7 @@ class Polygon(BaseModel):
     def to_scatter(self, color: str, name: str) -> Scatter:
         vertex_list: list[tuple[float, float]] = [
             (v.pixel_x, v.pixel_y)
-            for v in self.saved_ordered_vertices()
+            for v in self.ordered_vertices()
         ]
         if vertex_list[-1] != vertex_list[0]:
             vertex_list.append(vertex_list[0])  # Close de loop.
@@ -368,10 +369,10 @@ class Polygon(BaseModel):
         )
 
     @classmethod
-    def from_text(cls, text: str, patch: Patch) -> tuple[Polygon, list[Vertex]]:
+    def from_text(cls, text: str, patch: Patch) -> Self:
         vertex_tuples = cls.polygon_text_to_vertices(text)
-        polygon, vertices = Polygon.from_ordered_vertices(vertex_tuples, patch)
-        return polygon, vertices
+        polygon = Polygon.from_ordered_vertices(vertex_tuples, patch)
+        return polygon
 
     @staticmethod
     def polygon_text_to_vertices(text: str) -> list[tuple[float, float]]:
@@ -393,21 +394,20 @@ class Polygon(BaseModel):
     @classmethod
     def from_ordered_vertices(cls,
                               clockwise_vertices: list[tuple[float, float]],
-                              patch: Patch) \
-            -> tuple[Polygon, list[Vertex]]:
+                              patch: Patch) -> Self:
         polygon = cls.new(patch=patch)
         vertices = []
         for i, (x, y) in enumerate(clockwise_vertices):
             vertices.append(
                 Vertex.new(pixel_x=x, pixel_y=y, clockwise_rank=i,
                            polygon=polygon))
-        return polygon, vertices
+        polygon.vertices = vertices
+        return polygon
 
     @classmethod
     def from_aligned_rectangle_data(cls, first_vertex: tuple[float, float],
                                     opposite_vertex: tuple[float, float],
-                                    patch: Patch) \
-            -> tuple[Polygon, list[Vertex]]:
+                                    patch: Patch) -> Self:
         return Polygon.from_ordered_vertices(
             [
                 (first_vertex[0], first_vertex[1]),

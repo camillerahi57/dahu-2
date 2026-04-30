@@ -52,6 +52,7 @@ class CharacType(StrEnum):
     VSM_SQUID = 'vsm_squid'
     EDX = 'edx'
     XRAY = 'xray'
+    IMAGING = 'imaging'
 
 
 class MokeMachine(StrEnum):
@@ -89,3 +90,8 @@ class VsmSquidOrientation(StrEnum):
 class XrayType(StrEnum):
     SMART_LAB = 'smart_lab'
     ESRF = 'esrf'
+
+
+class EtchingDevelopers(StrEnum):
+    pass
+    # TODO Bases from https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/

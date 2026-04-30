@@ -128,7 +128,7 @@ class RectangleOppositeVertexY(FormField):
 
 class TargetDiameterInPixels(FormField):
     def _streamlit_input(self):
-        return st.number_input("Target diameter in pixels", width=200
+        return st.number_input("Target diameter in pixels", width=300
                                , on_change=self.on_change, min_value=0)
 
     def _is_valid(self) -> tuple[bool, str]:
@@ -136,12 +136,31 @@ class TargetDiameterInPixels(FormField):
             return False, 'Target diameter must be strictly positive.'
         return True, ''
 
+    def is_coherent_with_1st_patch(self, patch: Patch):
+        if patch.disc is not None and self.is_valid:
+            first_patch_diameter = patch.disc.radius_in_px * 2
+            entered_px_diameter = self.value
+            difference = abs(first_patch_diameter - entered_px_diameter)
+            diff_ratio = difference / entered_px_diameter
+            if diff_ratio < 0.1:
+                return True
+        return False
+
+    def show_coherence_warning(self, target_patch: Patch):
+        if (self.has_changed
+                and self.is_valid
+                and not self.is_coherent_with_1st_patch(target_patch)):
+            st.warning(
+                "The first patch you entered is supposed to be the target, "
+                f"but it's radius is {int(target_patch.disc.radius_in_px)}, "
+                f"which doesn't correspond to the diameter of {self.value} "
+                f"pixels you just entered.")
+
 
 class TargetDiameterMillimeters(FormField):
     def _streamlit_input(self):
         return st.number_input("Real target diameter in millimeters:",
-                               on_change=self.on_change,
-                               width=200)
+                               on_change=self.on_change, width=300, step=1)
 
     def _is_valid(self) -> tuple[bool, str]:
         if self.value < 0:
@@ -154,13 +173,18 @@ class TargetDiameterMillimeters(FormField):
 
 
 class PatchText(FormField):
-    EXAMPLE = ""
+    EXAMPLE = ("disc / [target_stoichio] / 310,445 / 1134,454 / 708,1206\n"
+               "disc / Nd / 438,383 / 505,394 / 467,454\n"
+               "polygon / Fe / 925,438 / 1001,388 / 1069,471 / 1000,528\n")
 
     def _streamlit_input(self):
-        return st.text_area("Patches:", on_change=self.on_change,
-                            placeholder=self.EXAMPLE)
+        label = "Start with a disc for the target it-self."
+        return st.text_area(label, on_change=self.on_change,
+                            placeholder=self.EXAMPLE, height=200)
 
     def _is_valid(self) -> tuple[bool, str]:
+        if not self.value.strip().startswith('disc'):
+            return False, 'Please start with the target disc.'
         return True, ''
 
 

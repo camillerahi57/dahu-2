@@ -32,6 +32,7 @@ class SessionKeys(StrEnum):
     SPUTTERING_SYSTEM = 'sputter_system_key'
     LAYER_DATA = 'additional_layer_data_key'
     CURRENT_FILM = 'current_film_key'
+    TARGET_IMG = 'cropped_target_key'
 
 
 class ChemicalElement(StrEnum):
