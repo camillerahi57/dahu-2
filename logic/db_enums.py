@@ -26,15 +26,25 @@ class FilmLayerFunction(StrEnum):
 
 
 class MagnetronSputteringGenerator(StrEnum):
-    DC = 'dc'
-    RF = 'rf'
+    RF_1 = 'RF-1'
+    RF_2 = 'RF-2'
+    RF_3 = 'RF-3'
+    RF_4 = 'RF-4'
+    DC_1 = 'DC-1'
+    DC_2 = 'DC-2'
+    DC_3 = 'DC-3'
+    DC_4 = 'DC-4'
+    DC_5 = 'DC-5'
+    DC_6 = 'DC-6'
+    DC_7 = 'DC-7'
+    DC_8 = 'DC-8'
 
 
 class FilmModifType(StrEnum):
+    LIFT_OFF = 'lift_off'
     ANNEALING = 'annealing'
     WET_ETCHING = 'wet_etching'
     ION_BEAM_ETCHING = 'ion_etching'
-    PATTERNING = 'patterned'
 
 
 class PixelCoordinateSystem(StrEnum):
@@ -95,3 +105,16 @@ class XrayType(StrEnum):
 class EtchingDevelopers(StrEnum):
     pass
     # TODO Bases from https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
+
+
+class StoichioOf(StrEnum):
+    SUBSTRATE_LAYER = 'substrate_layer'
+    PATCH = 'patch'
+    NOMINAL_FILM_LAYER = 'nominal_film_layer'
+    ANNEALING_ATMOSPHERE = 'annealing_atmosphere'
+    ACID_CONSTITUENT = 'acid_constituent'
+
+
+class MagnetronMachineModel(StrEnum):
+    MODEL_1 = 'model_1'
+    MODEL_2 = 'model_2'

@@ -9,8 +9,10 @@ SUB_ID_URL_KEY = 'substrate_id'
 DOMAIN = 'localhost:8501'
 FILE_STORAGE_PATH = Path(
     r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
-FILM_INIT_STATE = 'Film initial state'
+FILM_INIT_STATE = 'As deposited'
 PATTERN_IMAGE_PATH = 'pages/logic/images'
+NEW_TARGET = 'NEW TARGET'
+PIXEL_COORDS = 'pixel_selection'
 
 
 class CookieKeys(StrEnum):
@@ -28,11 +30,15 @@ class SessionKeys(StrEnum):
     PATCH_FORMS = 'patch_forms_key'
     PAGE_FILE_NAME = 'page_name_key'
     SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
+    SUBSTRATE_LAYER_FORMS = 'substrate_layer_forms_key'
     FILM_LAYERS = 'film_layers_key'
     SPUTTERING_SYSTEM = 'sputter_system_key'
     LAYER_DATA = 'additional_layer_data_key'
     CURRENT_FILM = 'current_film_key'
-    TARGET_IMG = 'cropped_target_key'
+    CROPPED_TARGET_IMG = 'cropped_target_key'
+    UPLOADED_TARGET_IMG = 'uploaded_target_key'
+    TARGET_IMG_NAME = 'target_img_name_key'
+    CROPPED_PIC = 'cropped_pic_key'
 
 
 class ChemicalElement(StrEnum):

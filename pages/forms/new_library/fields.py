@@ -1,10 +1,10 @@
 import streamlit as st
 
 from logic.constants import CookieKeys as Ck
-from logic.db_schema import Library, Film, Target, Patch, Substrate
+from logic.lab_modelization.db_models import Library, Film, Target, Patch, Substrate
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
-from logic.form_fields.shared import FormField
+from forms.shared import FormField
 from logic.functions import is_valid_email_address
 
 

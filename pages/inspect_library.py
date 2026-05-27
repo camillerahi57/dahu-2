@@ -1,14 +1,15 @@
 import streamlit as st
 from pandas import DataFrame
 
+from pages import PageEnum
 from logic.components import inspect_page_header
 from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
 from logic.db_enums import FilmModifType
-from logic.db_schema import Library, Film, Substrate, Target, FilmModification,\
-    Annealing, Patterning, IonBeamEtching, WetEtching
+from logic.lab_modelization.db_models import Library, Film, Substrate, Target, FilmModification,\
+    Annealing, IonBeamEtching, WetEtching
 from logic.functions import link_html, email_html, \
     load_session_state
-from logic.sub_forms.new_film_modif import ModifData
+from new_film_modif import ModifData
 from logic.table_columns import LibInspectColumnName as ColName
 
 
@@ -17,12 +18,17 @@ lib: Library = Library.get_by_id(lib_id)
 film: Film = Film.get(Film.library == lib)
 substrate: Substrate = Substrate.get_by_id(film.substrate)
 layers = film.layers
+
+targets = []
+for lay in layers:
+    for usage in lay.target_uses:
+        targets += usage.target
 targets: set[Target] = set(lay.target for lay in layers)
 target_link_htmls = [link_html(target.physical_name, target.url())
                      for target in targets]
 layers = reversed(list(layers))
 
-sess = load_session_state('inspect_lib.py')
+sess = load_session_state(PageEnum.inspect_lib)
 sess[Sk.CURRENT_FILM] = film
 
 st.set_page_config(layout="wide", page_title=lib.name)
@@ -75,9 +81,9 @@ def film_modif_info(modif_: FilmModification):
                  f"**Pressure:** {process.pressure}\n\n"
                  f"**Furnace:** {process.furnace}")
 
-    elif isinstance(process, Patterning):
-        st.write(f"**Diagram name:** {process.diagram_file_name}")
-        st.image(process.image_path())
+    # elif isinstance(process, Patterning):
+    #     st.write(f"**Diagram name:** {process.diagram_file_name}")
+    #     st.image(process.image_path())
 
     elif isinstance(process, IonBeamEtching):
         st.write(f"**Duration:** {process.duration}\n\n"

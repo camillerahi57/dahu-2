@@ -16,7 +16,7 @@ class TargetBrowserColumnName(StrEnum):
     made_on = 'Made on'
     made_by = 'Made by'
     physical_name = 'Physical Name'
-    comment = 'Comment'
+    # comment = 'Comment'
     inspect_link = 'Link'
 
 

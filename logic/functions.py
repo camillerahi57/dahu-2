@@ -1,6 +1,7 @@
 import base64
 import io
 import re
+from datetime import date as dt_date
 from pathlib import Path
 from time import sleep
 from uuid import uuid4
@@ -8,12 +9,14 @@ from uuid import uuid4
 import PIL
 import numpy as np
 import streamlit as st
+from peewee import DateField
 from streamlit_js_eval import streamlit_js_eval
 from plotly.graph_objs import Scatter
 
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
 
+from pages import PageEnum
 from logic.constants import (CookieKeys as Ck,
                              SessionKeys as Sk, FILE_STORAGE_PATH)
 
@@ -83,11 +86,12 @@ def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]],
     )
 
 
-def load_session_state(page_name: str | Path) -> SessionStateProxy:
+def load_session_state(page_enum: PageEnum) -> SessionStateProxy:
     sess = st.session_state
-    if sess.get(Sk.PAGE_FILE_NAME) != page_name:  # Page has changed.
+    page = page_enum.value
+    if sess.get(Sk.PAGE_FILE_NAME) != page.url_path:  # Page has changed.
         reset_session(sess)
-        sess[Sk.PAGE_FILE_NAME] = page_name
+        sess[Sk.PAGE_FILE_NAME] = page.url_path
     add_cookie_data_to_session(sess)
     return sess
 
@@ -166,6 +170,13 @@ def store_file(file_data: bytes, file_name: str = None) -> Path:
     return file_path
 
 
+def replace_file_name_extension(name: str, new_extension: str):
+    new_extension = new_extension.removeprefix('.')
+    parts = name.split(".")
+    parts[-1] = new_extension
+    return ".".join(parts)
+
+
 def link_html(label: str, url: str):
     return f"<a href=\"{url}\" target=\"_self\">{label}</a>"
 
@@ -174,3 +185,7 @@ def email_html(email: str, label: str=None):
     if label is None:
         label = email
     return f'<a href="mailto:{email}">{label}</a>'
+
+
+def extensive_date_str(date: DateField):
+    return dt_date(date.year, date.month, date.day).strftime("%B %d, %Y")

@@ -3,12 +3,13 @@ from datetime import datetime
 
 import streamlit as st
 
+from pages import PageEnum
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
-from logic.db_schema import Target, FilmLayer, Film, db, Substrate, \
+from logic.lab_modelization.db_models import Target, FilmLayer, Film, db, Substrate, \
     MagnetronSputtering, TriodeSputtering, Library
-from logic.form_fields.new_lib import LibNameField, FilmPhysicalNameField, \
+from forms.new_library.fields import LibNameField, FilmPhysicalNameField, \
     CommentField, MadeOnField, MadeByField, \
     SputteringSystemField, TargetField, FilmLayerFunctionField, \
     StoichiometryField, \
@@ -16,10 +17,10 @@ from logic.form_fields.new_lib import LibNameField, FilmPhysicalNameField, \
     HasActiveCoolingField, RotationField, \
     FilamentCurrentField, SubstrateField, DepositTempField, \
     DepositDurationField, DepositPowerField
-from logic.form_fields.shared import DialogData
+from forms.shared import DialogData
 from logic.functions import load_session_state, save_session_state
 
-sess = load_session_state('new_lib.py')
+sess = load_session_state(PageEnum.new_lib)
 
 st.title('New Library')
 
@@ -131,12 +132,12 @@ can_submit = base_fields_valid and len(layer_data_list) > 0
 if st.button("Submit Library", disabled=not can_submit):
     target = Target.from_name(target_fld.value)
     substrate = Substrate.get(Substrate.name == substrate_fld.value)
-    library = Library.new(lib_name_fld.value, datetime.now(), comment_fld.value)
-    film = Film.new(film_name_fld.value, made_on_fld.value, made_by_fld.value,
-                    substrate,
-                    library)
+    library = Library(lib_name_fld.value, datetime.now(), comment_fld.value)
+    film = Film(film_name_fld.value, made_on_fld.value, made_by_fld.value,
+                substrate,
+                library)
     film_layers = [
-        FilmLayer.new(
+        FilmLayer(
             position_from_buffer=i,
             deposit_temp=data.deposit_temp,
             deposit_duration=data.deposit_duration,
@@ -150,7 +151,7 @@ if st.button("Submit Library", disabled=not can_submit):
         for i, data in enumerate(layer_data_list)
     ]
     magnetron_sputterings = [
-        MagnetronSputtering.new(
+        MagnetronSputtering(
             deposit_distance=additional.sputtering.deposit_distance,
             deposit_angle=additional.sputtering.deposit_angle,
             generator=additional.sputtering.sputtering_generator,
@@ -160,7 +161,7 @@ if st.button("Submit Library", disabled=not can_submit):
         if isinstance(additional.sputtering, LayerData.Magnetron)
     ]
     triode_sputterings = [
-        TriodeSputtering.new(
+        TriodeSputtering(
             has_active_cooling=additional.sputtering.has_active_cooling,
             rotation=additional.sputtering.rotation,
             filament_current=additional.sputtering.filament_current,
@@ -185,4 +186,4 @@ if st.button("Submit Library", disabled=not can_submit):
         sess[Ck.LAST_EMAIL_USED] = made_by_fld.value
 
     save_session_state(sess)
-    st.switch_page('library_added.py')
+    st.switch_page('added_library.py')

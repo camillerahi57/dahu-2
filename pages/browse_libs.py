@@ -2,14 +2,15 @@ import streamlit as st
 import pandas as pd
 from streamlit_dynamic_filters import DynamicFilters
 
+from pages import PageEnum
 from logic.components import browser_side_bar
 from logic.constants import LIB_ID_URL_KEY, DOMAIN, CookieKeys as Ck
-from logic.db_schema import Library, Film
+from logic.lab_modelization.db_models import Library, Film
 from logic.table_columns import LibraryBrowserColumnName as ColName
 from logic.functions import save_session_state, load_session_state, \
     get_email_user_name
 
-sess = load_session_state('browse_libs.py')
+sess = load_session_state(PageEnum.browse_libs)
 
 st.set_page_config(layout="wide")
 if st.button("➕ Add a new library"):
@@ -25,7 +26,7 @@ query = Library.select(
 ).join(Film).dicts()
 
 # Python file name (with .py) allows IDE refactorization:
-page_name = 'inspect_lib.py'.removesuffix('.py')
+page_name = 'inspect_library.py'.removesuffix('.py')
 
 for row in query:
     row[ColName.experimenter] = get_email_user_name(row[ColName.experimenter])
