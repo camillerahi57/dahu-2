@@ -1,7 +1,7 @@
 import streamlit as st
 from pandas import DataFrame
 
-from pages import PageEnum
+from logic.page_list import PageEnum
 from logic.components import inspect_page_header
 from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
 from logic.db_enums import FilmModifType

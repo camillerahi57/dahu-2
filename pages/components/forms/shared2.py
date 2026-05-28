@@ -13,48 +13,37 @@ class FieldType(StrEnum):
 
 class Field(ABC):
     @final
-    def __init__(self, key: str|int = 'default'):
+    def __init__(self, key: str|int = 'default_key', *, updated=None):
         with st.container(width='content'):
+            self.is_updated = updated is not None
             self._input: Any
-            self.error: str
+            self.err_msg: str
             self.is_valid: bool
 
             self.key = self.__class__.__name__.lower() + f'_{key}'
-            self._input = self._streamlit_input()
-            is_valid, err_msg = self._validate()
+            self._input = self._streamlit_input(updated)
+            if self.is_filled:
+                is_valid, err_msg = self._validate()
+            else:
+                if self.type == FieldType.MANDATORY:
+                    is_valid, err_msg = False, 'Mandatory field.'
+                elif self.type == FieldType.ADVISED:
+                    is_valid, err_msg = True, 'Advised field.'
+                else:
+                    is_valid, err_msg = True, ''
 
-            self.is_valid, self.error = is_valid, err_msg
-            if self.type == FieldType.MANDATORY and not self.is_filled():
-                self.is_valid = False
+            self.is_valid, self.err_msg = is_valid, err_msg
 
-            with st.container(width='content'):
-                if not self.is_filled():
-                    if self.type == FieldType.MANDATORY:
-                        st.warning("Mandatory field.")
-                    if self.type == FieldType.ADVISED:
-                        st.warning("Advised field.")
-                else:  # Is filled.
-                    if not is_valid:  # Not valid.
-                        st.warning(self.error)
+            if err_msg != '':
+                with st.container(width='content'):
+                    st.warning(err_msg)
 
-    # @final
-    # def can_be_submitted(self) -> bool:
-    #     match self.type:
-    #         case FieldType.MANDATORY:
-    #             return self.error is None
-    #         case FieldType.ADVISED:
-    #             if self.is_filled():
-    #                 return self.error is None
-    #             else:
-    #                 return True
-    #         case FieldType.OPTIONAL:
-    #             return True
-
+    @property
     def is_filled(self) -> bool:
         return self._input not in {'', None}
 
     @abstractmethod
-    def _streamlit_input(self):
+    def _streamlit_input(self, updated=None):
         raise NotImplementedError
 
     @abstractmethod
@@ -68,7 +57,7 @@ class Field(ABC):
 
     @property
     def value(self) -> Any:
-        if not self.is_valid or not self.is_filled():
+        if not self.is_valid or not self.is_filled:
             return None
         return self._input
 

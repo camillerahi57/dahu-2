@@ -202,10 +202,12 @@ class Target(_BaseModel):
         return names
 
     def get_last_state(self) -> DeteriorationState:
-        return (DeteriorationState.select()
+        return self.old_to_recent_states()[-1]
+
+    def old_to_recent_states(self) -> list[DeteriorationState]:
+        return list(DeteriorationState.select()
                 .where(DeteriorationState.target == self)
-                .order_by(DeteriorationState.date.desc())
-                .first())
+                .order_by(DeteriorationState.date.asc()))
 
     @classmethod
     def from_name(cls, name: str) -> Self:
@@ -796,7 +798,7 @@ class AcidConstituent(_BaseModel):
 
 
 class DeteriorationState(_BaseModel):
-    date = DateField(unique=True)
+    date = DateField()
     made_by_email = CharField()
     px_to_real_length_factor = FloatField(null=True)
     photo_file_name = CharField(null=True)

@@ -4,7 +4,7 @@ from logic.constants import CookieKeys as Ck
 from logic.lab_modelization.db_models import Library, Film, Target, Patch, Substrate
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
-from forms.shared import FormField
+from components.forms.shared import FormField
 from logic.functions import is_valid_email_address
 
 

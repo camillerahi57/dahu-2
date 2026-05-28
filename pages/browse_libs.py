@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from streamlit_dynamic_filters import DynamicFilters
 
-from pages import PageEnum
+from logic.page_list import PageEnum
 from logic.components import browser_side_bar
 from logic.constants import LIB_ID_URL_KEY, DOMAIN, CookieKeys as Ck
 from logic.lab_modelization.db_models import Library, Film

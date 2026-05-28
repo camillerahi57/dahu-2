@@ -79,12 +79,12 @@ class FormField(ABC):  # Generic type T.
     @classmethod
     def get_field_key(cls, input_key: str):
         sess = st.session_state
-        return 'field_' + sess[Sk.PAGE_FILE_NAME] + cls.__name__ + input_key
+        return 'field_' + sess[Sk.PAGE_URL_PATH] + cls.__name__ + input_key
 
     @classmethod
     def get_input_key(cls, input_key: str):
         sess = st.session_state
-        return 'widget_' + sess[Sk.PAGE_FILE_NAME] + cls.__name__ + input_key
+        return 'widget_' + sess[Sk.PAGE_URL_PATH] + cls.__name__ + input_key
 
     @classmethod
     def input(cls, key: str = '') -> Self:

@@ -21,14 +21,14 @@ class CookieKeys(StrEnum):
     same key in the cookie."""
 
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
-    LIB_FILTERS = 'f4ze86sd4c+e1v68rrf46sdw1cqz568fc4'
-    TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq4<3q1dz'
+    LIB_FILTERS = 'f4ze86sd4ce1v68rrf46sdw1cqz568fc4'
+    TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq43q1dz'
     SUBSTRATE_FILTERS = 'e46vsq98f4z5618af9ez4sxdq4658f4s'
 
 
 class SessionKeys(StrEnum):
     PATCH_FORMS = 'patch_forms_key'
-    PAGE_FILE_NAME = 'page_name_key'
+    PAGE_URL_PATH = 'page_url_path_key'
     SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
     SUBSTRATE_LAYER_FORMS = 'substrate_layer_forms_key'
     FILM_LAYERS = 'film_layers_key'

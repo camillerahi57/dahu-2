@@ -1,9 +1,9 @@
 import streamlit as st
 
-from forms.new_substrate.fields import HasCrystalOrientationField, HField, \
+from components.forms.new_substrate.fields import HasCrystalOrientationField, HField, \
     KField, LField, StoichiometryField, ThicknessField, NbOfLayersField, \
     SubstrateNameField, CommentField
-from forms.shared2 import Form
+from components.forms.shared2 import Form
 
 
 class CrystalOrientationForm(Form):

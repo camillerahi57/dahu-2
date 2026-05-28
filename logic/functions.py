@@ -10,13 +10,14 @@ import PIL
 import numpy as np
 import streamlit as st
 from peewee import DateField
+from streamlit.navigation.page import StreamlitPage
 from streamlit_js_eval import streamlit_js_eval
 from plotly.graph_objs import Scatter
 
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
 
-from pages import PageEnum
+from logic.page_list import PageEnum
 from logic.constants import (CookieKeys as Ck,
                              SessionKeys as Sk, FILE_STORAGE_PATH)
 
@@ -86,12 +87,15 @@ def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]],
     )
 
 
-def load_session_state(page_enum: PageEnum) -> SessionStateProxy:
+def load_session_state(page: StreamlitPage) -> SessionStateProxy:
+    """Always start a page by colling this function, to reset the session.
+    :rtype: SessionStateProxy
+    """
+    # TODO call this function in a custom switch_page function.
     sess = st.session_state
-    page = page_enum.value
-    if sess.get(Sk.PAGE_FILE_NAME) != page.url_path:  # Page has changed.
+    if sess.get(Sk.PAGE_URL_PATH) != page.url_path:  # Page has changed.
         reset_session(sess)
-        sess[Sk.PAGE_FILE_NAME] = page.url_path
+        sess[Sk.PAGE_URL_PATH] = page.url_path
     add_cookie_data_to_session(sess)
     return sess
 
@@ -105,9 +109,10 @@ def add_cookie_data_to_session(sess: SessionStateProxy):
 
 
 def reset_session(sess: SessionStateProxy):
-    page_name = sess.get(Sk.PAGE_FILE_NAME)
+    # page_name = sess.get(Sk.PAGE_URL_PATH)
     for key in sess:
-        if key in Ck or key.startswith(page_name):
+        # if key in Ck or key.startswith(page_name):  # Y avait ça. Normal ?
+        if key in Sk:
             del sess[key]
 
 

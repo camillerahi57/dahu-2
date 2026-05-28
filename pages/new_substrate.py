@@ -1,5 +1,5 @@
-from pages import PageEnum
-from forms.new_substrate.sub_forms import RootForm
+from logic.page_list import PageEnum
+from components.forms.new_substrate.sub_forms import RootForm
 import streamlit as st
 
 from logic.lab_modelization.db_models import db, Substrate, SubstrateLayer

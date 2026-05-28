@@ -3,13 +3,13 @@ from datetime import datetime
 
 import streamlit as st
 
-from pages import PageEnum
+from logic.page_list import PageEnum
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
 from logic.lab_modelization.db_models import Target, FilmLayer, Film, db, Substrate, \
     MagnetronSputtering, TriodeSputtering, Library
-from forms.new_library.fields import LibNameField, FilmPhysicalNameField, \
+from components.forms.new_library.fields import LibNameField, FilmPhysicalNameField, \
     CommentField, MadeOnField, MadeByField, \
     SputteringSystemField, TargetField, FilmLayerFunctionField, \
     StoichiometryField, \
@@ -17,7 +17,7 @@ from forms.new_library.fields import LibNameField, FilmPhysicalNameField, \
     HasActiveCoolingField, RotationField, \
     FilamentCurrentField, SubstrateField, DepositTempField, \
     DepositDurationField, DepositPowerField
-from forms.shared import DialogData
+from components.forms.shared import DialogData
 from logic.functions import load_session_state, save_session_state
 
 sess = load_session_state(PageEnum.new_lib)

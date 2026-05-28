@@ -1,6 +1,6 @@
 import streamlit as st
 
-from pages import PageEnum
+from logic.page_list import PageEnum
 
 # Don't import anything from this file, as it will run it again and re-run
 # the current page.

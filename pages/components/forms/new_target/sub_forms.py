@@ -7,12 +7,12 @@ from PIL.ImageFile import ImageFile
 from streamlit_cropperjs import st_cropperjs
 
 from components.pixel_selector import pixel_selector_button
-from forms.new_target.fields import MadeAtField, ExperimenterEmailField, \
+from components.forms.new_target.fields import MadeAtField, ExperimenterEmailField, \
     TargetNameField, CommentField, PhotoUploadField, StoichiometryField, \
     NbOfVertexField, MillimeterEquivalenceField, PixelEquivalenceField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, NbOfPatchField, \
     ShapeField, PreviousVersionField
-from forms.shared2 import Form, StopPageLoad
+from components.forms.shared2 import Form, StopPageLoad
 from logic.constants import SessionKeys as Sk, NEW_TARGET
 from logic.db_enums import PixelCoordinateSystem, ShapeType
 from logic.functions import replace_file_name_extension
@@ -33,7 +33,7 @@ class BasicInfoForm(Form):
 
         previous_version_fld = PreviousVersionField()
         previous_name = previous_version_fld.value
-        if previous_name == NEW_TARGET or not previous_version_fld.is_filled():
+        if previous_name == NEW_TARGET or not previous_version_fld.is_filled:
             previous_version = None
         else:
             previous_version = Target.from_name(previous_name)
@@ -334,8 +334,6 @@ class PatchForm(Form):
             )
         else:
             raise RuntimeError(f'Invalid shape {self.shape}.')
-
-
 
 
 class PatchListForm(Form):
