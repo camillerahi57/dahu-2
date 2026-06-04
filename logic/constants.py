@@ -5,6 +5,7 @@ from typing import Self
 
 LIB_ID_URL_KEY = 'lib_id'
 TARGET_ID_URL_KEY = 'target_id'
+STATE_ID_URL_KEY = 'state_id'
 SUB_ID_URL_KEY = 'substrate_id'
 DOMAIN = 'localhost:8501'
 FILE_STORAGE_PATH = Path(
@@ -13,6 +14,9 @@ FILM_INIT_STATE = 'As deposited'
 PATTERN_IMAGE_PATH = 'pages/logic/images'
 NEW_TARGET = 'NEW TARGET'
 PIXEL_COORDS = 'pixel_selection'
+REDIRECT_PATH_URL_KEY = 'redirect_path'
+ID_KEY_URL_KEY = 'id_key'
+ID_VALUE_URL_KEY = 'id_value'
 
 
 class CookieKeys(StrEnum):
@@ -39,6 +43,7 @@ class SessionKeys(StrEnum):
     UPLOADED_TARGET_IMG = 'uploaded_target_key'
     TARGET_IMG_NAME = 'target_img_name_key'
     CROPPED_PIC = 'cropped_pic_key'
+    USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
 
 
 class ChemicalElement(StrEnum):

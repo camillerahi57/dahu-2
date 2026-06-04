@@ -5,8 +5,6 @@ import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 from streamlit_dynamic_filters import DynamicFilters
 
-from logic.page_list import PageEnum
-
 
 def browser_side_bar(dynamic_filters: DynamicFilters, current_page: str | Path):
     with st.sidebar:
@@ -30,7 +28,7 @@ def inspect_page_header(object_type: str, instance_name: str,
                         on_delete: Callable, on_edit: Callable,
                         browse_page: StreamlitPage):
     if st.button('← Browse'):
-        st.switch_page(browse_page.url_path)
+        st.switch_page(browse_page)
     col1, col2 = st.columns(2)
     with col1:
         with st.container(horizontal=True, vertical_alignment="center"):

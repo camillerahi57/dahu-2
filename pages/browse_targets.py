@@ -2,15 +2,15 @@ import pandas as pd
 from streamlit_dynamic_filters import DynamicFilters
 import streamlit as st
 
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, DOMAIN, TARGET_ID_URL_KEY
 from logic.lab_modelization.db_models import Target
 from logic.table_columns import TargetBrowserColumnName as ColName
-from logic.functions import load_session_state, save_session_state, \
+from logic.functions import load_session_state, save_cookies, \
     get_email_user_name
 
-sess = load_session_state(PageEnum.browse_targets)
+sess = load_session_state(pages.browse_targets)
 
 st.set_page_config(layout="wide")
 
@@ -56,4 +56,4 @@ browser_side_bar(dynamic_filters, 'browse_targets.py')
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-save_session_state(sess)
+save_cookies(sess)

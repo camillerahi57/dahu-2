@@ -1,13 +1,12 @@
-from enum import Enum
+from dataclasses import dataclass
 
 from pint import UnitRegistry
-from pint.registry import Quantity
 
 ur = UnitRegistry()
 
 
-class DahuUnit(Enum):
+@dataclass
+class _DahuUnit:
     length = ur.meter
 
-    def from_(self, quantity: Quantity):
-        return self.value.from_(quantity)
+dahu_unit = _DahuUnit()

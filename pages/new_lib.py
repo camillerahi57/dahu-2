@@ -3,7 +3,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator
@@ -18,9 +18,9 @@ from components.forms.new_library.fields import LibNameField, FilmPhysicalNameFi
     FilamentCurrentField, SubstrateField, DepositTempField, \
     DepositDurationField, DepositPowerField
 from components.forms.shared import DialogData
-from logic.functions import load_session_state, save_session_state
+from logic.functions import load_session_state, save_cookies
 
-sess = load_session_state(PageEnum.new_lib)
+sess = load_session_state(pages.new_lib)
 
 st.title('New Library')
 
@@ -185,5 +185,5 @@ if st.button("Submit Library", disabled=not can_submit):
 
         sess[Ck.LAST_EMAIL_USED] = made_by_fld.value
 
-    save_session_state(sess)
+    save_cookies(sess)
     st.switch_page('added_library.py')

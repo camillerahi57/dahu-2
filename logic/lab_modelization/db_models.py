@@ -10,7 +10,7 @@ import chemparse
 import plotly.graph_objects as go
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
-    UUIDField, BooleanField, DateField
+    BooleanField, DateField
 from playhouse.shortcuts import model_to_dict  # noqa
 from plotly.graph_objs import Scatter
 from pyparsing import alphanums
@@ -37,40 +37,28 @@ db = PostgresqlDatabase(
 # overridden to have argument autocompletion.
 
 
-type CascadingBackref[T] = list[T]
+type DependentBackref[T] = list[T]
 type Backref[T] = list[T]
 
 
 class _BaseModel(Model):
-    id = UUIDField(primary_key=True, default=uuid4)
+    id: int
 
-    # @classmethod
-    # def from_fields(cls, field_values: dict[Field, Any]):
-    #     kwargs = {f.name: v for f, v in field_values.items()}
-    #     return cls(**kwargs)
-
-    def save(self, *args, **kwargs):
-        """As written on top of this, we use UUID4 instead of the default
-        Peewee ID. This allows us to instantiate a model with an id already set.
-
-        However, this creates a bug where Peewee .save() method is always
-        updating, instead of saving a new object in the database. That's why
-        we have to override this .save() method and add 'force_insert' in
-        case get_or_none returns None (which means it's a new row, in which
-        case it's an insert)."""
-        cls = self.__class__
-        if (not kwargs.get('force_insert')
-                and not cls.get_or_none(cls.id == self.id)):
-            kwargs['force_insert'] = True
-        return super().save(*args, **kwargs)
+    class Meta:
+        database = db
+        legacy_table_names = False
 
     @final
-    def cascade_save(self, *args, **kwargs):
-        """Saves the object and all other objects that are part of it
-        (foreign keys pointing to it with on_delete='CASCADE')."""
+    def save_with_dependent(self, *args, **kwargs):
+        """Saves the object and all other objects that dependent on it.
+        An object A depends on an object B if A has a foreign key towards B
+        with de parameter [on_delete='RESTRICT'] or [on_delete='CASCADE'].
+        If the parameter is [on_delete='SET NULL'], which means the foreign
+        key can point to nothing, A does not dependent on B."""
+
         self.save(*args, **kwargs)
-        for obj in self.cascading_objects():
-            obj.cascade_save()
+        for obj in self.dependent_objects():
+            obj.save_with_dependent()
 
     @classmethod
     def get_model_kwargs(cls, kwargs: dict[str, Any]):
@@ -79,25 +67,18 @@ class _BaseModel(Model):
         return {k: v for k, v in kwargs.items()
                 if k in cls._meta.sorted_field_names}
 
-    def data_dict(self):
-        return model_to_dict(self, recurse=False)
-
-    class Meta:
-        database = db
-        legacy_table_names = False
-
     @classmethod
-    def cascading_fld_names(cls) -> Iterable[str]:
+    def dependent_object_fld_names(cls) -> Iterable[str]:
         for name, hint in get_type_hints(cls).items():
             try:
-                if hint.__origin__ == CascadingBackref:
+                if hint.__origin__ == DependentBackref:
                     yield name
             except AttributeError:
                 pass
 
-    def cascading_objects(self) -> list[_BaseModel]:
+    def dependent_objects(self) -> list[_BaseModel]:
         objects = []
-        for fld_name in self.cascading_fld_names():
+        for fld_name in self.dependent_object_fld_names():
             objects += self.__getattribute__(fld_name)
         return objects
 
@@ -106,7 +87,7 @@ class Substrate(_BaseModel):
     name = CharField(unique=True)
     comment = CharField(null=True)
 
-    layers: CascadingBackref[SubstrateLayer]
+    layers: DependentBackref[SubstrateLayer]
 
     def __init__(self, name: str, comment: str, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -145,10 +126,10 @@ class SubstrateLayer(_BaseModel):
     k = IntegerField(null=True)
     l = IntegerField(null=True)
     position_from_back = IntegerField()
-    substrate = ForeignKeyField(Substrate, on_delete='CASCADE',
+    substrate = ForeignKeyField(Substrate, on_delete='RESTRICT',
                                 backref='layers')
 
-    stoichio: CascadingBackref[StoichioElement]
+    stoichio: DependentBackref[StoichioElement]
 
     def __init__(self, thickness: float | None, h: int | None, k: int | None,
                  l: int | None, substrate: Substrate | None,
@@ -182,7 +163,7 @@ class Target(_BaseModel):
     previous_version = ForeignKeyField(
         'self', null=True, on_delete='SET NULL', backref='next_version')
 
-    states: CascadingBackref[DeteriorationState]
+    states: DependentBackref[DeteriorationState]
 
     uses: Backref[TargetUse]
 
@@ -234,7 +215,7 @@ class Target(_BaseModel):
 #     center_px_x = FloatField()
 #     center_px_y = FloatField()
 #     radius_in_px = FloatField()
-#     patch = ForeignKeyField(Patch, on_delete='CASCADE', backref='disc')
+#     patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='disc')
 #
 #     @classmethod
 #     def new(cls, center_px_x: float, center_px_y: float, radius_in_px: float,
@@ -287,7 +268,7 @@ class Target(_BaseModel):
 #         return (ux, uy), radius
 
 # class Polygon(BaseModel):
-#     patch = ForeignKeyField(Patch, on_delete='CASCADE', backref='polygon')
+#     patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='polygon')
 #
 #     vertices: list[Vertex]
 #
@@ -418,8 +399,8 @@ class Library(_BaseModel):
     comment = CharField(null=True)
     hdf5_file_name = CharField(null=True)
 
-    uploaded_files: CascadingBackref[UserUploadedFile]
-    film: CascadingBackref[Film]  # Should be a list of exactly 1 element.
+    uploaded_files: DependentBackref[UserUploadedFile]
+    film: DependentBackref[Film]  # Should be a list of exactly 1 element.
 
     # Will add charac refs in the future.
 
@@ -458,10 +439,10 @@ class Film(_BaseModel):
     made_on = DateField()
     made_by_email = CharField()
     substrate = ForeignKeyField(Substrate)
-    library = ForeignKeyField(Library, on_delete='CASCADE', backref='film')
+    library = ForeignKeyField(Library, on_delete='RESTRICT', backref='film')
 
-    layers: CascadingBackref[FilmLayer]
-    modifs: CascadingBackref[FilmModification]
+    layers: DependentBackref[FilmLayer]
+    modifs: DependentBackref[FilmModification]
 
     # Will add characterization.
 
@@ -488,10 +469,10 @@ class Film(_BaseModel):
         modifs = FilmModification.select().where(
             FilmModification.film == self)
 
-        def get_modif_nb(fm: FilmModification):
+        def get_modif_count(fm: FilmModification):
             return int(fm.modif_number)  # noqa
 
-        return sorted(list(modifs), key=get_modif_nb)
+        return sorted(list(modifs), key=get_modif_count)
 
 
 class FilmLayer(_BaseModel):
@@ -502,12 +483,12 @@ class FilmLayer(_BaseModel):
     function: FilmLayerFunction = CharField()
     sputtering_system: SputteringSystem = CharField(null=True)
 
-    film = ForeignKeyField(Film, on_delete='CASCADE', backref='layers')
+    film = ForeignKeyField(Film, on_delete='RESTRICT', backref='layers')
 
-    stoichio: CascadingBackref[StoichioElement]
-    target_uses: CascadingBackref[TargetUse]
-    magnetron_sputtering: CascadingBackref[MagnetronSputtering]
-    triode_sputtering: CascadingBackref[TriodeSputtering]
+    stoichio: DependentBackref[StoichioElement]
+    target_uses: DependentBackref[TargetUse]
+    magnetron_sputtering: DependentBackref[MagnetronSputtering]
+    triode_sputtering: DependentBackref[TriodeSputtering]
 
     def __init__(self, position_from_buffer: int | None,
                  deposit_temp: float | None,
@@ -531,7 +512,7 @@ class MagnetronSputtering(_BaseModel):
     generator: MagnetronSputteringGenerator = CharField(null=True)
     machine_model: MagnetronMachineModel = CharField(null=True)
 
-    film_layer = ForeignKeyField(FilmLayer, on_delete='CASCADE',
+    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                  backref='magnetron_sputtering')
 
     def __init__(self, deposit_distance: float | None,
@@ -559,7 +540,7 @@ class TriodeSputtering(_BaseModel):
     deposit_duration = FloatField(null=True)
     presputtering_thickness = FloatField(null=True)
 
-    film_layer = ForeignKeyField(FilmLayer, on_delete='CASCADE',
+    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                  backref='triode_sputtering')
 
     def __init__(self,
@@ -585,7 +566,7 @@ class TriodeSputtering(_BaseModel):
 
 class UserUploadedFile(_BaseModel):
     file_name = CharField(unique=True)
-    library = ForeignKeyField(Library, on_delete='CASCADE',
+    library = ForeignKeyField(Library, on_delete='RESTRICT',
                               backref='uploaded_files')
 
     def __init__(self, file_name: str, library: Library, *args, **kwargs):
@@ -608,12 +589,12 @@ class FilmModification(_BaseModel):
     comment = CharField(null=True)
     modif_type: FilmModifType = CharField()
 
-    film = ForeignKeyField(Film, on_delete='CASCADE', backref='modifs')
+    film = ForeignKeyField(Film, on_delete='RESTRICT', backref='modifs')
 
-    annealing: CascadingBackref[Annealing]
-    wet_etching: CascadingBackref[WetEtching]
-    ion_beam_etching: CascadingBackref[IonBeamEtching]
-    lift_off: CascadingBackref[LiftOff]
+    annealing: DependentBackref[Annealing]
+    wet_etching: DependentBackref[WetEtching]
+    ion_beam_etching: DependentBackref[IonBeamEtching]
+    lift_off: DependentBackref[LiftOff]
 
     # Will add characs in the future.
 
@@ -663,7 +644,7 @@ class LiftOff(_BaseModel):
     pattern_diagram_file_name = CharField(null=True)
     recipe_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE',
+    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT',
                                  backref='lift_off')
 
     def __init__(self, used_ultrasound: bool | None,
@@ -682,9 +663,9 @@ class Annealing(_BaseModel):
     pressure = FloatField(null=True)
     pumping_duration = FloatField(null=True)
     furnace: Furnace = CharField(null=True)
-    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
 
-    steps: CascadingBackref[AnnealingStep]
+    steps: DependentBackref[AnnealingStep]
 
     def __init__(self, pumping_duration: float | None, pressure: float | None,
                  furnace: Furnace | None,
@@ -697,10 +678,10 @@ class AnnealingStep(_BaseModel):
     elapsed = FloatField()
     temperature = FloatField()
 
-    annealing = ForeignKeyField(Annealing, on_delete='CASCADE',
+    annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
                                 backref='steps')
 
-    atmosphere: CascadingBackref[StoichioElement]
+    atmosphere: DependentBackref[StoichioElement]
 
     def __init__(self, elapsed: float, temperature: float,
                  annealing: Annealing, *args, **kwargs):
@@ -718,9 +699,9 @@ class IonBeamEtching(_BaseModel):
     has_a_pattern = BooleanField(null=True)
     pattern_diagram_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
 
-    constituents: CascadingBackref[PlasmaConstituent]
+    constituents: DependentBackref[PlasmaConstituent]
 
     def __init__(self, duration: float | None, flow: float | None,
                  incidence_angle: float | None, rotation: float | None,
@@ -738,10 +719,10 @@ class IonBeamEtching(_BaseModel):
 class PlasmaConstituent(_BaseModel):
     proportion = FloatField()
 
-    etching = ForeignKeyField(IonBeamEtching, on_delete='CASCADE',
+    etching = ForeignKeyField(IonBeamEtching, on_delete='RESTRICT',
                               backref='constituents')
 
-    stoichio: CascadingBackref[StoichioElement]
+    stoichio: DependentBackref[StoichioElement]
 
     def __init__(self, proportion: float, etching: IonBeamEtching,
                  *args, **kwargs):
@@ -761,9 +742,9 @@ class WetEtching(_BaseModel):
     pattern_diagram_file_name = CharField(null=True)
     recipe_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='CASCADE')
+    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
 
-    constituents: CascadingBackref[AcidConstituent]
+    constituents: DependentBackref[AcidConstituent]
 
     def __init__(self,
                  hard_bake_temperature: float | None,
@@ -786,10 +767,10 @@ class WetEtching(_BaseModel):
 class AcidConstituent(_BaseModel):
     proportion = FloatField()
 
-    etching = ForeignKeyField(WetEtching, on_delete='CASCADE',
+    etching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
                               backref='constituents')
 
-    stoichio: CascadingBackref[StoichioElement]
+    stoichio: DependentBackref[StoichioElement]
 
     def __init__(self, proportion: float, etching: WetEtching, *args,
                  **kwargs):
@@ -800,17 +781,17 @@ class AcidConstituent(_BaseModel):
 class DeteriorationState(_BaseModel):
     date = DateField()
     made_by_email = CharField()
-    px_to_real_length_factor = FloatField(null=True)
+    length_per_px = FloatField(null=True)
     photo_file_name = CharField(null=True)
     calibration_factor = FloatField(null=True)
     comment = CharField(null=True)
     pixel_coordinate_system: PixelCoordinateSystem = CharField(null=True)
 
-    target = ForeignKeyField(Target, on_delete='CASCADE', backref='states')
+    target = ForeignKeyField(Target, on_delete='RESTRICT', backref='states')
 
-    patches: CascadingBackref[Patch]
+    patches: DependentBackref[Patch]
 
-    def __init__(self, date: datetime, px_to_real_length_factor: float | None,
+    def __init__(self, date: datetime, length_per_px: float | None,
                  photo_file_name: str | None, calibration_factor: float | None,
                  comment: str | None,
                  pixel_coordinate_system: PixelCoordinateSystem | None,
@@ -859,11 +840,11 @@ class Patch(_BaseModel):
     stack_idx = IntegerField()
 
     deterioration_state = ForeignKeyField(DeteriorationState,
-                                          on_delete='CASCADE',
+                                          on_delete='RESTRICT',
                                           backref='patches')
 
-    stoichio: CascadingBackref[StoichioElement]
-    vertices: CascadingBackref[Vertex]
+    stoichio: DependentBackref[StoichioElement]
+    vertices: DependentBackref[Vertex]
 
     def __init__(self, stack_idx: int,
                  deterioration_state: DeteriorationState,
@@ -906,6 +887,9 @@ class Patch(_BaseModel):
         if letter_count(str(stoichio_str)) == 0:
             return False, f"Requires at least one chemical element."
         return True, ''
+
+    def stoichio_str(self):
+        return StoichioElement.complete_stoichio(self.stoichio)
 
     @staticmethod
     def rgb_color(stoichio_str: str) -> tuple[int, int, int]:
@@ -1014,7 +998,7 @@ class Vertex(_BaseModel):
     pixel_y: float = FloatField()
     clockwise_rank = IntegerField()
 
-    patch = ForeignKeyField(Patch, on_delete='CASCADE', backref='vertices')
+    patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='vertices')
 
     def __init__(self, pixel_x: float, pixel_y: float, clockwise_rank: int,
                  patch: Patch, *args, **kwargs):
@@ -1030,10 +1014,10 @@ class Vertex(_BaseModel):
 
 class TargetUse(_BaseModel):
     target = ForeignKeyField(Target, backref='uses')
-    film_layer = ForeignKeyField(FilmLayer, on_delete='CASCADE',
+    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                  backref='target_uses')
 
-    def __init__(self, deterioration_state: DeteriorationState,
+    def __init__(self, target: Target,
                  film_layer: FilmLayer,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -1047,22 +1031,22 @@ class StoichioElement(_BaseModel):
     element: ChemicalElement = CharField()
 
     substrate_layer = ForeignKeyField(
-        SubstrateLayer, null=True, on_delete='CASCADE',
+        SubstrateLayer, null=True, on_delete='RESTRICT',
         backref='stoichio')
     patch = ForeignKeyField(
-        Patch, null=True, on_delete='CASCADE',
+        Patch, null=True, on_delete='RESTRICT',
         backref='stoichio')
     film_layer = ForeignKeyField(
-        FilmLayer, null=True, on_delete='CASCADE',
+        FilmLayer, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
     annealing_step = ForeignKeyField(
-        AnnealingStep, null=True, on_delete='CASCADE',
+        AnnealingStep, null=True, on_delete='RESTRICT',
         backref='atmosphere')
     acid_constituent = ForeignKeyField(
-        AcidConstituent, null=True, on_delete='CASCADE',
+        AcidConstituent, null=True, on_delete='RESTRICT',
         backref='stoichio')
     plasma_constituent = ForeignKeyField(
-        PlasmaConstituent, on_delete='CASCADE', null=True,
+        PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='stoichio')
 
     def __init__(self, quantity: float, position_in_str: int,
@@ -1092,7 +1076,10 @@ class StoichioElement(_BaseModel):
         return elements
 
     def __str__(self):
-        return f'{self.element}{self.quantity:g}'
+        if self.quantity > 1:  # noqa
+            return f'{self.element}{self.quantity:g}'
+        else:
+            return f'{self.element}'
 
     @staticmethod
     def complete_stoichio(elements: list[StoichioElement]) -> str:

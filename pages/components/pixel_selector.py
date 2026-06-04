@@ -1,3 +1,4 @@
+import pyperclip
 from PIL.ImageFile import ImageFile
 from streamlit import dialog
 from streamlit_image_coordinates import streamlit_image_coordinates
@@ -14,9 +15,13 @@ def show_pixel_selector(target_img):
     )
     st.write("**Click on a pixel to get its coordinates.**")
     if coords:
-        with st.container(border=True, width='content'):
-            st.write(f"Clicked at:   **{coords['x']},"
-                     f"{coords['y']}**")
+        x, y = coords['x'], coords['y']
+        pyperclip.copy(f'{x}, {y}')
+        with st.container(horizontal=True, vertical_alignment='center'):
+            with st.container(border=True, width='content'):
+                st.write(f"Clicked at:   **{x}, {y}**")
+            with st.container(width='content'):
+                st.success(f"Copied to clipboard.")
 
 
 def pixel_selector_button(target_img: ImageFile, key: str = '0'):

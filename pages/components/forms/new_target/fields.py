@@ -13,9 +13,9 @@ from logic.lab_modelization.db_models import Target, Patch
 class MadeAtField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated: datetime = None):
-        updated = 'today' if updated is None else updated
-        return st.date_input("First made on", value=updated)
+    def _streamlit_input(self, default: datetime = None):
+        default = 'today' if default is None else default
+        return st.date_input("First made on", value=default)
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''
@@ -24,12 +24,29 @@ class MadeAtField(Field):
 class ExperimenterEmailField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated: str = None):
+    def _streamlit_input(self, default: str = ''):
         cookie_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
-        updated = cookie_email if updated is None else updated
+        default = cookie_email if default == '' else default
         return st.text_input(
             "First made by (email address)",
-            value=updated, width=500)
+            value=default, width=500)
+
+    def _validate(self) -> tuple[bool, str]:
+        if not is_valid_email_address(self._input):
+            return False, 'Please enter a valid email address.'
+        st.session_state[Ck.LAST_EMAIL_USED] = self._input
+        return True, ''
+
+
+class UpdaterEmailField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, default: str = ''):
+        cookie_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
+        default = cookie_email if default == '' else default
+        return st.text_input(
+            "Deterioration state updated by (email address)",
+            value=default, width=500)
 
     def _validate(self) -> tuple[bool, str]:
         if not is_valid_email_address(self._input):
@@ -41,24 +58,26 @@ class ExperimenterEmailField(Field):
 class TargetNameField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated: str = None):
-        return st.text_input("Target name", width=600, value=updated)
+    def _streamlit_input(self, default: str = None):
+        return st.text_input("Target name", width=600, value=default)
 
     def _validate(self) -> tuple[bool, str]:
         if len(self._input) == 0:
             return False, 'Please enter a target name.'
-        if self._input in Target.already_taken_names() and not self.is_updated:
+        is_already_taken = self._input in Target.already_taken_names()
+        is_default = self._input == self.default
+        if is_already_taken and not is_default:
             return False, "Target name already taken."
         return True, ''
 
 
-class NbOfPatchField(Field):
+class PatchCountField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input(
             "Number of patches (including base patch)",
-                  min_value=0,
+                  min_value=0, value=default,
                   step=1, width=300)
 
     def _validate(self) -> tuple[bool, str]:
@@ -70,22 +89,26 @@ class NbOfPatchField(Field):
 class ShapeField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
+        options = [ShapeType.DISC, ShapeType.POLYGON]
+        idx = options.index(default) if default is not None else None
         return st.radio(
             label='Patch shape', label_visibility='collapsed',
-            options=[ShapeType.DISC, ShapeType.POLYGON],
-            index=None, key=self.key, horizontal=True)
+            options=options,
+            index=idx, key=self.key, horizontal=True)
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''
 
 
-class NbOfVertexField(Field):
+class VertexCountField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
+        default = 3 if default is None else default
         return st.number_input("Number of vertices for the polygon",
-                               min_value=3, step=1, width=300, value=3)
+                               min_value=3, step=1, width=300, value=default,
+                               key=self.key)
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''
@@ -94,8 +117,9 @@ class NbOfVertexField(Field):
 class CommentField(Field):
     type = Ft.OPTIONAL
 
-    def _streamlit_input(self, updated=None):
-        return st.text_area("Comment about the target", width=99999)
+    def _streamlit_input(self, default=None):
+        return st.text_area("Comment about the target", width=99999,
+                            value=default)
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''
@@ -104,10 +128,10 @@ class CommentField(Field):
 class StoichiometryField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.text_input("Stoichiometry", width=300, key=self.key,
                              label_visibility='collapsed',
-                             placeholder='Stoichiometry')
+                             placeholder='Stoichiometry', value=default)
 
     def _validate(self) -> tuple[bool, str]:
         return Patch.is_valid_formula(self._input)
@@ -119,9 +143,10 @@ class StoichiometryField(Field):
 class CoordinateField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default: str=None):
         return st.text_input("X, Y", width=100, key=self.key,
-                             label_visibility='collapsed', placeholder='X, Y')
+                             label_visibility='collapsed', placeholder='X, Y',
+                             value=default)
 
     def _validate(self) -> tuple[bool, str]:
         try:
@@ -138,13 +163,13 @@ class CoordinateField(Field):
 class PreviousVersionField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated: str = None):
+    def _streamlit_input(self, default: str = None):
         names = Target.already_taken_names()
         options = [NEW_TARGET] + names
-        if updated is None:
+        if default is None:
             idx = None
         else:
-            idx = options.index(updated)
+            idx = options.index(default)
 
         return st.selectbox('Built from other target:', options=options,
                                 index=idx)
@@ -156,8 +181,9 @@ class PreviousVersionField(Field):
 class CalibrationFactorField(Field):
     type = Ft.ADVISED
 
-    def _streamlit_input(self, updated=None):
-        return st.number_input("Calibration factor", width=150)
+    def _streamlit_input(self, default=None):
+        return st.number_input("Calibration factor", width=150,
+                               value=default, step=0.1)
         # TODO Any constraints on that?
 
     def _validate(self) -> tuple[bool, str]:
@@ -169,9 +195,10 @@ class CalibrationFactorField(Field):
 class PhotoDateField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
+        default = 'today' if default is None else default
         return st.date_input("Picture taken on", max_value='today',
-                             value=None, width=150)
+                             value=default, width=150)
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''
@@ -180,7 +207,7 @@ class PhotoDateField(Field):
 class PhotoUploadField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.file_uploader("Select target photo",
                                 type=["jpg", "png"])
 
@@ -190,7 +217,7 @@ class PhotoUploadField(Field):
         else:
             return True, ''
 
-    def create_file_name(self):
+    def new_file_name(self):
         extension = self._input.name.split('.')[-1]
         return f'{uuid4()}.{extension}'
 
@@ -198,9 +225,9 @@ class PhotoUploadField(Field):
 class PixelEquivalenceField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("Is equivalent to (pixels):",
-                               min_value=0, step=1)
+                               min_value=0, step=1, value=default)
 
     def _validate(self) -> tuple[bool, str]:
         if self._input == 0:
@@ -212,9 +239,9 @@ class PixelEquivalenceField(Field):
 class MillimeterEquivalenceField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("Distance in millimeters:",
-                               min_value=0, step=1)
+                               min_value=0, step=1, value=default)
 
     def _validate(self) -> tuple[bool, str]:
         if self._input == 0:

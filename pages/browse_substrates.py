@@ -2,14 +2,14 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, DOMAIN, SUB_ID_URL_KEY
 from logic.lab_modelization.db_models import Substrate
 from logic.table_columns import SubstrateBrowserColumnName as ColName
-from logic.functions import load_session_state, save_session_state
+from logic.functions import load_session_state, save_cookies
 
-sess = load_session_state(PageEnum.browse_substrates)
+sess = load_session_state(pages.browse_substrates)
 
 st.set_page_config(layout="wide")
 
@@ -51,4 +51,4 @@ browser_side_bar(dynamic_filters, 'browse_substrates.py')
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-save_session_state(sess)
+save_cookies(sess)

@@ -10,14 +10,12 @@ import PIL
 import numpy as np
 import streamlit as st
 from peewee import DateField
-from streamlit.navigation.page import StreamlitPage
-from streamlit_js_eval import streamlit_js_eval
 from plotly.graph_objs import Scatter
-
+from streamlit.navigation.page import StreamlitPage
 from streamlit.runtime.state import SessionStateProxy
 from streamlit_cookies_controller import CookieController
+from streamlit_js_eval import streamlit_js_eval
 
-from logic.page_list import PageEnum
 from logic.constants import (CookieKeys as Ck,
                              SessionKeys as Sk, FILE_STORAGE_PATH)
 
@@ -120,7 +118,7 @@ def refresh_page_in_browser():
     streamlit_js_eval(js_expressions="parent.window.location.reload()")
 
 
-def save_session_state(sess: SessionStateProxy):
+def save_cookies(sess: SessionStateProxy):
     controller = new_controller()
     for key in Ck:
         if key in sess:
@@ -179,6 +177,12 @@ def replace_file_name_extension(name: str, new_extension: str):
     new_extension = new_extension.removeprefix('.')
     parts = name.split(".")
     parts[-1] = new_extension
+    return ".".join(parts)
+
+
+def remove_file_name_extension(name: str):
+    parts = name.split(".")
+    parts.pop()
     return ".".join(parts)
 
 

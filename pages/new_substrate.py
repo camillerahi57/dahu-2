@@ -1,11 +1,11 @@
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from components.forms.new_substrate.sub_forms import RootForm
 import streamlit as st
 
 from logic.lab_modelization.db_models import db, Substrate, SubstrateLayer
-from logic.functions import load_session_state, save_session_state
+from logic.functions import load_session_state, save_cookies
 
-sess = load_session_state(PageEnum.new_substrate)
+sess = load_session_state(pages.new_substrate)
 
 root_form = RootForm()
 substrate_name = root_form.substrate_name
@@ -35,6 +35,7 @@ if st.button("Submit", disabled=not root_form.is_valid, type='primary'):
                 form.stoichio, form.thickness, h, k, l,
                 substrate, position_from_back=i)
             substrate.layers.append(layer)
-        substrate.cascade_save()
-    save_session_state(sess)
-    st.switch_page(PageEnum.substrate_added.value)
+        substrate.save_with_dependent()
+
+    save_cookies(sess)
+    st.switch_page(pages.substrate_added)

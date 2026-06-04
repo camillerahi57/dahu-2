@@ -13,15 +13,15 @@ class FieldType(StrEnum):
 
 class Field(ABC):
     @final
-    def __init__(self, key: str|int = 'default_key', *, updated=None):
+    def __init__(self, key: str|int = 'default_key', *, default=None):
         with st.container(width='content'):
-            self.is_updated = updated is not None
+            self.default = default
             self._input: Any
             self.err_msg: str
             self.is_valid: bool
 
             self.key = self.__class__.__name__.lower() + f'_{key}'
-            self._input = self._streamlit_input(updated)
+            self._input = self._streamlit_input(default)
             if self.is_filled:
                 is_valid, err_msg = self._validate()
             else:
@@ -43,7 +43,7 @@ class Field(ABC):
         return self._input not in {'', None}
 
     @abstractmethod
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         raise NotImplementedError
 
     @abstractmethod
@@ -87,9 +87,8 @@ class Form(ABC):
             self.is_coherent
         ])
 
-    @classmethod
     @abstractmethod
-    def _check_coherence(cls) -> tuple[bool, str]:
+    def _check_coherence(self) -> tuple[bool, str]:
         raise NotImplementedError
 
 

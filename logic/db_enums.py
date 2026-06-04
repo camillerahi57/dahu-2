@@ -48,7 +48,7 @@ class FilmModifType(StrEnum):
 
 
 class PixelCoordinateSystem(StrEnum):
-    X_Y_EQ_W_H_ORIGIN_TOP_LEFT = "x,y=width,height;origin-top-left"
+    PLOTLY = "x,y=w,h;both-positive;top-left-origin"
 
 
 class Furnace(StrEnum):

@@ -8,7 +8,7 @@ import streamlit as st
 class StoichiometryField(Field):
     type = Ft.MANDATORY
     
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.text_input("Stoichiometry", key=self.key,
                              width=400)
 
@@ -19,7 +19,7 @@ class StoichiometryField(Field):
 class CommentField(Field):
     type = Ft.OPTIONAL
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.text_area("Comment (optional)")
 
     def _validate(self) -> tuple[bool, str]:
@@ -29,7 +29,7 @@ class CommentField(Field):
 class SubstrateNameField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.text_input("Substrate Name", width=400)
 
     def _validate(self) -> tuple[bool, str]:
@@ -43,7 +43,7 @@ class SubstrateNameField(Field):
 class ThicknessField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input(  # TODO more realistic example:
             "Thickness (ex: 6e-3)",
             step=1e-5, format="%.5f", key=self.key, width=200)
@@ -58,7 +58,7 @@ class HField(Field):
 
     HKL_WIDTH: Literal["stretch"] = 'stretch'
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("H", step=1, key=self.key,
                                width=HField.HKL_WIDTH)
 
@@ -68,7 +68,7 @@ class HField(Field):
 class KField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("K", step=1, key=self.key,
                                width=HField.HKL_WIDTH)
 
@@ -78,7 +78,7 @@ class KField(Field):
 class LField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("L", step=1, key=self.key,
                                width=HField.HKL_WIDTH)
 
@@ -88,7 +88,7 @@ class LField(Field):
 class HasCrystalOrientationField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.radio("Has a crystal orientation", [True, False],
                         index=None, key=self.key)
 
@@ -98,10 +98,10 @@ class HasCrystalOrientationField(Field):
         return True, ''
 
 
-class NbOfLayersField(Field):
+class LayerCountField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, updated=None):
+    def _streamlit_input(self, default=None):
         return st.number_input("Number of layers", step=1, width=150)
 
     def _validate(self) -> tuple[bool, str]:

@@ -2,15 +2,15 @@ import streamlit as st
 import pandas as pd
 from streamlit_dynamic_filters import DynamicFilters
 
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from logic.components import browser_side_bar
 from logic.constants import LIB_ID_URL_KEY, DOMAIN, CookieKeys as Ck
 from logic.lab_modelization.db_models import Library, Film
 from logic.table_columns import LibraryBrowserColumnName as ColName
-from logic.functions import save_session_state, load_session_state, \
+from logic.functions import save_cookies, load_session_state, \
     get_email_user_name
 
-sess = load_session_state(PageEnum.browse_libs)
+sess = load_session_state(pages.browse_libs)
 
 st.set_page_config(layout="wide")
 if st.button("➕ Add a new library"):
@@ -58,4 +58,4 @@ browser_side_bar(dynamic_filters, 'browse_libs.py')
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-save_session_state(sess)
+save_cookies(sess)

@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.forms.new_substrate.fields import HasCrystalOrientationField, HField, \
-    KField, LField, StoichiometryField, ThicknessField, NbOfLayersField, \
+    KField, LField, StoichiometryField, ThicknessField, LayerCountField, \
     SubstrateNameField, CommentField
 from components.forms.shared2 import Form
 
@@ -65,16 +65,16 @@ class LayerListForm(Form):
     def __init__(self):
         st.subheader("Layers:")
 
-        nb_of_layers_fld = NbOfLayersField()
+        layer_count_fld = LayerCountField()
         st.divider()
-        layer_nb = nb_of_layers_fld.value
+        layer_count = layer_count_fld.value
 
         layer_forms = []
-        if nb_of_layers_fld.is_valid:
-            for i in range(layer_nb):
+        if layer_count_fld.is_valid:
+            for i in range(layer_count):
                 if i == 0:
                     layer_label = 'Bottom layer'
-                elif i == layer_nb - 1:
+                elif i == layer_count - 1:
                     layer_label = 'Top layer'
                 else:
                     layer_label = f"Layer {i+1}"
@@ -84,7 +84,7 @@ class LayerListForm(Form):
 
         self.layer_forms = layer_forms
         super().__init__(
-            [nb_of_layers_fld],
+            [layer_count_fld],
             layer_forms,
         )
 

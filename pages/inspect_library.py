@@ -1,7 +1,7 @@
 import streamlit as st
 from pandas import DataFrame
 
-from logic.page_list import PageEnum
+from logic.page_list import pages
 from logic.components import inspect_page_header
 from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
 from logic.db_enums import FilmModifType
@@ -28,7 +28,7 @@ target_link_htmls = [link_html(target.physical_name, target.url())
                      for target in targets]
 layers = reversed(list(layers))
 
-sess = load_session_state(PageEnum.inspect_lib)
+sess = load_session_state(pages.inspect_lib)
 sess[Sk.CURRENT_FILM] = film
 
 st.set_page_config(layout="wide", page_title=lib.name)
