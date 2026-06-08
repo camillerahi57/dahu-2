@@ -1,6 +1,6 @@
 import streamlit as st
 
-from components.forms.new_deterioration_state.sub_forms import RootForm
+from components.forms.edit_deterioration_state.sub_forms import RootForm
 from components.forms.shared2 import StopPageLoad
 from logic.constants import CookieKeys as Ck, FILE_STORAGE_PATH, \
     STATE_ID_URL_KEY, REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY, \

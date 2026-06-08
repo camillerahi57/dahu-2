@@ -13,9 +13,10 @@ from components.forms.new_target.fields import MadeAtField, \
     TargetNameField, CommentField, PhotoUploadField, StoichiometryField, \
     VertexCountField, MillimeterEquivalenceField, PixelEquivalenceField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
-    ShapeField, PreviousVersionField
+    ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
+    IsCorrectFigureField, HasCorrectOrientationField
 from components.forms.shared2 import Form, StopPageLoad
-from components.pixel_selector import pixel_selector_button
+from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH
 from logic.db_enums import PixelCoordinateSystem, ShapeType
 from logic.functions import replace_file_name_extension
@@ -113,7 +114,7 @@ class PixelEquivalenceForm(Form):
         st.subheader("Millimeter to pixel conversion")
         with st.container(horizontal=True, vertical_alignment='top'):
             st.write("_You can use the following tool:_")
-            pixel_selector_button(target_img, 'px_equivalence')
+            pixel_helper_button(target_img, 'px_equivalence')
 
             with st.container(width=150):
                 millimeter_fld = MillimeterEquivalenceField(
@@ -121,7 +122,7 @@ class PixelEquivalenceForm(Form):
 
             with st.container(width=150):
                 pixel_fld = PixelEquivalenceField(
-                    default=Default.pixels.magnitude)
+                    default=int(Default.pixels.magnitude))
 
         if millimeter_fld.is_valid and pixel_fld.is_valid:
             length = millimeter_fld.value * ur.mm
@@ -162,13 +163,11 @@ class UploadAndCropForm(Form):
                 width='content')
             with container:
                 cropped_img = sess[Sk.CROPPED_TARGET_IMG]
-                max_width = 300
                 aspect_ratio = cropped_img.height / cropped_img.width
-                if aspect_ratio > 1:
-                    width = int(max_width / aspect_ratio)
-                else:
-                    width = max_width
-                st.image(cropped_img, width=width)
+                thumbnail_w = 300
+                thumbnail_h = round(thumbnail_w * aspect_ratio)
+                thumbnail = cropped_img.resize((thumbnail_w, thumbnail_h))
+                st.image(thumbnail)
                 with st.container():
                     st.write("**Target cropped ✅**")
                     if st.button("Delete"):
@@ -176,12 +175,16 @@ class UploadAndCropForm(Form):
                         del sess[Sk.UPLOADED_TARGET_IMG]
                         sess[Sk.USE_DEFAULT_TARGET_PIC] = False
                         st.rerun()
+
+            has_correct_orientation_fld = HasCorrectOrientationField(
+                key='correct_orientation', default=False)
             self.cropped_target_img: ImageFile = sess[Sk.CROPPED_TARGET_IMG]
             self.file_name = sess[Sk.TARGET_IMG_NAME]
-            super().__init__([], [])
+            super().__init__([has_correct_orientation_fld], [])
 
         elif Sk.UPLOADED_TARGET_IMG in sess:
             photo = sess[Sk.UPLOADED_TARGET_IMG]
+            st.warning("**Crop with target base** (can be approximate).")
             cropped_pic = st_cropperjs(
                 pic=photo, btn_text="Select target", key=Sk.CROPPED_PIC)
             if cropped_pic:
@@ -215,12 +218,17 @@ class StateInfoForm(Form):
             calibration_factor = 0.
             comment = ''
             id = None
+            has_comment = None
 
         if default_state is not None:
             Default.date = default_state.date
             Default.calibration_factor = default_state.calibration_factor
             Default.comment = default_state.comment
             Default.id = default_state.id
+            if default_state.comment != '':
+                Default.has_comment = HasCommentField.Option.YES
+            else:
+                Default.has_comment = HasCommentField.Option.NO
 
         photo_upload_form = UploadAndCropForm(default_state)
         target_img = photo_upload_form.cropped_target_img
@@ -233,18 +241,28 @@ class StateInfoForm(Form):
         st.divider()
         calibration_fld = CalibrationFactorField(
             default=Default.calibration_factor)
-        comment_fld = CommentField(Default.comment)
+        st.divider()
+        st.write("**Any comment about this target?**")
+        has_comment_fld = HasCommentField(default=Default.has_comment)
+        if not has_comment_fld.is_valid:
+            raise StopPageLoad
+        if has_comment_fld.value == HasCommentField.Option.YES:
+            comment_fld = CommentField(Default.comment)
+            comment = comment_fld.value
+        else:
+            comment_fld = None
+            comment = ''
 
         self.length_per_px = pixel_equivalence_form.ratio
         self.target_img = target_img
         self.photo_file_name = photo_upload_form.file_name
         self.state_date = date_fld.value
         self.calibration_factor = calibration_fld.value
-        self.comment = comment_fld.value
+        self.comment = comment
         self.target_date = target_date
 
         super().__init__(
-            fields=[date_fld, calibration_fld, comment_fld],
+            fields=[date_fld, calibration_fld, comment_fld, has_comment_fld],
             sub_forms=[photo_upload_form, pixel_equivalence_form],
         )
 
@@ -313,7 +331,7 @@ class DiscPatchForm(Form):
             Default.vertex3 = vertices[vertex_count*2//3]
 
         with st.container(horizontal=True, gap='xxsmall'):
-            pixel_selector_button(target_img, f'disc_px_select_{key}')
+            pixel_helper_button(target_img, f'disc_px_select_{key}')
             point_1_form = XYCoordinatesForm(key=f'disc_1_{key}',
                                              default_vertex=Default.vertex1)
             point_2_form = XYCoordinatesForm(key=f'disc_2_{key}',
@@ -360,7 +378,7 @@ class PolygonPatchForm(Form):
 
         xy_forms: list[XYCoordinatesForm] = []
         with st.container(horizontal=True, vertical_alignment='top'):
-            pixel_selector_button(target_img, f'poly_px_select_{key}')
+            pixel_helper_button(target_img, f'poly_px_select_{key}')
             for i in range(vertex_count_fld.value):
                 if Default.vertices is not None and i < len(Default.vertices):
                     default_vertex = Default.vertices[i]  # noqa I don't understand the warning.
@@ -392,10 +410,12 @@ class PolygonPatchForm(Form):
 
 class PatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
-                 default_patch: Patch | None):
+                 default_patch: Patch | None,
+                 default_is_base_patch: bool = False):
         class Default(SimpleNamespace):
             shape = None
             stoichio = ''
+            is_base_patch = default_is_base_patch
 
         if default_patch is not None:
             Default.shape = ShapeType.DISC if len(default_patch.vertices) > 100\
@@ -403,6 +423,8 @@ class PatchForm(Form):
             Default.stoichio = default_patch.stoichio_str()
 
         with st.container(border=True, width=99999):
+            is_base_patch_fld = IsBasePatchField(f'is_base_{key}',
+                                                 default=Default.is_base_patch)
             with st.container(horizontal=True):
                 st.write("Shape:")
                 shape_fld = ShapeField(key, default=Default.shape)
@@ -423,11 +445,10 @@ class PatchForm(Form):
             self.shape = shape
             self.stoichio = stoichio_fld.value
             self.updated_patch = default_patch
+            self.is_base_patch = is_base_patch_fld.value
 
-            if form is None:
-                super().__init__([shape_fld, stoichio_fld], [])
-            else:
-                super().__init__([shape_fld, stoichio_fld], [form])
+            super().__init__([shape_fld, stoichio_fld, is_base_patch_fld],
+                             [form])
 
     def _check_coherence(self) -> tuple[bool, str]:
         return True, ''
@@ -485,7 +506,8 @@ class PatchListForm(Form):
         if not patch_count_fld.is_valid:
             raise StopPageLoad
 
-        self.patch_forms: list[PatchForm] = []
+        st.divider(width=50)
+        patch_forms: list[PatchForm] = []
         for i in range(patch_count):
             if Default.patches is not None and i < len(Default.patches):
                 default_state = Default.patches[i]  # noqa I don't understand the warning.
@@ -493,12 +515,22 @@ class PatchListForm(Form):
                 default_state = None
             default_state: Patch | None
             patch_form = PatchForm(f'{i}', target_img,
-                                   default_patch=default_state)
-            self.patch_forms.append(patch_form)
+                                   default_patch=default_state,
+                                   default_is_base_patch=(i==0))
+            patch_forms.append(patch_form)
+
+        # Putting base patch as the first one (order matters).
+        ordered_patches = [f for f in patch_forms if f.is_base_patch]
+        ordered_patches.extend([f for f in patch_forms if not f.is_base_patch])
+        self.patch_forms = ordered_patches
 
         super().__init__(fields=[patch_count_fld], sub_forms=self.patch_forms)
 
     def _check_coherence(self) -> tuple[bool, str]:
+        base_patch_count = len([f for f in self.patch_forms if f.is_base_patch])
+        if base_patch_count != 1:
+            return False, (f"There must be exactly one *base* patch. "
+                           f"Got: {base_patch_count}.")
         return True, ''
 
     def to_patches(self, state: DeteriorationState) \
@@ -532,6 +564,8 @@ class DeteriorationStateForm(Form):
             patch_fig = state.to_figure()
             st.plotly_chart(patch_fig)
 
+        is_correct_fld = IsCorrectFigureField()
+
         st.divider()
         self.target = target
         self.target_img = state_info_form.target_img
@@ -540,7 +574,7 @@ class DeteriorationStateForm(Form):
         self.state = state
 
         super().__init__(
-            fields=[],
+            fields=[is_correct_fld],
             sub_forms = [state_info_form, patch_list_form],
         )
 

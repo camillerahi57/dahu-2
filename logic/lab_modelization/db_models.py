@@ -208,7 +208,7 @@ class Target(_BaseModel):
     def comments(self) -> list[tuple[datetime, str]]:
         return [(state.date, state.comment) # noqa Wrong warning.
                 for state in self.states
-                if state.comment is not None]
+                if state.comment not in {None, ''}]
 
 
 # class Disc(BaseModel):

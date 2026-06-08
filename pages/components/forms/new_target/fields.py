@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 from uuid import uuid4
 
 import streamlit as st
@@ -29,23 +30,6 @@ class ExperimenterEmailField(Field):
         default = cookie_email if default == '' else default
         return st.text_input(
             "First made by (email address)",
-            value=default, width=500)
-
-    def _validate(self) -> tuple[bool, str]:
-        if not is_valid_email_address(self._input):
-            return False, 'Please enter a valid email address.'
-        st.session_state[Ck.LAST_EMAIL_USED] = self._input
-        return True, ''
-
-
-class UpdaterEmailField(Field):
-    type = Ft.MANDATORY
-
-    def _streamlit_input(self, default: str = ''):
-        cookie_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
-        default = cookie_email if default == '' else default
-        return st.text_input(
-            "Deterioration state updated by (email address)",
             value=default, width=500)
 
     def _validate(self) -> tuple[bool, str]:
@@ -115,13 +99,15 @@ class VertexCountField(Field):
 
 
 class CommentField(Field):
-    type = Ft.OPTIONAL
+    type = Ft.MANDATORY
 
     def _streamlit_input(self, default=None):
         return st.text_area("Comment about the target", width=99999,
-                            value=default)
+                            value=default, label_visibility="collapsed")
 
     def _validate(self) -> tuple[bool, str]:
+        if self._input == '':
+            return False, 'Please enter a comment.'
         return True, ''
 
 
@@ -137,7 +123,47 @@ class StoichiometryField(Field):
         return Patch.is_valid_formula(self._input)
 
 
+class IsBasePatchField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, default=False):
+        return st.checkbox("Is the base patch of the target.",
+                           value=default, key=self.key)
+
+    def _validate(self) -> tuple[bool, str]:
+        return True, ''
+
+
 # TODO Forbid negative pixels everywhere.
+
+class IsCorrectFigureField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, default=False):
+        return st.checkbox("**The figure matches the picture "
+                           "of the target.**",
+                           value=default, key=self.key)
+
+    def _validate(self) -> tuple[bool, str]:
+        if not self._input:
+            return False, ("Please ensure the figure matches the target "
+                           "picture.")
+        return True, ''
+
+
+class HasCorrectOrientationField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, default=False):
+        return st.checkbox("**The picture has been taken properly "
+                           "(not tilted or rotated by 90°).**",
+                           value=default, key=self.key)
+
+    def _validate(self) -> tuple[bool, str]:
+        if not self._input:
+            return False, ("If the picture is tilted, edit it on your "
+                           "phone or computer.")
+        return True, ''
 
 
 class CoordinateField(Field):
@@ -172,7 +198,24 @@ class PreviousVersionField(Field):
             idx = options.index(default)
 
         return st.selectbox('Built from other target:', options=options,
-                                index=idx)
+                                index=idx, width=300)
+
+    def _validate(self) -> tuple[bool, str]:
+        return True, ''
+
+
+class HasCommentField(Field):
+    type = Ft.MANDATORY
+
+    class Option(StrEnum):
+        YES = 'Yes'
+        NO = 'No'
+
+    def _streamlit_input(self, default: str = None):
+        options = list(self.Option)
+        index = options.index(default) if default else None
+        return st.radio('No label', options, horizontal=True,
+                        index=index, label_visibility='collapsed', )
 
     def _validate(self) -> tuple[bool, str]:
         return True, ''

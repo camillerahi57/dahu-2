@@ -12,7 +12,7 @@ FILE_STORAGE_PATH = Path(
     r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 FILM_INIT_STATE = 'As deposited'
 PATTERN_IMAGE_PATH = 'pages/logic/images'
-NEW_TARGET = 'NEW TARGET'
+NEW_TARGET = 'NOT BASED ON AN EXISTING TARGET'
 PIXEL_COORDS = 'pixel_selection'
 REDIRECT_PATH_URL_KEY = 'redirect_path'
 ID_KEY_URL_KEY = 'id_key'
@@ -44,6 +44,7 @@ class SessionKeys(StrEnum):
     TARGET_IMG_NAME = 'target_img_name_key'
     CROPPED_PIC = 'cropped_pic_key'
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
+    PREVIOUS_PIXEL_COORDS = 'previous_pixel_coords_key'
 
 
 class ChemicalElement(StrEnum):

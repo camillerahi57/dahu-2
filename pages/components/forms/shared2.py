@@ -65,6 +65,8 @@ class Field(ABC):
 class Form(ABC):
     def __init__(self, fields: list[Field], sub_forms: list[Form],
                  *args, **kwargs):
+        fields = [f for f in fields if f is not None]  # Remove Nones.
+        sub_forms = [s for s in sub_forms if s is not None]
         self.fields = fields
         self.sub_forms = sub_forms
 

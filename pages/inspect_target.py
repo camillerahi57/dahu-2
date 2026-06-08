@@ -34,13 +34,13 @@ def main_page():
 
     states = target.old_to_recent_states()
     last_state = states[-1]
-    show_state(last_state)
+    show_state(last_state, len(states))
 
     if len(states) > 1:
         st.divider()
         st.subheader('Deterioration History:')
         for state in reversed(states[:-1]):
-            show_state(state)
+            show_state(state, len(states))
 
 
 def show_target_info(target: Target):
@@ -79,7 +79,7 @@ def display_target_state(state: DeteriorationState):
                         key=f'state_plot_{state.id}')
 
 
-def show_state(state: DeteriorationState):
+def show_state(state: DeteriorationState, state_count: int):
     with st.container(horizontal=True, vertical_alignment="center",
                       horizontal_alignment='center', border=True,
                       width='content'):
@@ -90,9 +90,10 @@ def show_state(state: DeteriorationState):
                              key=f'state_edit_{state.id}'):
                     params = {STATE_ID_URL_KEY: f'{state.id}'}
                     st.switch_page(pages.edit_state, query_params=params)
-                if st.button("❌ Delete State",
-                             key=f'state_del_{state.id}'):
-                    confirm_state_deletion_dialog(state)
+                if state_count > 1:
+                    if st.button("❌ Delete State",
+                                 key=f'state_del_{state.id}'):
+                        confirm_state_deletion_dialog(state)
         display_target_state(state)
 
 
