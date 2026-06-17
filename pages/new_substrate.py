@@ -3,9 +3,9 @@ from components.forms.new_substrate.sub_forms import RootForm
 import streamlit as st
 
 from logic.lab_modelization.db_models import db, Substrate, SubstrateLayer
-from logic.functions import load_session_state, save_cookies
+from logic.functions import new_session_state, save_cookies
 
-sess = load_session_state(pages.new_substrate)
+sess = new_session_state(pages.new_substrate)
 
 root_form = RootForm()
 substrate_name = root_form.substrate_name
@@ -17,7 +17,7 @@ st.divider()
 if root_form.is_valid:
     layer_strings = []
     for f in reversed(layer_forms):
-        layer_strings.append(f'――――― {f.stoichio}')
+        layer_strings.append(f'――――――――――― {f.stoichio}')
     with st.container(border=True, width='content'):
         st.write("⬇️ Top layer")
         st.text('\n'.join(layer_strings))
@@ -25,11 +25,11 @@ if root_form.is_valid:
 
 
 if st.button("Submit", disabled=not root_form.is_valid, type='primary'):
-    substrate = Substrate(name=substrate_name, comment=comment)
+    substrate = Substrate(label=substrate_name, comment=comment)
     with db.atomic():
         substrate.layers = []
         for i, form in enumerate(layer_forms):
-            cryst_orient = form.cryst_orient_data
+            cryst_orient = form.cryst_orient_form
             h, k, l = cryst_orient.h, cryst_orient.k, cryst_orient.l
             layer = SubstrateLayer.from_stoichio(
                 form.stoichio, form.thickness, h, k, l,

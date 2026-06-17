@@ -4,7 +4,7 @@ from streamlit import switch_page
 
 from logic.components import inspect_page_header
 from logic.constants import TARGET_ID_URL_KEY, STATE_ID_URL_KEY
-from logic.functions import email_html, extensive_date_str, load_session_state
+from logic.functions import email_html, extensive_date_str, new_session_state
 from logic.lab_modelization.db_models import Target, DeteriorationState
 from logic.math_tools import get_constrained_size
 from logic.page_list import pages
@@ -12,21 +12,21 @@ from logic.page_list import pages
 
 def main_page():
     page = pages.inspect_target
-    load_session_state(page)
+    new_session_state(page)
 
     target_id = st.query_params[TARGET_ID_URL_KEY]
     target: Target = Target.get_by_id(target_id)
 
-    st.set_page_config(layout="wide", page_title=target.physical_name)
+    st.set_page_config(layout="wide", page_title=target.label)
     on_delete = get_on_delete_callback(target)
     on_edit = get_target_edit_callback(target)
 
-    inspect_page_header('Target', target.physical_name, on_delete,
+    inspect_page_header('Target', target.label, on_delete,
                         on_edit, pages.browse_targets)
 
     show_target_info(target)
     with st.container(horizontal=True, vertical_alignment="center"):
-        st.subheader('Current Deterioration State', width='content')
+        st.subheader('Most Recent Deterioration State', width='content')
         if st.button('➕ Add New State'):
             query_params = {TARGET_ID_URL_KEY: target_id}
             st.switch_page('new_deterioration_state.py',
@@ -53,7 +53,7 @@ def show_target_info(target: Target):
             if target.previous_version is not None:
                 previous: Target = target.previous_version
                 st.write("Based on previous target:")
-                if st.button(previous.physical_name, type='tertiary',
+                if st.button(previous.label, type='tertiary',
                              key='previous'):
                     switch_page(
                         pages.inspect_target,
@@ -101,10 +101,14 @@ def show_state_info(state: DeteriorationState):
     email = email_html(state.made_by_email)
     date_str = extensive_date_str(state.date)
     comment = state.comment if state.comment else "_empty_"
-    with st.container(width='content'):
+    with (st.container(width='content')):
         st.subheader(date_str)
+        st.divider(width=1)
         st.write(f"**Updated by:** {email}", unsafe_allow_html=True)
-        st.write(f"**Calibration factor:** {state.calibration_factor:.2f}")
+        calib = state.calibration_factor_comment
+        if calib in {None, ''}:
+            calib = "*empty*"
+        st.write(f"**Calibration factor:**  {calib}")
         with st.container(width=300):
             st.write(f"**Comment:** {comment}")
 
@@ -114,14 +118,14 @@ def dependent_lib_error(target_: Target):
     markdown = (f"The target cannot be deleted because {len(libs)} "
                 f"libraries depend on it:")
     for lib_ in libs:
-        markdown += f"\n- [{lib_.name}]({lib_.get_url()})"
+        markdown += f"\n- [{lib_.label}]({lib_.url})"
     st.error(markdown)
 
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(target_: Target):
     st.error(f"Are you sure you want to **permanently** delete the "
-             f"target **\"{target_.physical_name}\"**?")
+             f"target **\"{target_.label}\"**?")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('Yes', key=f"target_confirm_{target_.id}"):
             target_.delete_instance(recursive=True)

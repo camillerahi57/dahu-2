@@ -5,7 +5,7 @@ from components.forms.shared2 import StopPageLoad
 from logic.constants import CookieKeys as Ck, FILE_STORAGE_PATH, \
     STATE_ID_URL_KEY, REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY, \
     TARGET_ID_URL_KEY
-from logic.functions import load_session_state, save_cookies
+from logic.functions import new_session_state, save_cookies
 from logic.lab_modelization.db_models import db, Target, DeteriorationState
 from logic.page_list import pages
 
@@ -13,7 +13,7 @@ state_id = st.query_params[STATE_ID_URL_KEY]
 old_state: DeteriorationState = DeteriorationState.get_by_id(state_id)
 target: Target = old_state.target
 
-sess = load_session_state(pages.edit_state)
+sess = new_session_state(pages.edit_state)
 st.set_page_config(layout='centered')
 
 try:

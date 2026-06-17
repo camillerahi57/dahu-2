@@ -17,7 +17,7 @@ PIXEL_COORDS = 'pixel_selection'
 REDIRECT_PATH_URL_KEY = 'redirect_path'
 ID_KEY_URL_KEY = 'id_key'
 ID_VALUE_URL_KEY = 'id_value'
-
+DB_UNIT_SYSTEM = 'SI'
 
 class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable
@@ -45,6 +45,7 @@ class SessionKeys(StrEnum):
     CROPPED_PIC = 'cropped_pic_key'
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
     PREVIOUS_PIXEL_COORDS = 'previous_pixel_coords_key'
+    SELECTED_TARGETS = 'selected_targets_key'
 
 
 class ChemicalElement(StrEnum):

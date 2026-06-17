@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from math import pi, cos, sin
 from typing import Self, NamedTuple
 
+from pint.registry import Quantity, Unit
 from plotly.graph_objs import Scatter
 
 
@@ -99,3 +100,7 @@ def get_constrained_size(img_w: int, img_h: int, max_w: int, max_h: int)\
     constrained_h = height_and_width_constrained_h
 
     return round(constrained_w), round(constrained_h)
+
+
+def to_float(quantity: Quantity|None, unit: Unit) -> float|None:
+    return quantity.to(unit).magnitude if quantity is not None else None

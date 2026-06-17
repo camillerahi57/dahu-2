@@ -14,7 +14,10 @@ from logic.constants import PIXEL_COORDS
 def show_pixel_helper(target_img):
     sess = st.session_state
     st.write("**Click on a pixel to get its coordinates.**")
-    st.write(f"**Click twice to get the distance between 2 points.**")
+    st.write(f"**Click on two different pixels to get the distance between "
+             f"them in pixels.**")
+    st.write(f"You should not try to measure the diameter at a glance, "
+             f"because it's not precise enough.")
     st.write('You can zoom in and out with [Ctrl][+] and [Ctrl][-].')
     coord_container = st.container(horizontal=True, vertical_alignment='center',
                                    border=True)
@@ -32,7 +35,7 @@ def show_pixel_helper(target_img):
         if Sk.PREVIOUS_PIXEL_COORDS in sess:
             previous_x, previous_y = sess[Sk.PREVIOUS_PIXEL_COORDS]
             distance = round(sqrt((previous_x - x)**2 + (previous_y - y)**2))
-            coord_container.write(f"Distance to previous click: **{distance}**"
+            coord_container.write(f"Distance to previous pixel: **{distance}**"
                                   f" pixels.")
         sess[Sk.PREVIOUS_PIXEL_COORDS] = (x, y)
 

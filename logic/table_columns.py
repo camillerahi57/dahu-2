@@ -3,7 +3,7 @@ from enum import StrEnum
 
 class LibraryBrowserColumnName(StrEnum):
     made_on = 'Made on'
-    lib_name = 'Name'
+    lib_name = 'Label'
     inspect_link = 'Inspect Link'
     # characs = 'Charac. Methods'
     experimenter = 'Experimenter'
@@ -15,13 +15,13 @@ class LibraryBrowserColumnName(StrEnum):
 class TargetBrowserColumnName(StrEnum):
     made_on = 'Made on'
     made_by = 'Made by'
-    physical_name = 'Physical Name'
+    label = 'Label'
     # comment = 'Comment'
     inspect_link = 'Link'
 
 
 class SubstrateBrowserColumnName(StrEnum):
-    name = 'Name'
+    label = 'Label'
     comment = 'Comment'
     inspect_link = 'Link'
 

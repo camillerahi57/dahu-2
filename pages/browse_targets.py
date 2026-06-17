@@ -7,10 +7,10 @@ from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, DOMAIN, TARGET_ID_URL_KEY
 from logic.lab_modelization.db_models import Target
 from logic.table_columns import TargetBrowserColumnName as ColName
-from logic.functions import load_session_state, save_cookies, \
+from logic.functions import new_session_state, save_cookies, \
     get_email_user_name
 
-sess = load_session_state(pages.browse_targets)
+sess = new_session_state(pages.browse_targets)
 
 st.set_page_config(layout="wide")
 
@@ -20,13 +20,12 @@ if st.button("➕ Add a new target"):
 query = Target.select(
     Target.made_on.alias(ColName.made_on),
     Target.made_by_email.alias(ColName.made_by),
-    Target.physical_name.alias(ColName.physical_name),
+    Target.label.alias(ColName.label),
     # TargetModel.comment.alias(ColName.comment),
     Target.id,
 ).dicts()
 
-page_name = 'inspect_target.py'.removesuffix(
-    '.py')  # Using the file name allows refactorization.
+page_name = pages.inspect_target.url_path
 
 for row in query:
     row[ColName.made_by] = get_email_user_name(row[ColName.made_by])
@@ -38,7 +37,7 @@ rows = [row for row in query]
 
 column_config = {
     ColName.made_on: st.column_config.DateColumn(width='small'),
-    ColName.physical_name: st.column_config.TextColumn(width='large'),
+    ColName.label: st.column_config.TextColumn(width='large'),
     ColName.inspect_link: st.column_config.LinkColumn(display_text='Inspect',
                                                       width='small'),
     ColName.made_by: st.column_config.TextColumn(width='small'),

@@ -10,7 +10,7 @@ from streamlit_cropperjs import st_cropperjs
 
 from components.forms.new_target.fields import MadeAtField, \
     ExperimenterEmailField, \
-    TargetNameField, CommentField, PhotoUploadField, StoichiometryField, \
+    TargetLabelField, CommentField, PhotoUploadField, StoichiometryField, \
     VertexCountField, MillimeterEquivalenceField, PixelEquivalenceField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
@@ -23,37 +23,39 @@ from logic.functions import replace_file_name_extension
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
-from logic.units import ur, dahu_unit as du
 
 
 class BasicInfoForm(Form):
     def __init__(self, default_target: Target = None):
-
-        class Default(SimpleNamespace):
-            made_at = None
-            email = ''
-            name = ''
-            built_from_name = None
-
-        if default_target is not None:
-            Default.made_at = default_target.made_on
-            Default.email = default_target.made_by_email
-            Default.name = default_target.physical_name
-            built_from: Target | None = default_target.previous_version
-            if built_from is None:
-                Default.built_from_name = NEW_TARGET
-            else:
-                Default.built_from_name = built_from.physical_name
-
         col1, col2 = st.columns(2)
         with col1:
-            made_on_fld = MadeAtField(default=Default.made_at)
+            made_on_fld = MadeAtField(
+                form_default=None
+                if default_target is None
+                else default_target.made_on
+            )
         with col2:
-            email_fld = ExperimenterEmailField(default=Default.email)
-        target_name_fld = TargetNameField(default=Default.name)
+            email_fld = ExperimenterEmailField(
+                form_default=''
+                if default_target is None
+                else default_target.made_by_email
+            )
+        target_label_fld = TargetLabelField(
+            form_default=''
+            if default_target is None
+            else default_target.label
+        )
 
+        if default_target is None:
+            previous_version_name = None
+        elif default_target.previous_version is None:
+            previous_version_name = NEW_TARGET
+        else:
+            previous_version_name = default_target.previous_version.label
         previous_version_fld = PreviousVersionField(
-            default=Default.built_from_name)
+            form_default=previous_version_name
+        )
+
         previous_name = previous_version_fld.value
         if previous_name == NEW_TARGET or not previous_version_fld.is_filled:
             built_from = None
@@ -62,17 +64,17 @@ class BasicInfoForm(Form):
 
         self.made_on = made_on_fld.value
         self.made_by_email = email_fld.value
-        self.physical_name = target_name_fld.value
+        self.label = target_label_fld.value
         self.built_from = built_from
         self.default_target = default_target
 
         super().__init__(
-            fields=[made_on_fld, email_fld, target_name_fld,
+            fields=[made_on_fld, email_fld, target_label_fld,
                     previous_version_fld],
             sub_forms=[]
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         default, built_from = self.default_target, self.built_from
         if default is not None and built_from is not None:
             if default.id == built_from.id:
@@ -87,7 +89,7 @@ class BasicInfoForm(Form):
         target = Target(
             made_on=self.made_on,
             made_by_email=self.made_by_email,
-            physical_name=self.physical_name,
+            label=self.label,
             previous_version=self.built_from,
         )
         if id_ is not None:
@@ -99,36 +101,31 @@ class BasicInfoForm(Form):
 class PixelEquivalenceForm(Form):
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
-        ratio_unit = du.length / ur.pixel
+        default_db_length = 100  # Only ratio is stored in DB, so we
+        # arbitrarily chose a length to show it's equivalent in pixels.
 
-        class Default(SimpleNamespace):
-            millimeters = 0 * ur.mm
-            pixels = 0 * ur.pixel
-
-        if default_state is not None:
-            Default.millimeters = 100 * ur.mm
-            ratio = default_state.length_per_px * ratio_unit
-            pixels = round(Default.millimeters / ratio)
-            Default.pixels = pixels.to(ur.pixel)
-
-        st.subheader("Millimeter to pixel conversion")
         with st.container(horizontal=True, vertical_alignment='top'):
             st.write("_You can use the following tool:_")
             pixel_helper_button(target_img, 'px_equivalence')
 
             with st.container(width=150):
                 millimeter_fld = MillimeterEquivalenceField(
-                    default=Default.millimeters.magnitude)
+                    form_default=None,
+                    db_default=default_db_length
+                )
 
             with st.container(width=150):
                 pixel_fld = PixelEquivalenceField(
-                    default=int(Default.pixels.magnitude))
+                    form_default=None,
+                    db_default=None
+                        if default_state is None
+                        else default_db_length / default_state.length_per_px
+                )
 
         if millimeter_fld.is_valid and pixel_fld.is_valid:
-            length = millimeter_fld.value * ur.mm
-            pixels = pixel_fld.value * ur.pixel
-            ratio = length / pixels
-            length_per_px = ratio.to(ratio_unit).magnitude
+            length = millimeter_fld.in_db_unit
+            pixels = pixel_fld.value
+            length_per_px = length / pixels
         else:
             length_per_px = None
 
@@ -139,7 +136,7 @@ class PixelEquivalenceForm(Form):
             sub_forms=[],
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
 
@@ -177,14 +174,14 @@ class UploadAndCropForm(Form):
                         st.rerun()
 
             has_correct_orientation_fld = HasCorrectOrientationField(
-                key='correct_orientation', default=False)
+                key='correct_orientation', form_default=False)
             self.cropped_target_img: ImageFile = sess[Sk.CROPPED_TARGET_IMG]
             self.file_name = sess[Sk.TARGET_IMG_NAME]
             super().__init__([has_correct_orientation_fld], [])
 
         elif Sk.UPLOADED_TARGET_IMG in sess:
             photo = sess[Sk.UPLOADED_TARGET_IMG]
-            st.warning("**Crop with target base** (can be approximate).")
+            st.warning("**Crop with the base (if any) with a small margin:**")
             cropped_pic = st_cropperjs(
                 pic=photo, btn_text="Select target", key=Sk.CROPPED_PIC)
             if cropped_pic:
@@ -197,7 +194,7 @@ class UploadAndCropForm(Form):
             raise StopPageLoad
 
         else:
-            photo_upload_fld = PhotoUploadField()
+            photo_upload_fld = PhotoUploadField(form_default=None)
             if photo_upload_fld.value:
                 sess[Sk.UPLOADED_TARGET_IMG] = photo_upload_fld.value.read()
                 if default_state is None:
@@ -205,49 +202,54 @@ class UploadAndCropForm(Form):
                 st.rerun()
             raise StopPageLoad
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
 
 class StateInfoForm(Form):
     def __init__(self, target_date: datetime,
                  default_state: DeteriorationState | None):
-
-        class Default(SimpleNamespace):
-            date = None
-            calibration_factor = 0.
-            comment = ''
-            id = None
-            has_comment = None
-
+        db_has_comment = None
         if default_state is not None:
-            Default.date = default_state.date
-            Default.calibration_factor = default_state.calibration_factor
-            Default.comment = default_state.comment
-            Default.id = default_state.id
             if default_state.comment != '':
-                Default.has_comment = HasCommentField.Option.YES
+                db_has_comment = HasCommentField.Option.YES
             else:
-                Default.has_comment = HasCommentField.Option.NO
+                db_has_comment = HasCommentField.Option.NO
 
         photo_upload_form = UploadAndCropForm(default_state)
         target_img = photo_upload_form.cropped_target_img
 
-        date_fld = PhotoDateField(default=Default.date)
+        date_fld = PhotoDateField(
+            form_default=None,
+            db_default=None
+                if default_state is None
+                else default_state.date
+        )
 
         st.divider()
         pixel_equivalence_form = PixelEquivalenceForm(target_img, default_state)
 
         st.divider()
         calibration_fld = CalibrationFactorField(
-            default=Default.calibration_factor)
+            form_default=0.,
+            db_default=None
+                if default_state is None
+                else default_state.calibration_factor_comment
+        )
         st.divider()
         st.write("**Any comment about this target?**")
-        has_comment_fld = HasCommentField(default=Default.has_comment)
+        has_comment_fld = HasCommentField(
+            form_default=None,
+            db_default=db_has_comment
+        )
         if not has_comment_fld.is_valid:
             raise StopPageLoad
         if has_comment_fld.value == HasCommentField.Option.YES:
-            comment_fld = CommentField(Default.comment)
+            comment_fld = CommentField(
+                form_default='',
+                db_default=None if default_state is None
+                    else default_state.comment
+            )
             comment = comment_fld.value
         else:
             comment_fld = None
@@ -266,7 +268,7 @@ class StateInfoForm(Form):
             sub_forms=[photo_upload_form, pixel_equivalence_form],
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         if self.state_date < self.target_date:
             return False, ('Picture date cannot be anterior to the date '
                            'the target was made.')
@@ -301,14 +303,14 @@ class XYCoordinatesForm(Form):
             couple = str((x, y)).removeprefix('(').removesuffix(')')
         else:
             couple = ''
-        coord_fld = CoordinateField(key, default=str(couple))
+        coord_fld = CoordinateField(key, form_default=str(couple))
         if coord_fld.is_valid:
             self.x, self.y = eval(coord_fld.value)
         else:
             self.x, self.y = None, None
         super().__init__(fields=[coord_fld], sub_forms=[], )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
 
@@ -327,17 +329,23 @@ class DiscPatchForm(Form):
             vertices = default_patch.vertices
             vertex_count = len(vertices)
             Default.vertex1 = vertices[0]
-            Default.vertex2 = vertices[vertex_count//3]
-            Default.vertex3 = vertices[vertex_count*2//3]
+            Default.vertex2 = vertices[vertex_count // 3]
+            Default.vertex3 = vertices[vertex_count * 2 // 3]
 
         with st.container(horizontal=True, gap='xxsmall'):
             pixel_helper_button(target_img, f'disc_px_select_{key}')
-            point_1_form = XYCoordinatesForm(key=f'disc_1_{key}',
-                                             default_vertex=Default.vertex1)
-            point_2_form = XYCoordinatesForm(key=f'disc_2_{key}',
-                                             default_vertex=Default.vertex2)
-            point_3_form = XYCoordinatesForm(key=f'disc_3_{key}',
-                                             default_vertex=Default.vertex3)
+            point_1_form = XYCoordinatesForm(
+                key=f'disc_1_{key}',
+                default_vertex=Default.vertex1,
+            )
+            point_2_form = XYCoordinatesForm(
+                key=f'disc_2_{key}',
+                default_vertex=Default.vertex2,
+            )
+            point_3_form = XYCoordinatesForm(
+                key=f'disc_3_{key}',
+                default_vertex=Default.vertex3,
+            )
 
         self.pt_forms = [point_1_form, point_2_form, point_3_form]
         self.point_1 = Point(point_1_form.x, point_1_form.y)
@@ -349,7 +357,7 @@ class DiscPatchForm(Form):
             sub_forms=[point_1_form, point_2_form, point_3_form],
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         distinct_points = {self.point_1, self.point_2, self.point_3}
         valid_coords = all(f.is_valid for f in self.pt_forms)
         if valid_coords:
@@ -363,24 +371,22 @@ class DiscPatchForm(Form):
 class PolygonPatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None):
-        class Default(SimpleNamespace):
-            vertex_count = 3
-            vertices: list[Vertex]|None = None
-
-        if default_patch is not None:
-            default_vertices = default_patch.vertices
-            Default.vertex_count = len(default_vertices)
-            Default.vertices = default_vertices
+        default_vertices = None if default_patch is None \
+            else default_patch.vertices
 
         with st.container(horizontal=True, vertical_alignment='center'):
-            vertex_count_fld = VertexCountField(key,
-                                                default=Default.vertex_count)
+            vertex_count_fld = VertexCountField(
+                key,
+                form_default=3,
+                db_default=None if default_patch is None
+                    else len(default_patch.vertices)
+            )
 
         xy_forms: list[XYCoordinatesForm] = []
         with st.container(horizontal=True, vertical_alignment='top'):
             pixel_helper_button(target_img, f'poly_px_select_{key}')
             for i in range(vertex_count_fld.value):
-                if Default.vertices is not None and i < len(Default.vertices):
+                if default_vertices is not None and i < len(default_vertices):
                     default_vertex = Default.vertices[i]  # noqa I don't understand the warning.
                 else:
                     default_vertex = None
@@ -401,7 +407,7 @@ class PolygonPatchForm(Form):
             sub_forms=xy_forms,
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         distinct_points = set(self.vertices)
         if len(distinct_points) < 3 and all(f.is_valid for f in self.xy_forms):
             return False, 'Vertices must be distinct. Some points are equal.'
@@ -412,24 +418,30 @@ class PatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None,
                  default_is_base_patch: bool = False):
-        class Default(SimpleNamespace):
-            shape = None
-            stoichio = ''
-            is_base_patch = default_is_base_patch
-
-        if default_patch is not None:
-            Default.shape = ShapeType.DISC if len(default_patch.vertices) > 100\
-                else ShapeType.POLYGON
-            Default.stoichio = default_patch.stoichio_str()
+        if default_patch is None:
+            default_shape = None
+        elif len(default_patch.vertices) > 100:
+            default_shape = ShapeType.DISC
+        else:
+            default_shape = ShapeType.POLYGON
 
         with st.container(border=True, width=99999):
-            is_base_patch_fld = IsBasePatchField(f'is_base_{key}',
-                                                 default=Default.is_base_patch)
+            is_base_patch_fld = IsBasePatchField(
+            f'is_base_{key}',
+                form_default=default_is_base_patch
+            )
             with st.container(horizontal=True):
                 st.write("Shape:")
-                shape_fld = ShapeField(key, default=Default.shape)
-                stoichio_fld = StoichiometryField(key=key,
-                                                  default=Default.stoichio)
+                shape_fld = ShapeField(
+                    key,
+                    form_default=default_shape
+                )
+                stoichio_fld = StoichiometryField(
+                    key=key,
+                    form_default='',
+                    db_default=None if default_patch is None
+                        else default_patch.stoichio_str()
+                )
 
             shape = shape_fld.value
 
@@ -450,7 +462,7 @@ class PatchForm(Form):
             super().__init__([shape_fld, stoichio_fld, is_base_patch_fld],
                              [form])
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
     def to_patch_or_none(self, state: DeteriorationState) -> Patch | None:
@@ -490,18 +502,16 @@ class PatchForm(Form):
 class PatchListForm(Form):
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
-        class Default(SimpleNamespace):
-            patch_count = 0
-            patches: list[Patch]|None = None
-
-        if default_state is not None:
-            default_patches = default_state.patches
-            Default.patch_count = len(default_patches)
-            Default.patches = default_patches
+        default_patches = None if default_state is None \
+            else default_state.patches
 
         st.subheader('Patches')
         with st.container(horizontal=True, vertical_alignment='center'):
-            patch_count_fld = PatchCountField(default=Default.patch_count)
+            patch_count_fld = PatchCountField(
+                form_default=default_patches,
+                db_default=None if default_state is None
+                    else len(default_state.patches)
+            )
         patch_count = patch_count_fld.value
         if not patch_count_fld.is_valid:
             raise StopPageLoad
@@ -509,7 +519,7 @@ class PatchListForm(Form):
         st.divider(width=50)
         patch_forms: list[PatchForm] = []
         for i in range(patch_count):
-            if Default.patches is not None and i < len(Default.patches):
+            if default_patches is not None and i < len(default_patches):
                 default_state = Default.patches[i]  # noqa I don't understand the warning.
             else:
                 default_state = None
@@ -526,7 +536,7 @@ class PatchListForm(Form):
 
         super().__init__(fields=[patch_count_fld], sub_forms=self.patch_forms)
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         base_patch_count = len([f for f in self.patch_forms if f.is_base_patch])
         if base_patch_count != 1:
             return False, (f"There must be exactly one *base* patch. "
@@ -538,24 +548,19 @@ class PatchListForm(Form):
         return [form.to_patch_or_none(state)
                 for form in self.patch_forms]
 
+# On continue d'enlever les Default de merde
 
 class DeteriorationStateForm(Form):
     def __init__(self, target: Target, email: str = None,
                  default_state: DeteriorationState = None):
-        class Default(SimpleNamespace):
-            state = None
-
-        if default_state is not None:
-            Default.state = default_state
-
         state_info_form = StateInfoForm(target.made_on,
-                                        default_state=Default.state)
+                                        default_state=default_state)
         st.divider()
         state = state_info_form.to_deterioration_state(target, email)
         target.states = [state]
 
         patch_list_form = PatchListForm(state_info_form.target_img,
-                                        default_state=Default.state)
+                                        default_state=default_state)
         all_patches = patch_list_form.to_patches(state)
         filled_patches = [p for p in all_patches if p is not None]
         state.patches = filled_patches
@@ -564,7 +569,7 @@ class DeteriorationStateForm(Form):
             patch_fig = state.to_figure()
             st.plotly_chart(patch_fig)
 
-        is_correct_fld = IsCorrectFigureField()
+        is_correct_fld = IsCorrectFigureField(form_default=False)
 
         st.divider()
         self.target = target
@@ -578,7 +583,7 @@ class DeteriorationStateForm(Form):
             sub_forms = [state_info_form, patch_list_form],
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         missing_patch_count = len(self.all_patches) - len(self.filled_patches)
         if missing_patch_count > 0:
             return False, (f"Please enter data for all patches. "
@@ -601,5 +606,5 @@ class RootForm(Form):
             sub_forms=[basic_info_form, state_form],
         )
 
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         return True, ''

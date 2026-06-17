@@ -7,26 +7,25 @@ from logic.components import browser_side_bar
 from logic.constants import LIB_ID_URL_KEY, DOMAIN, CookieKeys as Ck
 from logic.lab_modelization.db_models import Library, Film
 from logic.table_columns import LibraryBrowserColumnName as ColName
-from logic.functions import save_cookies, load_session_state, \
+from logic.functions import save_cookies, new_session_state, \
     get_email_user_name
 
-sess = load_session_state(pages.browse_libs)
+sess = new_session_state(pages.browse_libs)
 
 st.set_page_config(layout="wide")
 if st.button("➕ Add a new library"):
     st.switch_page('new_lib.py')
 
 query = Library.select(
-    Library.name.alias(ColName.lib_name),
+    Library.label.alias(ColName.lib_name),
     Library.id.alias(LIB_ID_URL_KEY),
-    # noqa, id is not declared in the project but is in Peewee.
     Library.comment.alias(ColName.comment),
     Film.made_on.alias(ColName.made_on),
     Film.made_by_email.alias(ColName.experimenter)
 ).join(Film).dicts()
 
 # Python file name (with .py) allows IDE refactorization:
-page_name = 'inspect_library.py'.removesuffix('.py')
+page_name = pages.inspect_lib.url_path
 
 for row in query:
     row[ColName.experimenter] = get_email_user_name(row[ColName.experimenter])

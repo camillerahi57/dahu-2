@@ -7,9 +7,9 @@ from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, DOMAIN, SUB_ID_URL_KEY
 from logic.lab_modelization.db_models import Substrate
 from logic.table_columns import SubstrateBrowserColumnName as ColName
-from logic.functions import load_session_state, save_cookies
+from logic.functions import new_session_state, save_cookies
 
-sess = load_session_state(pages.browse_substrates)
+sess = new_session_state(pages.browse_substrates)
 
 st.set_page_config(layout="wide")
 
@@ -17,13 +17,12 @@ if st.button("➕ Add a new substrate"):
     st.switch_page('new_substrate.py')
 
 query = Substrate.select(
-    Substrate.name.alias(ColName.name),
+    Substrate.label.alias(ColName.label),
     Substrate.comment.alias(ColName.comment),
     Substrate.id,
 ).dicts()
 
-page_name = 'inspect_substrate.py'.removesuffix('.py')  # Using the file name
-# allows refactorization.
+page_name = pages.inspect_substrate.url_path
 
 rows = list(query)
 
@@ -33,7 +32,7 @@ for row in rows:
                                  f"{SUB_ID_URL_KEY}={row['id']}")  # noqa
 
 column_config = {
-    ColName.name: st.column_config.TextColumn(width='small'),
+    ColName.label: st.column_config.TextColumn(width='small'),
     ColName.inspect_link: st.column_config.LinkColumn(display_text='Inspect',
                                                       width='small'),
     ColName.comment: st.column_config.TextColumn(width='large'),
@@ -44,7 +43,7 @@ col_order = column_config.keys()  # Same order as in the column config
 
 df = pd.DataFrame(rows, columns=list(col_order))
 
-possible_filters = [ColName.name]
+possible_filters = [ColName.label]
 dynamic_filters = DynamicFilters(df, filters=possible_filters,
                                  filters_name=Ck.SUBSTRATE_FILTERS)
 browser_side_bar(dynamic_filters, 'browse_substrates.py')

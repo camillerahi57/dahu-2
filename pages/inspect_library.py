@@ -5,10 +5,11 @@ from logic.page_list import pages
 from logic.components import inspect_page_header
 from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
 from logic.db_enums import FilmModifType
-from logic.lab_modelization.db_models import Library, Film, Substrate, Target, FilmModification,\
-    Annealing, IonBeamEtching, WetEtching
+from logic.lab_modelization.db_models import (
+    Library, Film, Substrate, Target, FilmModification,\
+    Annealing, IonBeamEtching, WetEtching)
 from logic.functions import link_html, email_html, \
-    load_session_state
+    new_session_state
 from new_film_modif import ModifData
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -19,19 +20,15 @@ film: Film = Film.get(Film.library == lib)
 substrate: Substrate = Substrate.get_by_id(film.substrate)
 layers = film.layers
 
-targets = []
-for lay in layers:
-    for usage in lay.target_uses:
-        targets += usage.target
 targets: set[Target] = set(lay.target for lay in layers)
-target_link_htmls = [link_html(target.physical_name, target.url())
+target_link_htmls = [link_html(target.label, target.url())
                      for target in targets]
 layers = reversed(list(layers))
 
-sess = load_session_state(pages.inspect_lib)
+sess = new_session_state(pages.inspect_lib)
 sess[Sk.CURRENT_FILM] = film
 
-st.set_page_config(layout="wide", page_title=lib.name)
+st.set_page_config(layout="wide", page_title=lib.label)
 
 
 def dependent_lib_error(lib_: Library):
@@ -39,14 +36,14 @@ def dependent_lib_error(lib_: Library):
     markdown = (f"The library cannot be deleted because {len(libs)} "
                 f"other libraries refer to some of its characterizations:")
     for lib_ in libs:
-        markdown += f"\n- [{lib_.name}]({lib_.url()})"
+        markdown += f"\n- [{lib_.label}]({lib_.url()})"
     st.error(markdown)
 
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(lib_: Library):
     st.error(f"Are you sure you want to **permanently** delete the "
-             f"library **\"{lib_.name}\"**?\n\n**This will also delete:**\n"
+             f"library **\"{lib_.label}\"**?\n\n**This will also delete:**\n"
              f"- Film data\n- Film characterizations\n- Film modifications\n"
              f"- Uploaded data for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
@@ -63,10 +60,10 @@ def on_delete():
 
 
 MODIF_NAMES = {
+    FilmModifType.LIFT_OFF: 'Lift off',
     FilmModifType.ANNEALING: 'Annealing',
-    FilmModifType.PATTERNING: 'Patterning',
-    FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
     FilmModifType.WET_ETCHING: 'Wet etching',
+    FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
 }
 
 @st.dialog('Modification Process')
@@ -76,7 +73,7 @@ def film_modif_info(modif_: FilmModification):
     process = modif_.modification_process()
 
     if isinstance(process, Annealing):
-        st.write(f"**Temperature:** {process.temperature}\n\n"
+        st.write(f"**Max temperature:** {process.max_temperature}\n\n"
                  f"**Duration:** {process.duration}\n\n"
                  f"**Pressure:** {process.pressure}\n\n"
                  f"**Furnace:** {process.furnace}")
@@ -97,18 +94,17 @@ def film_modif_info(modif_: FilmModification):
         constituents_str = ''
         for const in constituents:
             percent = const.proportion / proportion_sum * 100
-            constituents_str += f"\n- {const.formula}: {percent:g}%"
+            constituents_str += f"\n- {const.stoichio_str}: {percent:g}%"
         st.write(f"**Plasma constituents:**{constituents_str}")
 
     elif isinstance(process, WetEtching):
-        st.write(f"**Duration:** {process.duration}\n\n"
-                 f"**Temperature:** {process.temperature}")
+        st.write(f"**Recipe:** {process.recipe_file_name}")
         constituents = process.constituents
         proportion_sum = sum(const.proportion for const in constituents)
         constituents_str = ''
         for const in constituents:
             percent = const.proportion / proportion_sum * 100
-            constituents_str += f"- {const.formula}: {percent:g}%\n\n"
+            constituents_str += f"- {const.stoichio_str}: {percent:g}%\n\n"
         st.write(f"**Acid constituents:**\n\n{constituents_str}")
 
     else:
@@ -126,8 +122,8 @@ def card(label_: str):
         st.space()
 
 
-inspect_page_header('Library', lib.name, on_delete, lambda: None,
-                    'browse_libs.py')
+inspect_page_header('Library', lib.label, on_delete, lambda: None,
+                    pages.browse_libs)
 
 with (st.container(horizontal=True, vertical_alignment='center',
                   horizontal_alignment='left', border=True)):
@@ -164,9 +160,9 @@ with col2:
         st.write(f"Made on **{date_str}** by "
                  f"**{email_html(film.made_by_email)}**",
                  unsafe_allow_html=True)
-        st.write(f"**Label written on sample:** {film.physical_name}")
+        st.write(f"**Label written on sample:** {film.label}")
         st.write(f"**Substrate:** "
-                 f"{link_html(substrate.name, substrate.url())}",
+                 f"{link_html(substrate.label, substrate.url())}",
                  unsafe_allow_html=True)
         st.write(f"**Target:** {', '.join(target_link_htmls)}",
                  unsafe_allow_html=True)
@@ -175,10 +171,10 @@ with col2:
         st.write(f"**Layers**:")
         table_content = [
             {
-                ColName.stoichio: lay.stoichiometry,
+                ColName.stoichio: lay.element_str,
                 ColName.deposit_temp: lay.deposit_temp,
-                ColName.deposit_duration: lay.deposit_duration,
-                ColName.deposit_power: lay.deposit_power,
+                ColName.deposit_duration: lay.sputtering.deposit_duration,
+                ColName.deposit_power: lay.sputtering.deposit_power,
             }
             for lay in layers
         ]

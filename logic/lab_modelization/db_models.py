@@ -23,6 +23,8 @@ from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronMachineModel, PixelCoordinateSystem
 from logic.functions import letter_count
 from logic.math_tools import VertexList
+from logic.page_list import pages
+from logic.python_tools import remove_digits
 
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
@@ -42,7 +44,7 @@ type Backref[T] = list[T]
 
 
 class _BaseModel(Model):
-    id: int
+    id: int|IntegerField
 
     class Meta:
         database = db
@@ -79,26 +81,27 @@ class _BaseModel(Model):
     def dependent_objects(self) -> list[_BaseModel]:
         objects = []
         for fld_name in self.dependent_object_fld_names():
-            objects += self.__getattribute__(fld_name)
+            new_objects = self.__getattribute__(fld_name)
+            objects += list(new_objects)
         return objects
 
 
 class Substrate(_BaseModel):
-    name = CharField(unique=True)
+    label = CharField(unique=True)
     comment = CharField(null=True)
 
     layers: DependentBackref[SubstrateLayer]
 
-    def __init__(self, name: str, comment: str, *args, **kwargs):
+    def __init__(self, label: str, comment: str, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @classmethod
     def already_taken_names(cls):
         query = Substrate.select(
-            Substrate.name
+            Substrate.label
         ).dicts()
-        names = [row[Substrate.name.name]
+        names = [row[Substrate.label.name]
                  # Name of the name field (which is 'name'),
                  # not the name of the substrate.
                  for row in query]
@@ -115,9 +118,13 @@ class Substrate(_BaseModel):
         return len(self.libraries()) == 0
 
     def url(self):
-        page_name = 'inspect_substrate.py'.removesuffix('.py')
+        page_name = pages.inspect_substrate.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{SUB_ID_URL_KEY}={self.id}"
+
+    @classmethod
+    def from_label(cls, label: str) -> Self:
+        return Substrate.get(Substrate.label == label)
 
 
 class SubstrateLayer(_BaseModel):
@@ -126,7 +133,7 @@ class SubstrateLayer(_BaseModel):
     k = IntegerField(null=True)
     l = IntegerField(null=True)
     position_from_back = IntegerField()
-    substrate = ForeignKeyField(Substrate, on_delete='RESTRICT',
+    substrate: Substrate = ForeignKeyField(Substrate, on_delete='RESTRICT',
                                 backref='layers')
 
     stoichio: DependentBackref[StoichioElement]
@@ -159,16 +166,17 @@ class SubstrateLayer(_BaseModel):
 class Target(_BaseModel):
     made_on = DateField()
     made_by_email = CharField()
-    physical_name = CharField(unique=True)
-    previous_version = ForeignKeyField(
+    label = CharField(unique=True)
+    previous_version: Target = ForeignKeyField(
         'self', null=True, on_delete='SET NULL', backref='next_version')
 
     states: DependentBackref[DeteriorationState]
+    film_layers: DependentBackref[FilmLayer]
 
-    uses: Backref[TargetUse]
+    # uses: Backref[TargetUse]
 
     def __init__(self, made_on: datetime, made_by_email: str,
-                 physical_name: str, previous_version: Target|None,
+                 label: str, previous_version: Target | None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -176,13 +184,15 @@ class Target(_BaseModel):
     @classmethod
     def already_taken_names(cls):
         query = Target.select(
-            Target.physical_name
+            Target.label
         ).dicts()
-        names = [row[Target.physical_name.name]
+        names = [row[Target.label.name]
                  for row in query]
+        names = sorted(names, key=lambda name: name)
         return names
 
-    def get_last_state(self) -> DeteriorationState:
+    @property
+    def last_state(self) -> DeteriorationState:
         return self.old_to_recent_states()[-1]
 
     def old_to_recent_states(self) -> list[DeteriorationState]:
@@ -191,19 +201,19 @@ class Target(_BaseModel):
                 .order_by(DeteriorationState.date.asc()))
 
     @classmethod
-    def from_name(cls, name: str) -> Self:
-        return Target.get(Target.physical_name == name)
+    def from_name(cls, label: str) -> Self:
+        return Target.get(Target.label == label)
 
     def libraries(self) -> set[Library]:
         return set.union(*(state.libraries() for state in self.states))
 
     def url(self):
-        page_name = 'inspect_target.py'.removesuffix('.py')
+        page_name = pages.inspect_target.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{TARGET_ID_URL_KEY}={self.id}"
 
     def can_be_deleted(self):
-        return len(self.uses) == 0
+        return len(self.film_layers) == 0
 
     def comments(self) -> list[tuple[datetime, str]]:
         return [(state.date, state.comment) # noqa Wrong warning.
@@ -394,18 +404,17 @@ class EsrfPoni(_BaseModel):
 
 
 class Library(_BaseModel):
-    name = CharField(unique=True)
+    label = CharField(unique=True)
     last_inspected_at = DateTimeField()
     comment = CharField(null=True)
-    hdf5_file_name = CharField(null=True)
 
     uploaded_files: DependentBackref[UserUploadedFile]
-    film: DependentBackref[Film]  # Should be a list of exactly 1 element.
+    films: DependentBackref[Film]  # Should be a list of exactly 1 element.
 
     # Will add charac refs in the future.
 
-    def __init__(self, name: str, last_inspected_at: datetime, comment: str,
-                 hdf5_file_name: str | None, *args, **kwargs):
+    def __init__(self, label: str, last_inspected_at: datetime, comment: str,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -415,14 +424,15 @@ class Library(_BaseModel):
     @classmethod
     def already_taken_names(cls):
         query = cls.select(
-            cls.name
+            cls.label
         ).dicts()
-        names = [row[cls.name.name]
+        names = [row[cls.label.name]
                  for row in query]
         return names
 
-    def get_url(self):
-        page_name = 'inspect_library.py'.removesuffix('.py')
+    @property
+    def url(self):
+        page_name = pages.inspect_lib.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{LIB_ID_URL_KEY}={self.id}"
 
@@ -435,18 +445,19 @@ class Library(_BaseModel):
 
 
 class Film(_BaseModel):
-    physical_name = CharField(unique=True)
+    label = CharField(unique=True)
     made_on = DateField()
     made_by_email = CharField()
-    substrate = ForeignKeyField(Substrate)
-    library = ForeignKeyField(Library, on_delete='RESTRICT', backref='film')
+    substrate: Substrate = ForeignKeyField(Substrate)
+    library: Library = ForeignKeyField(Library, on_delete='RESTRICT',
+                                       backref='films')
 
     layers: DependentBackref[FilmLayer]
     modifs: DependentBackref[FilmModification]
 
     # Will add characterization.
 
-    def __init__(self, physical_name: str, made_on: datetime,
+    def __init__(self, label: str, made_on: datetime,
                  made_by_email: str,
                  substrate: Substrate, library: Library,
                  *args, **kwargs):
@@ -459,9 +470,9 @@ class Film(_BaseModel):
     @classmethod
     def already_taken_names(cls):
         query = Film.select(
-            Film.physical_name
+            Film.label
         ).dicts()
-        names = [row[Film.physical_name.name]
+        names = [row[Film.label.name]
                  for row in query]
         return names
 
@@ -483,12 +494,14 @@ class FilmLayer(_BaseModel):
     function: FilmLayerFunction = CharField()
     sputtering_system: SputteringSystem = CharField(null=True)
 
-    film = ForeignKeyField(Film, on_delete='RESTRICT', backref='layers')
+    film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='layers')
+    target: Target = ForeignKeyField(Target, on_delete='RESTRICT',
+                             backref='film_layers')
 
     stoichio: DependentBackref[StoichioElement]
-    target_uses: DependentBackref[TargetUse]
-    magnetron_sputtering: DependentBackref[MagnetronSputtering]
-    triode_sputtering: DependentBackref[TriodeSputtering]
+    # target_uses: DependentBackref[TargetUse]
+    magnetron_sputterings: DependentBackref[MagnetronSputtering]  # List of 1.
+    triode_sputterings: DependentBackref[TriodeSputtering]  # List of 1.
 
     def __init__(self, position_from_buffer: int | None,
                  deposit_temp: float | None,
@@ -500,8 +513,25 @@ class FilmLayer(_BaseModel):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    def elements(self):
-        return set(e.element for e in self.stoichio)
+    @property
+    def element_str(self) -> str:
+        return remove_digits(self.nominal_stoichio)
+
+    @property
+    def nominal_stoichio(self) -> str:
+        return StoichioElement.complete_stoichio(self.stoichio)
+
+    @property
+    def sputtering(self) -> MagnetronSputtering|TriodeSputtering:
+        mag_sputters = self.magnetron_sputterings
+        triode_sputters = self.triode_sputterings
+        if len(mag_sputters) + len(triode_sputters) != 1:
+            raise RuntimeError("There must be exactly one sputtering per "
+                               "layer.")
+        if len(mag_sputters) == 1:
+            return mag_sputters[0]
+        else:
+            return triode_sputters[0]
 
 
 class MagnetronSputtering(_BaseModel):
@@ -512,8 +542,8 @@ class MagnetronSputtering(_BaseModel):
     generator: MagnetronSputteringGenerator = CharField(null=True)
     machine_model: MagnetronMachineModel = CharField(null=True)
 
-    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='magnetron_sputtering')
+    film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
+                                 backref='magnetron_sputterings')
 
     def __init__(self, deposit_distance: float | None,
                  deposit_angle: float | None,
@@ -527,8 +557,9 @@ class MagnetronSputtering(_BaseModel):
 
 class TriodeSputtering(_BaseModel):
     has_active_cooling = BooleanField(null=True)
-    rotation = FloatField(null=True)
-    filament_current = FloatField(null=True)
+    rotation_speed = FloatField(null=True)
+    filament_current_start = FloatField(null=True)
+    filament_current_end = FloatField(null=True)
     anode_current = FloatField(null=True)
     anode_voltage = FloatField(null=True)
     cathode_current = FloatField(null=True)
@@ -540,13 +571,14 @@ class TriodeSputtering(_BaseModel):
     deposit_duration = FloatField(null=True)
     presputtering_thickness = FloatField(null=True)
 
-    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='triode_sputtering')
+    film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
+                                 backref='triode_sputterings')
 
     def __init__(self,
                  has_active_cooling: bool | None,
                  rotation: float | None,
-                 filament_current: float | None,
+                 filament_current_start: float | None,
+                 filament_current_end: float | None,
                  anode_current: float | None,
                  anode_voltage: float | None,
                  cathode_current: float | None,
@@ -563,11 +595,16 @@ class TriodeSputtering(_BaseModel):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
+    @property
+    def deposit_power(self) -> float:
+        return None  # noqa TODO Can we define a power for triode?
+
 
 class UserUploadedFile(_BaseModel):
     file_name = CharField(unique=True)
-    library = ForeignKeyField(Library, on_delete='RESTRICT',
+    library: Library = ForeignKeyField(Library, on_delete='RESTRICT',
                               backref='uploaded_files')
+    upload_date = DateField()
 
     def __init__(self, file_name: str, library: Library, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -589,7 +626,7 @@ class FilmModification(_BaseModel):
     comment = CharField(null=True)
     modif_type: FilmModifType = CharField()
 
-    film = ForeignKeyField(Film, on_delete='RESTRICT', backref='modifs')
+    film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='modifs')
 
     annealing: DependentBackref[Annealing]
     wet_etching: DependentBackref[WetEtching]
@@ -644,8 +681,8 @@ class LiftOff(_BaseModel):
     pattern_diagram_file_name = CharField(null=True)
     recipe_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT',
-                                 backref='lift_off')
+    film_modif: FilmModification = ForeignKeyField(
+        FilmModification, on_delete='RESTRICT', backref='lift_off')
 
     def __init__(self, used_ultrasound: bool | None,
                  ultrasound_config: str | None,
@@ -663,7 +700,8 @@ class Annealing(_BaseModel):
     pressure = FloatField(null=True)
     pumping_duration = FloatField(null=True)
     furnace: Furnace = CharField(null=True)
-    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
+    film_modif: FilmModification = ForeignKeyField(
+        FilmModification, on_delete='RESTRICT')
 
     steps: DependentBackref[AnnealingStep]
 
@@ -673,17 +711,33 @@ class Annealing(_BaseModel):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
+    @property
+    def max_temperature(self) -> float:
+        return max(s.temperature for s in self.steps)
+
+    @property
+    def ordered_steps(self):
+        def key(step: AnnealingStep):
+            return step.starts_at
+        return sorted(self.steps, key=key)
+
+    @property
+    def duration(self) -> float:
+        steps = self.ordered_steps
+        return steps[-1].starts_at + steps[-1].duration
+
 
 class AnnealingStep(_BaseModel):
-    elapsed = FloatField()
-    temperature = FloatField()
+    starts_at: float = FloatField()
+    duration: float = FloatField()
+    temperature: float = FloatField()
 
-    annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
+    annealing: Annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
                                 backref='steps')
 
     atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self, elapsed: float, temperature: float,
+    def __init__(self, starts_at: float, duration: float, temperature: float,
                  annealing: Annealing, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -699,7 +753,8 @@ class IonBeamEtching(_BaseModel):
     has_a_pattern = BooleanField(null=True)
     pattern_diagram_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
+    film_modif: FilmModification = ForeignKeyField(
+        FilmModification, on_delete='RESTRICT')
 
     constituents: DependentBackref[PlasmaConstituent]
 
@@ -719,8 +774,8 @@ class IonBeamEtching(_BaseModel):
 class PlasmaConstituent(_BaseModel):
     proportion = FloatField()
 
-    etching = ForeignKeyField(IonBeamEtching, on_delete='RESTRICT',
-                              backref='constituents')
+    etching: IonBeamEtching = ForeignKeyField(
+        IonBeamEtching, on_delete='RESTRICT', backref='constituents')
 
     stoichio: DependentBackref[StoichioElement]
 
@@ -728,6 +783,10 @@ class PlasmaConstituent(_BaseModel):
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    @property
+    def stoichio_str(self):
+        return StoichioElement.complete_stoichio(self.stoichio)
 
 
 class WetEtching(_BaseModel):
@@ -742,7 +801,8 @@ class WetEtching(_BaseModel):
     pattern_diagram_file_name = CharField(null=True)
     recipe_file_name = CharField(null=True)
 
-    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT')
+    film_modif: FilmModification = ForeignKeyField(
+        FilmModification, on_delete='RESTRICT')
 
     constituents: DependentBackref[AcidConstituent]
 
@@ -767,7 +827,7 @@ class WetEtching(_BaseModel):
 class AcidConstituent(_BaseModel):
     proportion = FloatField()
 
-    etching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
+    etching: WetEtching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
                               backref='constituents')
 
     stoichio: DependentBackref[StoichioElement]
@@ -777,23 +837,29 @@ class AcidConstituent(_BaseModel):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
+    @property
+    def stoichio_str(self):
+        return StoichioElement.complete_stoichio(self.stoichio)
+
 
 class DeteriorationState(_BaseModel):
     date = DateField()
     made_by_email = CharField()
     length_per_px = FloatField(null=True)
     photo_file_name = CharField(null=True)
-    calibration_factor = FloatField(null=True)
+    # TODO Relevant for triode only, should we fill it in the triode form? :
+    calibration_factor_comment = CharField(null=True)
     comment = CharField(null=True)
     pixel_coordinate_system: PixelCoordinateSystem = CharField(null=True)
 
-    target = ForeignKeyField(Target, on_delete='RESTRICT', backref='states')
+    target: Target = ForeignKeyField(
+        Target, on_delete='RESTRICT', backref='states')
 
     patches: DependentBackref[Patch]
 
     def __init__(self, date: datetime, length_per_px: float | None,
-                 photo_file_name: str | None, calibration_factor: float | None,
-                 comment: str | None,
+                 photo_file_name: str | None,
+                 calibration_factor_comment: float | None, comment: str | None,
                  pixel_coordinate_system: PixelCoordinateSystem | None,
                  target: Target, made_by_email: str,
                  *args, **kwargs):
@@ -839,9 +905,8 @@ class DeteriorationState(_BaseModel):
 class Patch(_BaseModel):
     stack_idx = IntegerField()
 
-    deterioration_state = ForeignKeyField(DeteriorationState,
-                                          on_delete='RESTRICT',
-                                          backref='patches')
+    deterioration_state: DeteriorationState = ForeignKeyField(
+        DeteriorationState, on_delete='RESTRICT', backref='patches')
 
     stoichio: DependentBackref[StoichioElement]
     vertices: DependentBackref[Vertex]
@@ -998,7 +1063,8 @@ class Vertex(_BaseModel):
     pixel_y: float = FloatField()
     clockwise_rank = IntegerField()
 
-    patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='vertices')
+    patch: Patch = ForeignKeyField(
+        Patch, on_delete='RESTRICT', backref='vertices')
 
     def __init__(self, pixel_x: float, pixel_y: float, clockwise_rank: int,
                  patch: Patch, *args, **kwargs):
@@ -1012,16 +1078,16 @@ class Vertex(_BaseModel):
         return iter([self.pixel_x, self.pixel_y])
 
 
-class TargetUse(_BaseModel):
-    target = ForeignKeyField(Target, backref='uses')
-    film_layer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='target_uses')
-
-    def __init__(self, target: Target,
-                 film_layer: FilmLayer,
-                 *args, **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
+# class TargetUse(_BaseModel):
+#     target: Target = ForeignKeyField(Target, backref='uses')
+#     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
+#                                  backref='target_uses')
+#
+#     def __init__(self, target: Target,
+#                  film_layer: FilmLayer,
+#                  *args, **kwargs):
+#         model_kwargs = self.get_model_kwargs(locals())
+#         super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class StoichioElement(_BaseModel):
@@ -1030,24 +1096,24 @@ class StoichioElement(_BaseModel):
     position_in_str = IntegerField()
     element: ChemicalElement = CharField()
 
-    substrate_layer = ForeignKeyField(
+    substrate_layer: SubstrateLayer|ForeignKeyField = ForeignKeyField(
         SubstrateLayer, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    patch = ForeignKeyField(
+    patch: Patch|ForeignKeyField = ForeignKeyField(
         Patch, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    film_layer = ForeignKeyField(
+    film_layer: FilmLayer = ForeignKeyField(
         FilmLayer, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
-    annealing_step = ForeignKeyField(
+    annealing_step: AnnealingStep = ForeignKeyField(
         AnnealingStep, null=True, on_delete='RESTRICT',
         backref='atmosphere')
-    acid_constituent = ForeignKeyField(
+    acid_constituent: AcidConstituent = ForeignKeyField(
         AcidConstituent, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    plasma_constituent = ForeignKeyField(
+    plasma_constituent: PlasmaConstituent = ForeignKeyField(
         PlasmaConstituent, on_delete='RESTRICT', null=True,
-        backref='stoichio')
+        backref='nominal_stoichio')
 
     def __init__(self, quantity: float, position_in_str: int,
                  element: ChemicalElement,

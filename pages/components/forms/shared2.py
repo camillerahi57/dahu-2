@@ -1,8 +1,11 @@
 from abc import abstractmethod, ABC
 from enum import StrEnum
-from typing import Any, final
+from typing import Any
 
 import streamlit as st
+from pint.registry import Unit
+
+from logic.units import to_db_unit, from_db_unit
 
 
 class FieldType(StrEnum):
@@ -10,25 +13,29 @@ class FieldType(StrEnum):
     ADVISED = 'advised'
     OPTIONAL = 'optional'
 
+# TODO In validation in subclasses, it's better to use arguments like input
+#  and key, other than self._pint and self.key.
 
 class Field(ABC):
-    @final
-    def __init__(self, key: str|int = 'default_key', *, default=None):
-        with st.container(width='content'):
-            self.default = default
-            self._input: Any
-            self.err_msg: str
-            self.is_valid: bool
+    def __init__(self, key: str|int = 'default_key', *, form_default,
+                 db_default=None):
+        form_default = form_default if db_default is None else db_default
+        self.default = form_default
+        self._input: Any
+        self.err_msg: str
+        self.is_valid: bool
 
+        with st.container(width='content'):
             self.key = self.__class__.__name__.lower() + f'_{key}'
-            self._input = self._streamlit_input(default)
+            self._input = self._streamlit_input(form_default)
             if self.is_filled:
                 is_valid, err_msg = self._validate()
             else:
                 if self.type == FieldType.MANDATORY:
                     is_valid, err_msg = False, 'Mandatory field.'
                 elif self.type == FieldType.ADVISED:
-                    is_valid, err_msg = True, 'Advised field.'
+                    is_valid, err_msg = True, ''
+                    # is_valid, err_msg = True, 'Advised field.'
                 else:
                     is_valid, err_msg = True, ''
 
@@ -43,7 +50,7 @@ class Field(ABC):
         return self._input not in {'', None}
 
     @abstractmethod
-    def _streamlit_input(self, default=None):
+    def _streamlit_input(self, prefill):
         raise NotImplementedError
 
     @abstractmethod
@@ -57,9 +64,37 @@ class Field(ABC):
 
     @property
     def value(self) -> Any:
+        """Returns the value if valid, else None."""
         if not self.is_valid or not self.is_filled:
             return None
         return self._input
+
+
+class UnitField(Field):
+    def __init__(self, key: str|int = 'default_key', *, form_default,
+                 db_default=None):
+        if db_default is not None:
+            db_default = from_db_unit(db_default, target_unit=self.ui_unit)
+        super().__init__(
+            key=key,
+            form_default=form_default,
+            db_default=db_default,
+        )
+
+    @property
+    @abstractmethod
+    def ui_unit(self) -> Unit:
+        raise NotImplementedError
+
+    @property
+    def in_db_unit(self) -> float|None:
+        """Returns value but with DB unit if not None,else None."""
+        if self.value is None:
+            return None
+        elif isinstance(self.value, int) or isinstance(self.value, float):
+            return to_db_unit(self.value * self.ui_unit)
+        else:
+            raise ValueError(f"Type {type(self.value)} cannot have a unit.")
 
 
 class Form(ABC):
@@ -74,7 +109,7 @@ class Form(ABC):
         self.all_flds_valid = all(f.is_valid for f in fields)
         self.all_sub_forms_valid = all(form.is_valid for form in sub_forms)
         if self.all_flds_valid and self.all_sub_forms_valid:
-            self.is_coherent, self.coherence_err = self._check_coherence()
+            self.is_coherent, self.coherence_err = self._is_coherent()
         else:  # If not all fields are filled, we consider the values to be
             # coherent.
             self.is_coherent, self.coherence_err = True, ''
@@ -90,7 +125,7 @@ class Form(ABC):
         ])
 
     @abstractmethod
-    def _check_coherence(self) -> tuple[bool, str]:
+    def _is_coherent(self) -> tuple[bool, str]:
         raise NotImplementedError
 
 

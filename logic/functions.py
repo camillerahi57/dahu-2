@@ -21,7 +21,7 @@ from logic.constants import (CookieKeys as Ck,
 
 
 def highlight_rows(row) -> list[str]:
-    if row.physical_name % 2 == 0:
+    if row.label % 2 == 0:
         return ['background-color: white'] * len(row)
     else:
         return ['background-color: #f0f0f0'] * len(row)
@@ -85,7 +85,7 @@ def polygon_patch_to_scatter(clock_wise_vertices: list[tuple[float, float]],
     )
 
 
-def load_session_state(page: StreamlitPage) -> SessionStateProxy:
+def new_session_state(page: StreamlitPage) -> SessionStateProxy:
     """Always start a page by colling this function, to reset the session.
     :rtype: SessionStateProxy
     """
