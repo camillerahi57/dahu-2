@@ -43,7 +43,8 @@ def show_pixel_helper(target_img):
 def pixel_helper_button(target_img: ImageFile, key: str = '0'):
     if PIXEL_COORDS in st.session_state:
         del st.session_state[PIXEL_COORDS]  # Reset the coordinates first.
-        del st.session_state[Sk.PREVIOUS_PIXEL_COORDS]
+        if Sk.PREVIOUS_PIXEL_COORDS in st.session_state:
+            del st.session_state[Sk.PREVIOUS_PIXEL_COORDS]
 
     if st.button('⏹️ Pixel Helper', key=f'pixel_helper_{key}'):
         show_pixel_helper(target_img)

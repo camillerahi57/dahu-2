@@ -1,7 +1,7 @@
 from components.forms.new_library.sub_forms import RootForm
-from components.forms.shared2 import StopPageLoad
+from components.forms.shared2 import StopPageRun
 from logic.constants import CookieKeys as Ck, REDIRECT_PATH_URL_KEY, \
-    ID_KEY_URL_KEY, ID_VALUE_URL_KEY, TARGET_ID_URL_KEY, LIB_ID_URL_KEY
+    ID_KEY_URL_KEY, ID_VALUE_URL_KEY, LIB_ID_URL_KEY
 
 import streamlit as st
 
@@ -23,6 +23,7 @@ try:
 
         with db.atomic():
             library.save_with_dependent()
+
         save_cookies(sess)
         st.switch_page(
             pages.submission_successful,
@@ -33,5 +34,5 @@ try:
             }
         )
 
-except StopPageLoad:
+except StopPageRun:
     pass

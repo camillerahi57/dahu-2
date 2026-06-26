@@ -27,7 +27,7 @@ class SubstrateBrowserColumnName(StrEnum):
 
 
 class LibInspectColumnName(StrEnum):
-    stoichio = 'Stoichio.'
+    nominal_stoichio = 'Nominal stoichio.'
     thickness = 'Thickness'
     deposit_temp = 'Deposit Temp.'
     deposit_duration = 'Duration'

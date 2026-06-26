@@ -15,42 +15,42 @@ from logic.units import ur
 class MadeAtField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill: datetime = None):
+    def _streamlit_input(self, prefill: datetime, key):
         prefill = 'today' if prefill is None else prefill
         return st.date_input("First made on", value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
 class ExperimenterEmailField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill: str = ''):
+    def _streamlit_input(self, prefill: str, key):
         cookie_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
         prefill = cookie_email if prefill == '' else prefill
         return st.text_input(
             "First made by (email address)",
             value=prefill, width=500)
 
-    def _validate(self) -> tuple[bool, str]:
-        if not is_valid_email_address(self._input):
+    def _validate(self, input_) -> tuple[bool, str]:
+        if not is_valid_email_address(input_):
             return False, 'Please enter a valid email address.'
-        st.session_state[Ck.LAST_EMAIL_USED] = self._input
+        st.session_state[Ck.LAST_EMAIL_USED] = input_
         return True, ''
 
 
 class TargetLabelField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill: str = None):
+    def _streamlit_input(self, prefill: str, key):
         return st.text_input("Target label", width=600, value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
-        if len(self._input) == 0:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if len(input_) == 0:
             return False, 'Please enter a target label.'
-        is_already_taken = self._input in Target.already_taken_names()
-        is_default = self._input == self.default
+        is_already_taken = input_ in Target.already_taken_names()
+        is_default = input_ == self.prefill
         if is_already_taken and not is_default:
             return False, "Target label already taken."
         return True, ''
@@ -59,14 +59,14 @@ class TargetLabelField(Field):
 class PatchCountField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         return st.number_input(
             "Number of patches (including base patch)",
                   min_value=0, value=prefill,
                   step=1, width=300)
 
-    def _validate(self) -> tuple[bool, str]:
-        if self._input < 1:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ < 1:
             return False, 'Please add at least one patch.'
         return True, ''
 
@@ -74,40 +74,40 @@ class PatchCountField(Field):
 class ShapeField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         options = [ShapeType.DISC, ShapeType.POLYGON]
         idx = options.index(prefill) if prefill is not None else None
         return st.radio(
             label='Patch shape', label_visibility='collapsed',
             options=options,
-            index=idx, key=self.key, horizontal=True)
+            index=idx, key=key, horizontal=True)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
 class VertexCountField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         prefill = 3 if prefill is None else prefill
         return st.number_input("Number of vertices for the polygon",
                                min_value=3, step=1, width=300, value=prefill,
-                               key=self.key)
+                               key=key)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
 class CommentField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         return st.text_area("Comment about the target", width=99999,
                             value=prefill, label_visibility="collapsed")
 
-    def _validate(self) -> tuple[bool, str]:
-        if self._input == '':
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ == '':
             return False, 'Please enter a comment.'
         return True, ''
 
@@ -115,23 +115,23 @@ class CommentField(Field):
 class StoichiometryField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
-        return st.text_input("Stoichiometry", width=300, key=self.key,
+    def _streamlit_input(self, prefill, key):
+        return st.text_input("Stoichiometry", width=300, key=key,
                              label_visibility='collapsed',
                              placeholder='Stoichiometry', value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
-        return Patch.is_valid_formula(self._input)
+    def _validate(self, input_) -> tuple[bool, str]:
+        return Patch.is_valid_formula(input_)
 
 
 class IsBasePatchField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=False):
+    def _streamlit_input(self, prefill, key):
         return st.checkbox("Is the base patch of the target.",
-                           value=prefill, key=self.key)
+                           value=prefill, key=key)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
@@ -140,13 +140,13 @@ class IsBasePatchField(Field):
 class IsCorrectFigureField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=False):
+    def _streamlit_input(self, prefill, key):
         return st.checkbox("**The figure matches the picture "
                            "of the target.**",
-                           value=prefill, key=self.key)
+                           value=prefill, key=key)
 
-    def _validate(self) -> tuple[bool, str]:
-        if not self._input:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if not input_:
             return False, ("Please ensure the figure matches the target "
                            "picture.")
         return True, ''
@@ -155,13 +155,13 @@ class IsCorrectFigureField(Field):
 class HasCorrectOrientationField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=False):
+    def _streamlit_input(self, prefill, key):
         return st.checkbox("**The picture has been taken properly "
                            "(not tilted or rotated by 90°).**",
-                           value=prefill, key=self.key)
+                           value=prefill, key=key)
 
-    def _validate(self) -> tuple[bool, str]:
-        if not self._input:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if not input_:
             return False, ("If the picture is tilted, edit it on your "
                            "phone or computer.")
         return True, ''
@@ -170,14 +170,14 @@ class HasCorrectOrientationField(Field):
 class CoordinateField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill: str=None):
-        return st.text_input("X, Y", width=100, key=self.key,
+    def _streamlit_input(self, prefill: str, key):
+        return st.text_input("X, Y", width=100, key=key,
                              label_visibility='collapsed', placeholder='X, Y',
                              value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         try:
-            x, y = eval(self._input)
+            x, y = eval(input_)
             if not isinstance(x, int) or not isinstance(y, int):
                 return False, 'Coordinates must be integers.'
             if x < 0 or y < 0:
@@ -190,7 +190,7 @@ class CoordinateField(Field):
 class PreviousVersionField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill: str = None):
+    def _streamlit_input(self, prefill: str, key):
         names = Target.already_taken_names()
         options = [NEW_TARGET] + names
         if prefill is None:
@@ -201,7 +201,7 @@ class PreviousVersionField(Field):
         return st.selectbox('Built from other target:', options=options,
                                 index=idx, width=300)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
@@ -212,52 +212,51 @@ class HasCommentField(Field):
         YES = 'Yes'
         NO = 'No'
 
-    def _streamlit_input(self, prefill: str = None):
+    def _streamlit_input(self, prefill: str, key):
         options = list(self.Option)
         index = options.index(prefill) if prefill else None
         return st.radio('No label', options, horizontal=True,
                         index=index, label_visibility='collapsed', )
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
-class CalibrationFactorField(UnitField):
+class CalibrationFactorField(Field):
     type = Ft.ADVISED
-    ui_unit = ur.nm / ur.coulomb
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         return st.text_input(
-            "Calibration factor comment",
+            "Calibration factor description",
             placeholder="Example: \"6 nm/C for 7.5cm and 900V\"",
             width=300,
         )
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
 class PhotoDateField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         prefill = 'today' if prefill is None else prefill
         return st.date_input("Picture taken on", max_value='today',
                              value=prefill, width=150)
 
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
 class PhotoUploadField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
         return st.file_uploader("Select target photo",
                                 type=["jpg", "png"])
 
-    def _validate(self) -> tuple[bool, str]:
-        if self._input is None:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ is None:
             return False, 'Please upload an image file.'
         else:
             return True, ''
@@ -270,12 +269,14 @@ class PhotoUploadField(Field):
 class PixelEquivalenceField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill=None):
+    def _streamlit_input(self, prefill, key):
+        if prefill is not None:
+            prefill = int(prefill)
         return st.number_input("Is equivalent to (pixels):",
                                min_value=0, step=1, value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
-        if self._input == 0:
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ == 0:
             return False, ('[Mandatory] Please enter the equivalent distance'
                            ' in pixels.')
         return True, ''
@@ -285,13 +286,12 @@ class MillimeterEquivalenceField(UnitField):
     type = Ft.MANDATORY
     ui_unit = ur.mm
 
-    def _streamlit_input(self, prefill=None):
-        return st.number_input("Distance in millimeters:",
-                               min_value=0, step=1, value=prefill)
+    def _streamlit_input(self, prefill, key):
+        return st.number_input(f"Distance in {self.ui_unit:P}:",
+                               min_value=0., step=1., value=prefill)
 
-    def _validate(self) -> tuple[bool, str]:
-        if self._input == 0:
-            return False, ('[Mandatory] Please enter a distance in millimeters'
-                           ' for which '
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ == 0:
+            return False, ('[Mandatory] Please enter a distance for which '
                            'you know the equivalent in pixels.')
         return True, ''

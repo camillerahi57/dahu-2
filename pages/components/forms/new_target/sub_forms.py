@@ -15,7 +15,7 @@ from components.forms.new_target.fields import MadeAtField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from components.forms.shared2 import Form, StopPageLoad
+from components.forms.shared2 import Form, StopPageRun
 from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH
 from logic.db_enums import PixelCoordinateSystem, ShapeType
@@ -23,6 +23,7 @@ from logic.functions import replace_file_name_extension
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
+from logic.units import ur, to_db_unit
 
 
 class BasicInfoForm(Form):
@@ -60,7 +61,7 @@ class BasicInfoForm(Form):
         if previous_name == NEW_TARGET or not previous_version_fld.is_filled:
             built_from = None
         else:
-            built_from = Target.from_name(previous_name)
+            built_from = Target.from_label(previous_name)
 
         self.made_on = made_on_fld.value
         self.made_by_email = email_fld.value
@@ -84,7 +85,7 @@ class BasicInfoForm(Form):
 
     def to_target(self, id_: int = None) -> Target:
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
 
         target = Target(
             made_on=self.made_on,
@@ -101,8 +102,12 @@ class BasicInfoForm(Form):
 class PixelEquivalenceForm(Form):
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
-        default_db_length = 100  # Only ratio is stored in DB, so we
-        # arbitrarily chose a length to show it's equivalent in pixels.
+        if default_state is not None:
+            default_db_length = to_db_unit(100 * ur.mm)  # Only ratio is
+            # stored in DB, so we arbitrarily chose a length to show it's
+            # equivalent in pixels.
+        else:
+            default_db_length = None
 
         with st.container(horizontal=True, vertical_alignment='top'):
             st.write("_You can use the following tool:_")
@@ -191,7 +196,7 @@ class UploadAndCropForm(Form):
             if st.button("Delete"):
                 del sess[Sk.UPLOADED_TARGET_IMG]
                 st.rerun()
-            raise StopPageLoad
+            raise StopPageRun
 
         else:
             photo_upload_fld = PhotoUploadField(form_default=None)
@@ -200,7 +205,7 @@ class UploadAndCropForm(Form):
                 if default_state is None:
                     sess[Sk.TARGET_IMG_NAME] = photo_upload_fld.new_file_name()
                 st.rerun()
-            raise StopPageLoad
+            raise StopPageRun
 
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
@@ -243,7 +248,7 @@ class StateInfoForm(Form):
             db_default=db_has_comment
         )
         if not has_comment_fld.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         if has_comment_fld.value == HasCommentField.Option.YES:
             comment_fld = CommentField(
                 form_default='',
@@ -277,7 +282,7 @@ class StateInfoForm(Form):
     def to_deterioration_state(self, target: Target, email: str = None) \
             -> DeteriorationState:
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         coord_system = PixelCoordinateSystem.PLOTLY
         photo_file_name = replace_file_name_extension(
             self.photo_file_name, 'png'
@@ -287,7 +292,7 @@ class StateInfoForm(Form):
             date=self.state_date,
             length_per_px=self.length_per_px,
             photo_file_name=photo_file_name,
-            calibration_factor=self.calibration_factor,
+            calibration_factor_comment=self.calibration_factor,
             comment=self.comment,
             pixel_coordinate_system=coord_system,
             target=target,
@@ -387,7 +392,7 @@ class PolygonPatchForm(Form):
             pixel_helper_button(target_img, f'poly_px_select_{key}')
             for i in range(vertex_count_fld.value):
                 if default_vertices is not None and i < len(default_vertices):
-                    default_vertex = Default.vertices[i]  # noqa I don't understand the warning.
+                    default_vertex = default_vertices[i]
                 else:
                     default_vertex = None
                 default_vertex: Vertex|None
@@ -473,7 +478,7 @@ class PatchForm(Form):
 
     def to_patch(self, state: DeteriorationState):
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         if self.shape == ShapeType.DISC:
             form: DiscPatchForm = self.form
             disc = Disc.from_circumference_points(
@@ -508,19 +513,19 @@ class PatchListForm(Form):
         st.subheader('Patches')
         with st.container(horizontal=True, vertical_alignment='center'):
             patch_count_fld = PatchCountField(
-                form_default=default_patches,
+                form_default=0,
                 db_default=None if default_state is None
                     else len(default_state.patches)
             )
         patch_count = patch_count_fld.value
         if not patch_count_fld.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
 
         st.divider(width=50)
         patch_forms: list[PatchForm] = []
         for i in range(patch_count):
             if default_patches is not None and i < len(default_patches):
-                default_state = Default.patches[i]  # noqa I don't understand the warning.
+                default_state = default_patches[i]
             else:
                 default_state = None
             default_state: Patch | None

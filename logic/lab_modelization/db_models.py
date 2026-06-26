@@ -8,23 +8,28 @@ from uuid import uuid4
 
 import chemparse
 import plotly.graph_objects as go
+from pandas import DataFrame
 from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
     BooleanField, DateField
+from pint.registry import Quantity
 from playhouse.shortcuts import model_to_dict  # noqa
-from plotly.graph_objs import Scatter
+from plotly import express as px
+from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from logic.constants import ChemicalElement, FILE_STORAGE_PATH, DOMAIN, \
-    LIB_ID_URL_KEY, SUB_ID_URL_KEY, TARGET_ID_URL_KEY, PATTERN_IMAGE_PATH
+from logic.constants import FILE_STORAGE_PATH, DOMAIN, \
+    LIB_ID_URL_KEY, SUB_ID_URL_KEY, TARGET_ID_URL_KEY, PATTERN_IMAGE_PATH, \
+    ROOM_TEMPERATURE_CELSIUS
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
-    MagnetronMachineModel, PixelCoordinateSystem
+    MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
 from logic.functions import letter_count
 from logic.math_tools import VertexList
 from logic.page_list import pages
 from logic.python_tools import remove_digits
+from logic.units import ur, db_units, to_db_unit
 
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
@@ -166,14 +171,12 @@ class SubstrateLayer(_BaseModel):
 class Target(_BaseModel):
     made_on = DateField()
     made_by_email = CharField()
-    label = CharField(unique=True)
+    label: str|ForeignKeyField = CharField(unique=True)
     previous_version: Target = ForeignKeyField(
         'self', null=True, on_delete='SET NULL', backref='next_version')
 
     states: DependentBackref[DeteriorationState]
-    film_layers: DependentBackref[FilmLayer]
-
-    # uses: Backref[TargetUse]
+    uses: DependentBackref[TargetUse]
 
     def __init__(self, made_on: datetime, made_by_email: str,
                  label: str, previous_version: Target | None,
@@ -201,7 +204,7 @@ class Target(_BaseModel):
                 .order_by(DeteriorationState.date.asc()))
 
     @classmethod
-    def from_name(cls, label: str) -> Self:
+    def from_label(cls, label: str) -> Self:
         return Target.get(Target.label == label)
 
     def libraries(self) -> set[Library]:
@@ -479,15 +482,36 @@ class Film(_BaseModel):
     def ordered_modifs(self) -> list[FilmModification]:
         modifs = FilmModification.select().where(
             FilmModification.film == self)
-
         def get_modif_count(fm: FilmModification):
             return int(fm.modif_number)  # noqa
-
         return sorted(list(modifs), key=get_modif_count)
+
+    @property
+    def ordered_layers(self) -> list[FilmLayer]:
+        layers = [l for l in self.layers]
+        def position(layer: FilmLayer):
+            return layer.position_from_buffer
+        return sorted(layers, key=position)
+
+    @property
+    def target_labels(self) -> set[str]:
+        labels: set[str] = set()
+        for l in self.layers:
+            for use in l.target_uses:
+                labels.add(use.target.label)
+        return labels
+
+    @property
+    def targets(self) -> set[Target]:
+        targets: set[Target] = set()
+        for l in self.target_labels:
+            target = Target.from_label(l)
+            targets.add(target)
+        return targets
 
 
 class FilmLayer(_BaseModel):
-    position_from_buffer = IntegerField()
+    position_from_buffer: int = IntegerField()
     deposit_temp = FloatField(null=True)
     nominal_thickness = FloatField(null=True)
     shadow_mask_description = CharField(null=True)
@@ -495,31 +519,35 @@ class FilmLayer(_BaseModel):
     sputtering_system: SputteringSystem = CharField(null=True)
 
     film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='layers')
-    target: Target = ForeignKeyField(Target, on_delete='RESTRICT',
-                             backref='film_layers')
+    # target: Target = ForeignKeyField(Target, on_delete='RESTRICT',
+    #                          backref='film_layers')
 
-    stoichio: DependentBackref[StoichioElement]
-    # target_uses: DependentBackref[TargetUse]
+    nominal_stoichio: DependentBackref[StoichioElement]
+    target_uses: DependentBackref[TargetUse]
     magnetron_sputterings: DependentBackref[MagnetronSputtering]  # List of 1.
     triode_sputterings: DependentBackref[TriodeSputtering]  # List of 1.
 
-    def __init__(self, position_from_buffer: int | None,
+    def __init__(self,
+                 position_from_buffer: int | None,
                  deposit_temp: float | None,
                  nominal_thickness: float | None,
                  shadow_mask_description: str | None,
                  function: FilmLayerFunction,
-                 sputtering_system: SputteringSystem | None, film: Film,
+                 sputtering_system: SputteringSystem | None,
+                 film: Film,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @property
     def element_str(self) -> str:
-        return remove_digits(self.nominal_stoichio)
+        return remove_digits(self.nominal_stoichio_str)
 
     @property
-    def nominal_stoichio(self) -> str:
-        return StoichioElement.complete_stoichio(self.stoichio)
+    def nominal_stoichio_str(self) -> str:
+        str_ = StoichioElement.to_str(self.nominal_stoichio)
+        assert len(str_) > 0
+        return str_
 
     @property
     def sputtering(self) -> MagnetronSputtering|TriodeSputtering:
@@ -532,6 +560,10 @@ class FilmLayer(_BaseModel):
             return mag_sputters[0]
         else:
             return triode_sputters[0]
+
+    @property
+    def target_labels(self) -> list[str]:
+        return [u.target.label for u in self.target_uses]
 
 
 class MagnetronSputtering(_BaseModel):
@@ -576,7 +608,7 @@ class TriodeSputtering(_BaseModel):
 
     def __init__(self,
                  has_active_cooling: bool | None,
-                 rotation: float | None,
+                 rotation_speed: float | None,
                  filament_current_start: float | None,
                  filament_current_end: float | None,
                  anode_current: float | None,
@@ -628,10 +660,10 @@ class FilmModification(_BaseModel):
 
     film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='modifs')
 
-    annealing: DependentBackref[Annealing]
-    wet_etching: DependentBackref[WetEtching]
-    ion_beam_etching: DependentBackref[IonBeamEtching]
-    lift_off: DependentBackref[LiftOff]
+    annealings: DependentBackref[Annealing]
+    wet_etchings: DependentBackref[WetEtching]
+    ion_beam_etchings: DependentBackref[IonBeamEtching]
+    lift_offs: DependentBackref[LiftOff]
 
     # Will add characs in the future.
 
@@ -651,28 +683,38 @@ class FilmModification(_BaseModel):
                     modif.save(shift_subsequent_modifs=False)
         super().save()
 
-    def delete_instance(self, recursive=..., delete_nullable=...):
+    def delete_instance(self, recursive: bool = False,
+                        delete_nullable: bool = False):
         """Saves a film modification with its modif_number, and adds 1 to all
         modif_number attributes of subsequent film modifications."""
         for modif in FilmModification.select():
             if modif.modif_number >= self.modif_number:
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
-        super().delete_instance()
+        super().delete_instance(recursive, delete_nullable)
 
     def modification_process(self) \
-            -> (Annealing | WetEtching | LiftOff |
-                IonBeamEtching):
+            -> (Annealing | WetEtching | LiftOff | IonBeamEtching):
         fmt = FilmModifType
         match self.modif_type:
             case fmt.ANNEALING:
-                return self.annealing[0]
+                return self.annealings[0]
             case fmt.WET_ETCHING:
-                return self.wet_etching[0]
+                return self.wet_etchings[0]
             case fmt.ION_BEAM_ETCHING:
-                return self.ion_beam_etching[0]
+                return self.ion_beam_etchings[0]
             case fmt.LIFT_OFF:
-                return self.lift_off[0]
+                return self.lift_offs[0]
+
+    @property
+    def previous_modif(self) -> Self:
+        if self.modif_number == 0:
+            return None
+        else:
+            return FilmModification.get(
+                (FilmModification.film == self.film) &
+                (FilmModification.modif_number == self.modif_number - 1)
+            )
 
 
 class LiftOff(_BaseModel):
@@ -682,7 +724,7 @@ class LiftOff(_BaseModel):
     recipe_file_name = CharField(null=True)
 
     film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT', backref='lift_off')
+        FilmModification, on_delete='RESTRICT', backref='lift_offs')
 
     def __init__(self, used_ultrasound: bool | None,
                  ultrasound_config: str | None,
@@ -701,9 +743,10 @@ class Annealing(_BaseModel):
     pumping_duration = FloatField(null=True)
     furnace: Furnace = CharField(null=True)
     film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT')
+        FilmModification, on_delete='RESTRICT', backref='annealings')
 
     steps: DependentBackref[AnnealingStep]
+    atmosphere: list[StoichioElement]
 
     def __init__(self, pumping_duration: float | None, pressure: float | None,
                  furnace: Furnace | None,
@@ -712,35 +755,113 @@ class Annealing(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @property
-    def max_temperature(self) -> float:
-        return max(s.temperature for s in self.steps)
+    def temperatures(self) -> set[Quantity]:
+        return {s.temp_quantity for s in self.steps}
+
+    @property
+    def max_temperature(self) -> Quantity:
+        return max(self.temperatures)  # noqa Wrong warning.
 
     @property
     def ordered_steps(self):
         def key(step: AnnealingStep):
-            return step.starts_at
+            return step.timestamp
         return sorted(self.steps, key=key)
+
+    def save(self, *args, **kwargs):
+        self.assert_valid_annealing()
+        super().save(*args, **kwargs)
 
     @property
     def duration(self) -> float:
         steps = self.ordered_steps
-        return steps[-1].starts_at + steps[-1].duration
+        assert steps[0].is_room_temperature and steps[-1].is_room_temperature, (
+            f"Annealing must start with and end with room temperature. Got "
+            f"respectively {steps[0].temperature} and {steps[-1].temperature} "
+            f"instead."
+        )
+        return steps[-1].timestamp
 
+    def assert_valid_annealing(self):
+        steps = self.ordered_steps
+        assert len(steps) >= 3, (
+            "There must be at least 3 steps: initial (room temp.), "
+            "aimed temp. state and end state (room temp. again).")
+        assert steps[0].is_room_temperature and steps[-1].is_room_temperature, (
+            'First and last steps must be at room temperature.')
+        assert steps[0].timestamp == 0, "First step must have timestamp 0."
+
+    @property
+    def atmosphere_formula(self):
+        return StoichioElement.to_str(self.atmosphere)
+
+    def get_figure(self) -> Figure:
+        return AnnealingStep.get_figure(self.steps)
 
 class AnnealingStep(_BaseModel):
-    starts_at: float = FloatField()
-    duration: float = FloatField()
-    temperature: float = FloatField()
+    timestamp: float = FloatField()
+    temperature: float = FloatField(null=True)
+    is_room_temperature: bool = BooleanField()
 
     annealing: Annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
                                 backref='steps')
 
     atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self, starts_at: float, duration: float, temperature: float,
-                 annealing: Annealing, *args, **kwargs):
+    def __init__(self, timestamp: float, temperature: float|None,
+                 is_room_temperature: bool, annealing: Annealing,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def is_plateau(self, previous_step: AnnealingStep) -> bool:
+        both_room_temp = (self.is_room_temperature
+                          and previous_step.is_room_temperature)
+        if both_room_temp:
+            return True
+        else:
+            if self.is_room_temperature or previous_step.is_room_temperature:
+                return False  # Only one of the two is room temperature.
+            else:
+                return self.temperature == previous_step.temperature
+
+    @classmethod
+    def get_figure(cls, steps: list[AnnealingStep]) -> Figure:
+        from components.forms.new_film_modif.fields import (PhaseDurationField,
+                                                            ReachedTempField)
+        timestamps = []
+        time_ui_unit = PhaseDurationField.ui_unit
+        for s in steps:
+            quantity = ur.Quantity(s.timestamp, db_units.time)
+            in_ui_unit = quantity.to(time_ui_unit).magnitude
+            timestamps.append(in_ui_unit)
+
+        temperatures = []
+        temp_ui_unit = ReachedTempField.ui_unit
+        for s in steps:
+            if s.is_room_temperature:
+                quantity = ur.Quantity(ROOM_TEMPERATURE_CELSIUS, ur.celsius)
+            else:
+                quantity = ur.Quantity(s.temperature, db_units.temperature)
+            in_ui_unit = quantity.to(temp_ui_unit).magnitude
+            temperatures.append(in_ui_unit)
+
+        x_label = f'Time ({time_ui_unit:~P})'
+        y_label = f'Temperature ({temp_ui_unit:~P})'
+
+        df = DataFrame(zip(timestamps, temperatures),
+                       columns=[x_label, y_label])
+
+        return px.line(data_frame=df, x=x_label, y=y_label, markers=True)
+
+    @property
+    def temp_quantity(self) -> Quantity:
+        if self.is_room_temperature:
+            room_temp = ur.Quantity(ROOM_TEMPERATURE_CELSIUS, ur.celsius)
+            return room_temp.to(db_units.temperature)
+        else:
+            return ur.Quantity(self.temperature, db_units.temperature)
+
 
 
 class IonBeamEtching(_BaseModel):
@@ -754,7 +875,7 @@ class IonBeamEtching(_BaseModel):
     pattern_diagram_file_name = CharField(null=True)
 
     film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT')
+        FilmModification, on_delete='RESTRICT', backref='ion_beam_etchings')
 
     constituents: DependentBackref[PlasmaConstituent]
 
@@ -786,7 +907,7 @@ class PlasmaConstituent(_BaseModel):
 
     @property
     def stoichio_str(self):
-        return StoichioElement.complete_stoichio(self.stoichio)
+        return StoichioElement.to_str(self.stoichio)
 
 
 class WetEtching(_BaseModel):
@@ -802,7 +923,7 @@ class WetEtching(_BaseModel):
     recipe_file_name = CharField(null=True)
 
     film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT')
+        FilmModification, on_delete='RESTRICT', backref='wet_etchings')
 
     constituents: DependentBackref[AcidConstituent]
 
@@ -839,7 +960,7 @@ class AcidConstituent(_BaseModel):
 
     @property
     def stoichio_str(self):
-        return StoichioElement.complete_stoichio(self.stoichio)
+        return StoichioElement.to_str(self.stoichio)
 
 
 class DeteriorationState(_BaseModel):
@@ -954,7 +1075,7 @@ class Patch(_BaseModel):
         return True, ''
 
     def stoichio_str(self):
-        return StoichioElement.complete_stoichio(self.stoichio)
+        return StoichioElement.to_str(self.stoichio)
 
     @staticmethod
     def rgb_color(stoichio_str: str) -> tuple[int, int, int]:
@@ -966,7 +1087,7 @@ class Patch(_BaseModel):
 
     def plotly_color(self, stoichio_str: str = None):
         if stoichio_str is None:
-            stoichio_str = StoichioElement.complete_stoichio(self.stoichio)
+            stoichio_str = StoichioElement.to_str(self.stoichio)
         r, g, b = Patch.rgb_color(stoichio_str)
         return f'rgba({r},{g},{b},1)'
 
@@ -993,7 +1114,7 @@ class Patch(_BaseModel):
         vertices = list(self.vertices)
         # Closing the polygon:
         vertices.append(vertices[0])
-        stoichio_str = StoichioElement.complete_stoichio(self.stoichio)
+        stoichio_str = StoichioElement.to_str(self.stoichio)
 
         x_coords, y_coords = zip(*vertices)
         return Scatter(
@@ -1078,16 +1199,14 @@ class Vertex(_BaseModel):
         return iter([self.pixel_x, self.pixel_y])
 
 
-# class TargetUse(_BaseModel):
-#     target: Target = ForeignKeyField(Target, backref='uses')
-#     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-#                                  backref='target_uses')
-#
-#     def __init__(self, target: Target,
-#                  film_layer: FilmLayer,
-#                  *args, **kwargs):
-#         model_kwargs = self.get_model_kwargs(locals())
-#         super().__init__(*args, **model_kwargs, **kwargs)
+class TargetUse(_BaseModel):
+    target: Target = ForeignKeyField(Target, backref='uses')
+    film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
+                                 backref='target_uses')
+
+    def __init__(self, target: Target, film_layer: FilmLayer, *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class StoichioElement(_BaseModel):
@@ -1102,16 +1221,16 @@ class StoichioElement(_BaseModel):
     patch: Patch|ForeignKeyField = ForeignKeyField(
         Patch, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    film_layer: FilmLayer = ForeignKeyField(
+    film_layer: FilmLayer|ForeignKeyField = ForeignKeyField(
         FilmLayer, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
-    annealing_step: AnnealingStep = ForeignKeyField(
+    annealing_step: AnnealingStep|ForeignKeyField = ForeignKeyField(
         AnnealingStep, null=True, on_delete='RESTRICT',
         backref='atmosphere')
-    acid_constituent: AcidConstituent = ForeignKeyField(
+    acid_constituent: AcidConstituent|ForeignKeyField = ForeignKeyField(
         AcidConstituent, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    plasma_constituent: PlasmaConstituent = ForeignKeyField(
+    plasma_constituent: PlasmaConstituent|ForeignKeyField = ForeignKeyField(
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')
 
@@ -1148,7 +1267,7 @@ class StoichioElement(_BaseModel):
             return f'{self.element}'
 
     @staticmethod
-    def complete_stoichio(elements: list[StoichioElement]) -> str:
+    def to_str(elements: list[StoichioElement]) -> str:
         def key(element: StoichioElement):
             return int(element.position_in_str)  # noqa
 

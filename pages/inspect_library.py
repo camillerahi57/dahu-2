@@ -1,16 +1,17 @@
 import streamlit as st
 from pandas import DataFrame
 
+from components.forms.new_film_modif.fields import PressureField
 from logic.page_list import pages
 from logic.components import inspect_page_header
-from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN
+from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN, \
+    FILM_ID_URL_KEY
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
-    Library, Film, Substrate, Target, FilmModification,\
+    Library, Film, Substrate, FilmModification,\
     Annealing, IonBeamEtching, WetEtching)
 from logic.functions import link_html, email_html, \
     new_session_state
-from new_film_modif import ModifData
 from logic.table_columns import LibInspectColumnName as ColName
 
 
@@ -18,12 +19,10 @@ lib_id = st.query_params[LIB_ID_URL_KEY]
 lib: Library = Library.get_by_id(lib_id)
 film: Film = Film.get(Film.library == lib)
 substrate: Substrate = Substrate.get_by_id(film.substrate)
-layers = film.layers
+layers = film.ordered_layers
 
-targets: set[Target] = set(lay.target for lay in layers)
 target_link_htmls = [link_html(target.label, target.url())
-                     for target in targets]
-layers = reversed(list(layers))
+                     for target in film.targets]
 
 sess = new_session_state(pages.inspect_lib)
 sess[Sk.CURRENT_FILM] = film
@@ -73,10 +72,10 @@ def film_modif_info(modif_: FilmModification):
     process = modif_.modification_process()
 
     if isinstance(process, Annealing):
-        st.write(f"**Max temperature:** {process.max_temperature}\n\n"
-                 f"**Duration:** {process.duration}\n\n"
-                 f"**Pressure:** {process.pressure}\n\n"
+        pressure_unit_str = f'{PressureField.ui_unit:P}'
+        st.write(f"**Pressure:** {process.pressure} {pressure_unit_str}\n\n"
                  f"**Furnace:** {process.furnace}")
+        st.plotly_chart(process.get_figure())
 
     # elif isinstance(process, Patterning):
     #     st.write(f"**Diagram name:** {process.diagram_file_name}")
@@ -112,7 +111,7 @@ def film_modif_info(modif_: FilmModification):
 
     st.divider()
     if st.button("Delete film modification ❌"):
-        modif_.delete_instance()
+        modif_.delete_instance(recursive=True)
         st.rerun()
 
 def card(label_: str):
@@ -130,11 +129,16 @@ with (st.container(horizontal=True, vertical_alignment='center',
     st.write("**Film modifications:**")
     modifs = film.ordered_modifs()
     for i, modif in enumerate(modifs):
-        if st.button(f'{i+1} -> {MODIF_NAMES[modif.modif_type]}'):
+        if i != 0:
+            st.write("->")
+        if st.button(f'{MODIF_NAMES[modif.modif_type]}', key=f'btn_{i}'):
             film_modif_info(modif)
     st.container(width=300)
     if st.button('➕**Add**', type='tertiary'):
-        ModifData.form()
+        st.switch_page(
+            pages.new_film_modif,
+            query_params={FILM_ID_URL_KEY: film.id}
+        )
 
 col1, col2 = st.columns([40, 60])
 
@@ -164,18 +168,18 @@ with col2:
         st.write(f"**Substrate:** "
                  f"{link_html(substrate.label, substrate.url())}",
                  unsafe_allow_html=True)
-        st.write(f"**Target:** {', '.join(target_link_htmls)}",
+        st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                  unsafe_allow_html=True)
         st.write(
             f"**Comment:** {lib.comment if lib.comment else '*No comment.*'}")
         st.write(f"**Layers**:")
-        table_content = [
+        table_rows = [
             {
-                ColName.stoichio: lay.element_str,
+                ColName.nominal_stoichio: lay.nominal_stoichio_str,
                 ColName.deposit_temp: lay.deposit_temp,
                 ColName.deposit_duration: lay.sputtering.deposit_duration,
                 ColName.deposit_power: lay.sputtering.deposit_power,
             }
             for lay in layers
         ]
-        st.dataframe(DataFrame(table_content), hide_index=True, )
+        st.dataframe(DataFrame(table_rows), hide_index=True, )

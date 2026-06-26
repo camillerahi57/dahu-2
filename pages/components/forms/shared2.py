@@ -3,9 +3,9 @@ from enum import StrEnum
 from typing import Any
 
 import streamlit as st
-from pint.registry import Unit
+from pint.registry import Unit, Quantity
 
-from logic.units import to_db_unit, from_db_unit
+from logic.units import to_db_unit, from_db_unit, ur
 
 
 class FieldType(StrEnum):
@@ -14,22 +14,22 @@ class FieldType(StrEnum):
     OPTIONAL = 'optional'
 
 # TODO In validation in subclasses, it's better to use arguments like input
-#  and key, other than self._pint and self.key.
+#  and key, other than self._input and self.key.
 
 class Field(ABC):
     def __init__(self, key: str|int = 'default_key', *, form_default,
                  db_default=None):
-        form_default = form_default if db_default is None else db_default
-        self.default = form_default
+        prefill = form_default if db_default is None else db_default
+        self.prefill = prefill
         self._input: Any
         self.err_msg: str
         self.is_valid: bool
 
         with st.container(width='content'):
-            self.key = self.__class__.__name__.lower() + f'_{key}'
-            self._input = self._streamlit_input(form_default)
+            key = self.__class__.__name__.lower() + f'_{key}'
+            self._input = self._streamlit_input(prefill, key)
             if self.is_filled:
-                is_valid, err_msg = self._validate()
+                is_valid, err_msg = self._validate(self._input)
             else:
                 if self.type == FieldType.MANDATORY:
                     is_valid, err_msg = False, 'Mandatory field.'
@@ -42,7 +42,7 @@ class Field(ABC):
             self.is_valid, self.err_msg = is_valid, err_msg
 
             if err_msg != '':
-                with st.container(width='content'):
+                with st.container(width='content', gap='xxsmall'):
                     st.warning(err_msg)
 
     @property
@@ -50,11 +50,11 @@ class Field(ABC):
         return self._input not in {'', None}
 
     @abstractmethod
-    def _streamlit_input(self, prefill):
+    def _streamlit_input(self, prefill, key: str):
         raise NotImplementedError
 
     @abstractmethod
-    def _validate(self) -> tuple[bool, str]:
+    def _validate(self, input_) -> tuple[bool, str]:
         raise NotImplementedError
 
     @property
@@ -92,9 +92,15 @@ class UnitField(Field):
         if self.value is None:
             return None
         elif isinstance(self.value, int) or isinstance(self.value, float):
-            return to_db_unit(self.value * self.ui_unit)
+            as_ui_unit = ur.Quantity(self.value, self.ui_unit)
+            return to_db_unit(as_ui_unit)
         else:
             raise ValueError(f"Type {type(self.value)} cannot have a unit.")
+
+    @property
+    def in_ui_unit(self) -> float|None:
+        """Returns value but with DB unit if not None,else None."""
+        return self.value
 
 
 class Form(ABC):
@@ -129,5 +135,5 @@ class Form(ABC):
         raise NotImplementedError
 
 
-class StopPageLoad(Exception):
+class StopPageRun(Exception):
     pass

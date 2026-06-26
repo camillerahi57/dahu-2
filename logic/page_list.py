@@ -31,6 +31,9 @@ class _Pages:
     new_charac: StreamlitPage = Page(
         '../pages/new_charac.py', url_path='new_charac',
         title='Add a New Characterization', icon="🐐")
+    new_film_modif: StreamlitPage = Page(
+        '../pages/new_film_modif.py', url_path='new_film_modif',
+        title='Add a New Film Modification', icon="🐐")
 
     inspect_lib: StreamlitPage = Page(
         '../pages/inspect_library.py', url_path='inspect_lib',

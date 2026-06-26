@@ -32,14 +32,16 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  PresputteringThicknessField, \
                                                  LayerCountField,
                                                  TargetCountField,
-                                                 AllTargetField,
+                                                 TargetField,
                                                  TargetChoiceField,
-                                                 ConfirmOrderField)
-from components.forms.shared2 import Form, StopPageLoad
+                                                 ConfirmOrderField,
+                                                 IsCoSputteringField)
+from components.forms.shared2 import Form, StopPageRun
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
-    MagnetronSputtering, TriodeSputtering, Substrate
+    MagnetronSputtering, TriodeSputtering, Substrate, Target, TargetUse, \
+    StoichioElement
 
 
 class BaseInfoForm(Form):
@@ -115,7 +117,7 @@ class FilmInfoForm(Form):
 
     def add_to_library(self, library: Library):
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         film = Film(
             label=self.label,
             made_on=self.made_on,
@@ -129,6 +131,16 @@ class FilmInfoForm(Form):
 class LayerIntroForm(Form):
     def __init__(self, default_layer: FilmLayer|None, key: str):
         no_db_default = default_layer is None
+        if default_layer is not None:
+            db_default_target_labels = [use.target.label
+                                       for use in default_layer.target_uses]
+            if len(db_default_target_labels) > 2:
+                raise NotImplementedError(
+                    "It is possible to have more than two targets in "
+                    "co-sputtering in the database, but it's not implemented "
+                    "in the user interface.")
+        else:
+            db_default_target_labels = []
         with st.container(horizontal=True):
             deposit_temp_fld = DepositTempField(
                 key=f'deposit_temp_{key}',
@@ -152,7 +164,7 @@ class LayerIntroForm(Form):
                 key=f'stoichio_{key}',
                 form_default='',
                 db_default = None if no_db_default
-                    else default_layer.nominal_stoichio
+                    else default_layer.nominal_stoichio_str
             )
             layer_function_fld = FilmLayerFunctionField(
                 key=f'function_{key}',
@@ -160,12 +172,28 @@ class LayerIntroForm(Form):
                 db_default = None if no_db_default
                     else default_layer.function
             )
+            is_cosputter_fld = IsCoSputteringField(
+                key=key,
+                form_default=False,
+                db_default = len(db_default_target_labels) == 2
+            )
             target_label_fld = TargetChoiceField(
                 key=key,
                 form_default=None,
                 db_default = None if no_db_default
-                    else default_layer.target.label
+                    else db_default_target_labels[0]
             )
+            if is_cosputter_fld.value:
+                target_2_label_fld = TargetChoiceField(
+                    key=f'co_sputter_target_{key}',
+                    form_default=None,
+                    db_default = None if no_db_default
+                        else db_default_target_labels[1]
+                )
+                target_2_label = target_2_label_fld.value
+            else:
+                target_2_label_fld = None
+                target_2_label = None
             sputtering_system_fld = SputteringSystemField(
                 key=key,
                 form_default=None,
@@ -173,18 +201,19 @@ class LayerIntroForm(Form):
                     else default_layer.sputtering_system
             )
 
-        self.deposit_temp = deposit_temp_fld.value
+        self.deposit_temp = deposit_temp_fld.in_db_unit
         self.nominal_thickness = nominal_thickness_fld.value
         self.shadow_mask_descr = shadow_mask_fld.value
         self.nominal_stoichio = nominal_stoichio_fld.value
         self.layer_function = layer_function_fld.value
         self.sputtering_system = sputtering_system_fld.value
-        self.target_name = target_label_fld.value
+        self.target_label = target_label_fld.value
+        self.target_2_label = target_2_label
 
         super().__init__(
             fields=[deposit_temp_fld, nominal_stoichio_fld, shadow_mask_fld,
-                    nominal_stoichio_fld, layer_function_fld,
-                    sputtering_system_fld],
+                    nominal_stoichio_fld, layer_function_fld, is_cosputter_fld,
+                    sputtering_system_fld, target_2_label_fld],
             sub_forms=[],
         )
 
@@ -233,10 +262,10 @@ class MagnetronForm(Form):
                     else default_layer.generator
             )
 
-        self.deposit_distance = deposit_distance_fld.value
-        self.deposit_angle = deposit_angle_fld.value
-        self.deposit_power = deposit_power_fld.value
-        self.deposit_duration = deposit_duration_fld.value
+        self.deposit_distance = deposit_distance_fld.in_db_unit
+        self.deposit_angle = deposit_angle_fld.in_db_unit
+        self.deposit_power = deposit_power_fld.in_db_unit
+        self.deposit_duration = deposit_duration_fld.in_db_unit
         self.generator = generator_fld.value
         self.machine_model = machine_model_fld.value
 
@@ -251,7 +280,7 @@ class MagnetronForm(Form):
 
     def add_to_layer(self, layer: FilmLayer):
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         magnetron = MagnetronSputtering(
             deposit_distance=self.deposit_distance,
             deposit_angle=self.deposit_angle,
@@ -385,10 +414,10 @@ class TriodeForm(Form):
 
     def add_to_layer(self, layer: FilmLayer):
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         triode = TriodeSputtering(
             has_active_cooling=self.active_cooling,
-            rotation=self.rotation_speed,
+            rotation_speed=self.rotation_speed,
             filament_current_start=self.filament_current_start,
             filament_current_end=self.filament_current_end,
             anode_current=self.anode_current,
@@ -430,9 +459,9 @@ class LayerForm(Form):
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
-    def add_to_film(self, film: Film, position_from_buffer: int):
+    def to_layer(self, film: Film, position_from_buffer: int):
         if not self.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
         base_info = self.intro_form
         layer = FilmLayer(
             position_from_buffer=position_from_buffer,
@@ -443,8 +472,23 @@ class LayerForm(Form):
             sputtering_system=self.sputter_system,
             film=film,
         )
+        stoichio = StoichioElement.from_str(
+            base_info.nominal_stoichio,
+            fk_field=StoichioElement.film_layer,
+            parent=layer,
+        )
+        layer.nominal_stoichio = stoichio
         self.sputter_form.add_to_layer(layer)
-        return film
+
+        first_target = Target.from_label(base_info.target_label)
+        targets = [first_target]
+        if base_info.target_2_label is not None:
+            co_sputter_target = Target.from_label(base_info.target_2_label)
+            targets.append(co_sputter_target)
+        target_uses = [TargetUse(target=target, film_layer=layer)
+                       for target in targets]
+        layer.target_uses = target_uses
+        return layer
 
 
 class LayerListForm(Form):
@@ -456,7 +500,7 @@ class LayerListForm(Form):
                 else len(default_film.layers)
         )
         if not layer_count_fld.is_valid:
-            raise StopPageLoad
+            raise StopPageRun
 
         layer_forms: list[LayerForm] = []
         for i in range(layer_count_fld.value):
@@ -478,33 +522,37 @@ class LayerListForm(Form):
 
     def add_to_film(self, film: Film):
         if not self.is_valid:
-            raise StopPageLoad
-        for i, f in enumerate(self.layer_forms):
-            f.add_to_film(film, i)
+            raise StopPageRun
+        layers = [f.to_layer(film, idx)
+                  for idx, f in enumerate(self.layer_forms)]
+        film.layers = layers
 
 
 class TargetListForm(Form):
     def __init__(self, default_film: Film|None):
-        no_db_default = default_film is None
+        if default_film is None:
+            db_default_target_labels = []
+        else:
+            db_default_target_labels = default_film.target_labels
         with st.container(border=True):
             st.subheader("Targets")
             with st.container(horizontal=True):
                 target_count_fld = TargetCountField(
                     form_default=0,
-                    db_default=None if no_db_default
-                        else len(default_film.layers)
+                    db_default=None if default_film is None
+                        else len(db_default_target_labels)
                 )
                 if not target_count_fld.is_valid:
-                    raise StopPageLoad
+                    raise StopPageRun
 
-                target_flds: list[AllTargetField] = []
+                target_flds: list[TargetField] = []
 
                 for i in range(target_count_fld.value):
                     try:
-                        default_name = default_film.layers[i].target.label
-                    except IndexError, AttributeError:
+                        default_name = db_default_target_labels[i]
+                    except IndexError:
                         default_name = None
-                    field = AllTargetField(form_default=default_name, key=i)
+                    field = TargetField(form_default=default_name, key=i)
                     target_flds.append(field)
 
         self.target_flds = target_flds

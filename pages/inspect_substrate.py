@@ -46,7 +46,7 @@ layers = reversed(substrate.layers)
 
 table_content = [
     {
-        'Stoichiometry': StoichioElement.complete_stoichio(lay.stoichio),
+        'Stoichiometry': StoichioElement.to_str(lay.stoichio),
         'Thickness': lay.thickness,  # TODO add unit.
         'Crystal struct.': lay.crystal_struct_str(),
     }
