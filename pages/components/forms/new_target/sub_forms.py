@@ -15,7 +15,7 @@ from components.forms.new_target.fields import MadeAtField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from components.forms.shared2 import Form, StopPageRun
+from components.forms.shared2 import Form, PausePageRun
 from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH
 from logic.db_enums import PixelCoordinateSystem, ShapeType
@@ -85,7 +85,7 @@ class BasicInfoForm(Form):
 
     def to_target(self, id_: int = None) -> Target:
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
 
         target = Target(
             made_on=self.made_on,
@@ -196,7 +196,7 @@ class UploadAndCropForm(Form):
             if st.button("Delete"):
                 del sess[Sk.UPLOADED_TARGET_IMG]
                 st.rerun()
-            raise StopPageRun
+            raise PausePageRun
 
         else:
             photo_upload_fld = PhotoUploadField(form_default=None)
@@ -205,7 +205,7 @@ class UploadAndCropForm(Form):
                 if default_state is None:
                     sess[Sk.TARGET_IMG_NAME] = photo_upload_fld.new_file_name()
                 st.rerun()
-            raise StopPageRun
+            raise PausePageRun
 
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
@@ -248,7 +248,7 @@ class StateInfoForm(Form):
             db_default=db_has_comment
         )
         if not has_comment_fld.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         if has_comment_fld.value == HasCommentField.Option.YES:
             comment_fld = CommentField(
                 form_default='',
@@ -282,7 +282,7 @@ class StateInfoForm(Form):
     def to_deterioration_state(self, target: Target, email: str = None) \
             -> DeteriorationState:
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         coord_system = PixelCoordinateSystem.PLOTLY
         photo_file_name = replace_file_name_extension(
             self.photo_file_name, 'png'
@@ -478,7 +478,7 @@ class PatchForm(Form):
 
     def to_patch(self, state: DeteriorationState):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         if self.shape == ShapeType.DISC:
             form: DiscPatchForm = self.form
             disc = Disc.from_circumference_points(
@@ -519,7 +519,7 @@ class PatchListForm(Form):
             )
         patch_count = patch_count_fld.value
         if not patch_count_fld.is_valid:
-            raise StopPageRun
+            raise PausePageRun
 
         st.divider(width=50)
         patch_forms: list[PatchForm] = []

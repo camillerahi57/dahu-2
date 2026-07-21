@@ -1,7 +1,7 @@
 from components.forms.new_deterioration_state.fields import UpdaterEmailField, \
     IsItReallyDeteriorationField as Iirdf
 from components.forms.new_target.sub_forms import DeteriorationStateForm
-from components.forms.shared2 import Form, StopPageRun
+from components.forms.shared2 import Form, PausePageRun
 from logic.lab_modelization.db_models import Target, DeteriorationState
 import streamlit as st
 
@@ -19,13 +19,13 @@ class RootForm(Form):
             form_default=False
         )
         if really_deterioration_fld.value is None:
-            raise StopPageRun
+            raise PausePageRun
         elif really_deterioration_fld.value is Iirdf.Option.HUMAN:
             st.warning("Please create a new target. When you create it, you can"
                      " indicate that it's based on the current one.\n\n"
                      "A new deterioration state is only for changes that are "
                      "unwanted, due to normal usage of the target.")
-            raise StopPageRun
+            raise PausePageRun
         else:
             pass
         email_fld = UpdaterEmailField(

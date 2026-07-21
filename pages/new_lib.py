@@ -1,5 +1,5 @@
 from components.forms.new_library.sub_forms import RootForm
-from components.forms.shared2 import StopPageRun
+from components.forms.shared2 import PausePageRun
 from logic.constants import CookieKeys as Ck, REDIRECT_PATH_URL_KEY, \
     ID_KEY_URL_KEY, ID_VALUE_URL_KEY, LIB_ID_URL_KEY
 
@@ -34,5 +34,5 @@ try:
             }
         )
 
-except StopPageRun:
+except PausePageRun:
     pass

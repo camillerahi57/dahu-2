@@ -17,10 +17,12 @@ class LibLabelField(Field):
         return st.text_input("Library Label", value=prefill, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ in Library.already_taken_names():
-            return False, "This label is already taken."
-        if input_ == '':
+        if input_ in {'', None}:
             return False, "Please enter a label."
+        is_taken = input_ in Library.already_taken_names()
+        is_default = input_ == self.prefill
+        if is_taken and not is_default:
+            return False, "This label is already taken."
         return True, ''
 
 
@@ -32,12 +34,14 @@ class FilmLabelField(Field):
                              value=prefill, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ in Film.already_taken_names():
+        if input_ == '':
+            return False, "Please enter a label."
+        is_taken = input_ in Film.already_taken_names()
+        is_default = input_ == self.prefill
+        if is_taken and not is_default:
             return False, (
                 "This label is already used. A library corresponding to this "
                 "sample might have already been created.")
-        if input_ == '':
-            return False, "Please enter a label."
         return True, ''
 
 

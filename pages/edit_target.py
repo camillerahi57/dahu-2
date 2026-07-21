@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.forms.new_target.sub_forms import BasicInfoForm
-from components.forms.shared2 import StopPageRun
+from components.forms.shared2 import PausePageRun
 from logic.constants import CookieKeys as Ck, TARGET_ID_URL_KEY, \
     REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY
 from logic.functions import new_session_state, save_cookies
@@ -35,6 +35,6 @@ try:
             }
         )
 
-except StopPageRun:
+except PausePageRun:
     pass
 

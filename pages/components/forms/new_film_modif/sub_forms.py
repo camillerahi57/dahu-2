@@ -1,15 +1,14 @@
 import streamlit as st
-from plotly.graph_objs import Figure
 
 from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField,\
     MadeByField, CommentField, ModifTypeField, FurnaceField, PressureField, \
-    PhaseDurationField, PumpingDurationField, PhaseCountField, ReachedTempField, \
-    IsRoomTemperatureField, PhaseTypeField, AnnealingAtmosphereField
-from components.forms.shared2 import Form, StopPageRun
-from logic.constants import FILM_INIT_STATE, SessionKeys as Sk
+    PhaseDurationField, PumpingDurationField, PhaseCountField, \
+    ReachedTempField, IsRoomTemperatureField, PhaseTypeField, \
+    AnnealingAtmosphereField
+from components.forms.shared2 import Form, PausePageRun
+from logic.constants import FILM_INIT_STATE
 from logic.lab_modelization.db_models import FilmModification, Annealing, \
     StoichioElement, Film, AnnealingStep
-
 
 phase_types = PhaseTypeField.Options
 
@@ -215,7 +214,7 @@ class PhaseForm(Form):
 
             phase_type = phase_type_fld.value
             if phase_type is None:
-                raise StopPageRun
+                raise PausePageRun
 
             if phase_type == phase_types.RAMP:
                 phase_form = RampPhaseForm(
@@ -266,7 +265,7 @@ class PhaseListForm(Form):
         phase_count = phase_count_fld.value
 
         if phase_count is None:
-            raise StopPageRun
+            raise PausePageRun
 
         phase_forms: list[PhaseForm] = []
         for phase_idx in range(phase_count):
@@ -332,7 +331,7 @@ class PhaseListForm(Form):
 
     def to_steps(self, annealing: Annealing):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
 
         forms = self.phase_forms
 

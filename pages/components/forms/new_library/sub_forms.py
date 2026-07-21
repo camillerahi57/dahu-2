@@ -36,7 +36,7 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  TargetChoiceField,
                                                  ConfirmOrderField,
                                                  IsCoSputteringField)
-from components.forms.shared2 import Form, StopPageRun
+from components.forms.shared2 import Form, PausePageRun
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
@@ -68,13 +68,19 @@ class BaseInfoForm(Form):
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
-    def to_library(self) -> Library:
-        return Library(
+    def to_library(self, id_: int = None) -> Library:
+        if not self.is_valid:
+            raise PausePageRun
+
+        lib = Library(
             label=self.label,
             last_inspected_at=datetime.now(),
             comment=self.comment,
             hdf5_file_name=None,
         )
+        if id_ is not None:
+            lib.id = id_
+        return lib
 
 
 class FilmInfoForm(Form):
@@ -116,8 +122,12 @@ class FilmInfoForm(Form):
         return True, ''
 
     def add_to_library(self, library: Library):
+        film = self.to_film(library)
+        library.films = [film]
+
+    def to_film(self, library: Library, id_: int = None) -> Film:
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         film = Film(
             label=self.label,
             made_on=self.made_on,
@@ -125,7 +135,10 @@ class FilmInfoForm(Form):
             substrate=Substrate.from_label(self.substrate_name),
             library=library,
         )
-        library.films = [film]
+        if id_ is not None:
+            film.id = id_
+
+        return film
 
 
 class LayerIntroForm(Form):
@@ -280,7 +293,7 @@ class MagnetronForm(Form):
 
     def add_to_layer(self, layer: FilmLayer):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         magnetron = MagnetronSputtering(
             deposit_distance=self.deposit_distance,
             deposit_angle=self.deposit_angle,
@@ -414,7 +427,7 @@ class TriodeForm(Form):
 
     def add_to_layer(self, layer: FilmLayer):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         triode = TriodeSputtering(
             has_active_cooling=self.active_cooling,
             rotation_speed=self.rotation_speed,
@@ -442,9 +455,19 @@ class LayerForm(Form):
             layer_intro_form = LayerIntroForm(default_layer, key)
             sputter_system = layer_intro_form.sputtering_system
             if sputter_system == SputteringSystem.TRIODE:
-                sputter_form = TriodeForm(default_layer, key=key)
+                if default_layer is not None:
+                    triode_sput = default_layer.triode_sputterings[0]
+                else:
+                    triode_sput = None
+                sputter_form = TriodeForm(triode_sput, key=key)
+
             elif sputter_system == SputteringSystem.MAGNETRON:
-                sputter_form = MagnetronForm(default_layer, key=key)
+                if default_layer is not None:
+                    magnetron_sput = (default_layer.magnetron_sputterings[0])
+                else:
+                    magnetron_sput = None
+                sputter_form = MagnetronForm(magnetron_sput, key=key)
+
             else:
                 sputter_form = None
 
@@ -461,7 +484,7 @@ class LayerForm(Form):
 
     def to_layer(self, film: Film, position_from_buffer: int):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         base_info = self.intro_form
         layer = FilmLayer(
             position_from_buffer=position_from_buffer,
@@ -500,7 +523,7 @@ class LayerListForm(Form):
                 else len(default_film.layers)
         )
         if not layer_count_fld.is_valid:
-            raise StopPageRun
+            raise PausePageRun
 
         layer_forms: list[LayerForm] = []
         for i in range(layer_count_fld.value):
@@ -520,12 +543,12 @@ class LayerListForm(Form):
             return False, "Please fill all layers."
         return True, ''
 
-    def add_to_film(self, film: Film):
+    def to_layers(self, film: Film):
         if not self.is_valid:
-            raise StopPageRun
+            raise PausePageRun
         layers = [f.to_layer(film, idx)
                   for idx, f in enumerate(self.layer_forms)]
-        film.layers = layers
+        return layers
 
 
 class TargetListForm(Form):
@@ -543,7 +566,7 @@ class TargetListForm(Form):
                         else len(db_default_target_labels)
                 )
                 if not target_count_fld.is_valid:
-                    raise StopPageRun
+                    raise PausePageRun
 
                 target_flds: list[TargetField] = []
 
@@ -558,7 +581,7 @@ class TargetListForm(Form):
         self.target_flds = target_flds
 
         sess = st.session_state
-        sess[Sk.SELECTED_TARGETS] = set(f.value for f in self.target_flds)
+        sess[Sk.SELECTED_TARGETS] = [f.value for f in self.target_flds]
 
         super().__init__(fields=[target_count_fld]+target_flds,
                          sub_forms=[])
@@ -580,7 +603,9 @@ class RootForm(Form):
 
         library = base_info_form.to_library()
         film_info_form.add_to_library(library)
-        layer_list_form.add_to_film(library.films[0])
+
+        layers = layer_list_form.to_layers(library.films[0])
+        library.films[0].layers = layers
 
         self.library = library
 

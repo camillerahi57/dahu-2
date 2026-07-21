@@ -29,7 +29,7 @@ from logic.functions import letter_count
 from logic.math_tools import VertexList
 from logic.page_list import pages
 from logic.python_tools import remove_digits
-from logic.units import ur, db_units, to_db_unit
+from logic.units import ur, db_units
 
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
@@ -216,7 +216,7 @@ class Target(_BaseModel):
         return f"http://{DOMAIN}/{page_name}?{TARGET_ID_URL_KEY}={self.id}"
 
     def can_be_deleted(self):
-        return len(self.film_layers) == 0
+        return len(self.uses) == 0
 
     def comments(self) -> list[tuple[datetime, str]]:
         return [(state.date, state.comment) # noqa Wrong warning.
@@ -494,20 +494,20 @@ class Film(_BaseModel):
         return sorted(layers, key=position)
 
     @property
-    def target_labels(self) -> set[str]:
+    def target_labels(self) -> list[str]:
         labels: set[str] = set()
         for l in self.layers:
             for use in l.target_uses:
                 labels.add(use.target.label)
-        return labels
+        return list(labels)
 
     @property
-    def targets(self) -> set[Target]:
+    def targets(self) -> list[Target]:
         targets: set[Target] = set()
         for l in self.target_labels:
             target = Target.from_label(l)
             targets.add(target)
-        return targets
+        return list(targets)
 
 
 class FilmLayer(_BaseModel):
@@ -991,15 +991,17 @@ class DeteriorationState(_BaseModel):
         return FILE_STORAGE_PATH / self.photo_file_name
 
     def libraries(self) -> set[Library]:
-        libs = (
-            Library
+        uses = (
+            TargetUse
             .select()
-            .join(Film, on=(Film.library == Library.id))
-            .join(FilmLayer, on=(FilmLayer.film == Film.id))
-            .join(TargetUse,
-                  on=(TargetUse.film_layer == FilmLayer.id))
-            .where(TargetUse.target == self))
-        return set(libs)
+            .where(TargetUse.target == self.target)
+        )
+        libs = set()
+        for use in uses:
+            use: TargetUse
+            lib = use.film_layer.film.library
+            libs.add(lib)
+        return libs
 
     @staticmethod
     def empty_figure():

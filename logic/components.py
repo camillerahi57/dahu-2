@@ -25,7 +25,7 @@ def browser_side_bar(dynamic_filters: DynamicFilters, current_page: str | Path):
 
 
 def inspect_page_header(object_type: str, instance_name: str,
-                        on_delete: Callable, on_edit: Callable,
+                        on_delete: Callable, on_edit: Callable|None,
                         browse_page: StreamlitPage):
     if st.button('← Browse'):
         st.switch_page(browse_page)
@@ -36,7 +36,8 @@ def inspect_page_header(object_type: str, instance_name: str,
             st.subheader(instance_name)
     with col2:
         with st.container(horizontal=True, horizontal_alignment='right'):
-            if st.button('Edit ✏️'):
-                on_edit()
+            if on_edit is not None:
+                if st.button('Edit ✏️'):
+                    on_edit()
             if st.button(f'Delete {object_type} ❌'):
                 on_delete()

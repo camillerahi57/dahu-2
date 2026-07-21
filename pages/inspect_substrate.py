@@ -27,7 +27,7 @@ def confirm_deletion_dialog():
              f"substrate **\"{substrate.label}\"**?")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
-            substrate.delete_instance()
+            substrate.delete_instance(recursive=True)
             st.switch_page('deleted_sub.py')
 
 

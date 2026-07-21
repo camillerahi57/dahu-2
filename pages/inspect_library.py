@@ -47,7 +47,7 @@ def confirm_deletion_dialog(lib_: Library):
              f"- Uploaded data for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
-            lib_.delete_instance()
+            lib_.delete_instance(recursive=True)
             st.switch_page('deleted_lib.py')
 
 
@@ -121,8 +121,13 @@ def card(label_: str):
         st.space()
 
 
-inspect_page_header('Library', lib.label, on_delete, lambda: None,
+inspect_page_header('Library', lib.label, on_delete, None,
                     pages.browse_libs)
+st.write(
+    f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
+
+if st.button('✏️ Edit name or comment', key='edit_lib'):
+    st.switch_page(page=pages.edit_lib, query_params={LIB_ID_URL_KEY: lib.id})
 
 with (st.container(horizontal=True, vertical_alignment='center',
                   horizontal_alignment='left', border=True)):
@@ -160,6 +165,12 @@ with col1:
 
 with col2:
     with st.container(border=True):
+        with st.container(horizontal_alignment='right'):
+            if st.button("✏️ Edit film information"):
+                st.switch_page(
+                    pages.edit_film,
+                    query_params={FILM_ID_URL_KEY: film.id},
+                )
         date_str = film.made_on.strftime("%B %d, %Y")
         st.write(f"Made on **{date_str}** by "
                  f"**{email_html(film.made_by_email)}**",
@@ -170,8 +181,12 @@ with col2:
                  unsafe_allow_html=True)
         st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                  unsafe_allow_html=True)
-        st.write(
-            f"**Comment:** {lib.comment if lib.comment else '*No comment.*'}")
+        with st.container(horizontal_alignment='right'):
+            if st.button("✏️ Edit layers"):
+                st.switch_page(
+                    pages.edit_film_layers,
+                    query_params={FILM_ID_URL_KEY: film.id}
+                )
         st.write(f"**Layers**:")
         table_rows = [
             {

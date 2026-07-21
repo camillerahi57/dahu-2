@@ -1,10 +1,9 @@
-from types import SimpleNamespace
+import streamlit as st
 
 from components.forms.new_deterioration_state.fields import UpdaterEmailField
 from components.forms.new_target.sub_forms import DeteriorationStateForm
 from components.forms.shared2 import Form
 from logic.lab_modelization.db_models import Target, DeteriorationState
-import streamlit as st
 
 
 class RootForm(Form):

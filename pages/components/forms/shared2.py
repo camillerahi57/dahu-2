@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Any
 
 import streamlit as st
-from pint.registry import Unit, Quantity
+from pint.registry import Unit
 
 from logic.units import to_db_unit, from_db_unit, ur
 
@@ -135,5 +135,5 @@ class Form(ABC):
         raise NotImplementedError
 
 
-class StopPageRun(Exception):
+class PausePageRun(Exception):
     pass

@@ -74,10 +74,18 @@ class _Pages:
     edit_target: StreamlitPage = Page(
         '../pages/edit_target.py', url_path='edit_target',
         title='Edit Target', icon='🐐')
-
     edit_state: StreamlitPage = Page(
         '../pages/edit_deterioration_state.py', url_path='edit_state',
         title='Edit Deterioration State', icon='🐐')
+    edit_lib: StreamlitPage = Page(
+        '../pages/edit_lib.py', url_path='edit_lib',
+        title='Edit Library', icon='🐐')
+    edit_film: StreamlitPage = Page(
+        '../pages/edit_film.py', url_path='edit_film',
+        title='Edit Film', icon='🐐')
+    edit_film_layers: StreamlitPage = Page(
+        '../pages/edit_film_layers.py', url_path='edit_film_layers',
+        title='Edit Film Layers', icon='🐐')
 
     test: StreamlitPage = Page(
         '../pages/test.py', url_path='test',
