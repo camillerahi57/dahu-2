@@ -29,6 +29,7 @@ class CookieKeys(StrEnum):
     LIB_FILTERS = 'f4ze86sd4ce1v68rrf46sdw1cqz568fc4'
     TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq43q1dz'
     SUBSTRATE_FILTERS = 'e46vsq98f4z5618af9ez4sxdq4658f4s'
+    PAGE_PARAMS = 'ncpiunsqpoudfhpuvndsoucnezquicdscnpouezq'
 
 
 class SessionKeys(StrEnum):
@@ -47,5 +48,5 @@ class SessionKeys(StrEnum):
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
     PREVIOUS_PIXEL_COORDS = 'previous_pixel_coords_key'
     SELECTED_TARGETS = 'selected_targets_key'
-
+    SWITCH_PAGE_REQUEST_LIB_ID = 'switch_page_request_lib_id_key'
 
