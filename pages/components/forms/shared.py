@@ -4,7 +4,7 @@ from typing import Self, Any
 
 import streamlit as st
 
-from logic.constants import SessionKeys as Sk
+from components.streamlit_tools import sess
 
 
 @dataclass
@@ -67,7 +67,6 @@ class FormField(ABC):  # Generic type T.
 
     @classmethod
     def get_or_create(cls, field_key: str, input_key: str) -> Self:
-        sess = st.session_state
         if field_key not in sess:
             sess[field_key] = cls(value=None, field_key=field_key, 
                                    input_key=input_key)
@@ -78,13 +77,11 @@ class FormField(ABC):  # Generic type T.
 
     @classmethod
     def get_field_key(cls, input_key: str):
-        sess = st.session_state
-        return 'field_' + sess[Sk.PAGE_URL_PATH] + cls.__name__ + input_key
+        return 'field_' + nav_stack[-1].url_path + cls.__name__ + input_key
 
     @classmethod
     def get_input_key(cls, input_key: str):
-        sess = st.session_state
-        return 'widget_' + sess[Sk.PAGE_URL_PATH] + cls.__name__ + input_key
+        return 'widget_' + nav_stack[-1].url_path + cls.__name__ + input_key
 
     @classmethod
     def input(cls, key: str = '') -> Self:
@@ -128,7 +125,6 @@ class DialogData(ABC):
 
     def clear_and_add_to_session(self, session_key: str) -> None:
         self.clear_all_fields()
-        sess = st.session_state
         if session_key not in sess:
             sess[session_key] = []
         sess[session_key].append(self)

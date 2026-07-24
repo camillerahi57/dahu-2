@@ -37,6 +37,7 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  ConfirmOrderField,
                                                  IsCoSputteringField)
 from components.forms.shared2 import Form, PausePageRun
+from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
@@ -197,11 +198,14 @@ class LayerIntroForm(Form):
                     else db_default_target_labels[0]
             )
             if is_cosputter_fld.value:
+                if no_db_default or len(db_default_target_labels) < 2:
+                    db_co_sputter_target = None
+                else:
+                    db_co_sputter_target = db_default_target_labels[1]
                 target_2_label_fld = TargetChoiceField(
                     key=f'co_sputter_target_{key}',
                     form_default=None,
-                    db_default = None if no_db_default
-                        else db_default_target_labels[1]
+                    db_default = db_co_sputter_target
                 )
                 target_2_label = target_2_label_fld.value
             else:
@@ -580,7 +584,6 @@ class TargetListForm(Form):
 
         self.target_flds = target_flds
 
-        sess = st.session_state
         sess[Sk.SELECTED_TARGETS] = [f.value for f in self.target_flds]
 
         super().__init__(fields=[target_count_fld]+target_flds,

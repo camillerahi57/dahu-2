@@ -3,6 +3,7 @@ from enum import StrEnum
 import streamlit as st
 
 from components.forms.shared2 import Field, FieldType as Ft, UnitField
+from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
     FILM_INIT_STATE
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement
@@ -62,7 +63,6 @@ class MadeAfterField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
-        sess = st.session_state
         film = sess[Sk.CURRENT_FILM]
         film_modifs = (FilmModification.select()
                        .where(FilmModification.film == film))

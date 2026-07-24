@@ -6,13 +6,13 @@ from streamlit import dialog
 from streamlit_image_coordinates import streamlit_image_coordinates
 import streamlit as st
 
+from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.constants import PIXEL_COORDS
 
 
 @dialog("Pixel Helper")
 def show_pixel_helper(target_img):
-    sess = st.session_state
     st.write("**Click on a pixel to get its coordinates.**")
     st.write(f"**Click on two different pixels to get the distance between "
              f"them in pixels.**")

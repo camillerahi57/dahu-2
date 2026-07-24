@@ -2,16 +2,19 @@ import streamlit as st
 
 from components.forms.new_target.sub_forms import BasicInfoForm
 from components.forms.shared2 import PausePageRun
-from logic.constants import CookieKeys as Ck, TARGET_ID_URL_KEY, \
-    REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY
-from logic.functions import new_session_state, save_cookies
+from components.streamlit_tools import init_page, sess, \
+    switch_to_submit_successful, current_params
+from logic.constants import CookieKeys as Ck, \
+    IdType
+from logic.functions import save_cookies
 from logic.lab_modelization.db_models import db, Target
 from logic.page_list import pages
 
-target_id = st.query_params[TARGET_ID_URL_KEY]
+init_page(pages.edit_target)
+
+target_id = current_params()[IdType.TARGET]
 old_target: Target = Target.get_by_id(target_id)
 
-sess = new_session_state(pages.edit_target)
 st.set_page_config(layout='centered')
 
 try:
@@ -25,14 +28,11 @@ try:
         with db.atomic():
             new_target.save()
 
-        save_cookies(sess)
-        st.switch_page(
-            pages.submission_successful,
-            query_params={
-                REDIRECT_PATH_URL_KEY: pages.inspect_target.url_path,
-                ID_KEY_URL_KEY: TARGET_ID_URL_KEY,
-                ID_VALUE_URL_KEY: new_target.id,
-            }
+        save_cookies()
+        switch_to_submit_successful(
+            redirect_to=pages.inspect_target,
+            id_type=IdType.TARGET,
+            object_id=new_target.id,
         )
 
 except PausePageRun:

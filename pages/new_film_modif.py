@@ -2,18 +2,20 @@ import streamlit as st
 
 from components.forms.new_film_modif.sub_forms import RootForm
 from components.forms.shared2 import PausePageRun
+from components.streamlit_tools import sess, init_page, \
+    switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \
-    FILM_ID_URL_KEY, REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY, \
-    LIB_ID_URL_KEY, SessionKeys as Sk
-from logic.functions import new_session_state, save_cookies
+    SessionKeys as Sk, IdType
+from logic.functions import save_cookies
 from logic.lab_modelization.db_models import (
     db, Film)
 from logic.page_list import pages
 
-sess = new_session_state(pages.new_film_modif)
+init_page(pages.new_film_modif)
+
 st.set_page_config(layout="centered")
 
-film_id = target_id = st.query_params[FILM_ID_URL_KEY]
+film_id = target_id = current_params()[IdType.FILM]
 film: Film = Film.get_by_id(film_id)
 st.session_state[Sk.CURRENT_FILM] = film
 
@@ -27,15 +29,20 @@ try:
         with db.atomic():
             film_modif.save_with_dependent()
 
-        save_cookies(sess)
-        st.switch_page(
-            page=pages.submission_successful,
-            query_params={
-                REDIRECT_PATH_URL_KEY: pages.inspect_lib.url_path,
-                ID_KEY_URL_KEY: LIB_ID_URL_KEY,
-                ID_VALUE_URL_KEY: film.library.id,
-            }
+        save_cookies()
+        switch_to_submit_successful(
+            redirect_to=pages.inspect_lib,
+            id_type=IdType.LIB,
+            object_id=film.library.id,
         )
+        # st.switch_page(
+        #     page=pages.submission_successful,
+        #     query_params={
+        #         REDIRECT_PATH: pages.inspect_lib.url_path,
+        #         OBJ_TYPE: LIB_ID,
+        #         OBJ_ID: film.library.id,
+        #     }
+        # )
 
 except PausePageRun:
     pass

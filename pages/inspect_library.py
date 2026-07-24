@@ -1,21 +1,23 @@
+import keyboard
 import streamlit as st
 from pandas import DataFrame
 
 from components.forms.new_film_modif.fields import PressureField
+from components.streamlit_tools import (
+    sess, init_page, current_params, switch_button, switch_to_submit_successful)
 from logic.page_list import pages
 from logic.components import inspect_page_header
-from logic.constants import LIB_ID_URL_KEY, SessionKeys as Sk, DOMAIN, \
-    FILM_ID_URL_KEY
+from logic.constants import SessionKeys as Sk, DOMAIN, IdType
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification,\
     Annealing, IonBeamEtching, WetEtching)
-from logic.functions import link_html, email_html, \
-    new_session_state
+from logic.functions import link_html, email_html
 from logic.table_columns import LibInspectColumnName as ColName
 
 
-lib_id = st.query_params[LIB_ID_URL_KEY]
+init_page(pages.inspect_lib)
+lib_id = current_params()[IdType.LIB]
 lib: Library = Library.get_by_id(lib_id)
 film: Film = Film.get(Film.library == lib)
 substrate: Substrate = Substrate.get_by_id(film.substrate)
@@ -24,7 +26,6 @@ layers = film.ordered_layers
 target_link_htmls = [link_html(target.label, target.url())
                      for target in film.targets]
 
-sess = new_session_state(pages.inspect_lib)
 sess[Sk.CURRENT_FILM] = film
 
 st.set_page_config(layout="wide", page_title=lib.label)
@@ -48,7 +49,8 @@ def confirm_deletion_dialog(lib_: Library):
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
             lib_.delete_instance(recursive=True)
-            st.switch_page('deleted_lib.py')
+            switch_to_submit_successful(pages.browse_libs)
+            # st.switch_page('deleted_lib.py')
 
 
 def on_delete():
@@ -121,13 +123,17 @@ def card(label_: str):
         st.space()
 
 
-inspect_page_header('Library', lib.label, on_delete, None,
-                    pages.browse_libs)
+inspect_page_header('Library', lib.label, on_delete, None)
 st.write(
     f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
 
-if st.button('✏️ Edit name or comment', key='edit_lib'):
-    st.switch_page(page=pages.edit_lib, query_params={LIB_ID_URL_KEY: lib.id})
+# if st.button('✏️ Edit name or comment', key='edit_lib'):
+#     st.switch_page(page=pages.edit_lib, query_params={IdType.LIB: lib.id})
+switch_button(
+    pages.edit_lib,
+    label='✏️ Edit name or comment',
+    q_params={IdType.LIB: lib.id},
+)
 
 with (st.container(horizontal=True, vertical_alignment='center',
                   horizontal_alignment='left', border=True)):
@@ -139,11 +145,13 @@ with (st.container(horizontal=True, vertical_alignment='center',
         if st.button(f'{MODIF_NAMES[modif.modif_type]}', key=f'btn_{i}'):
             film_modif_info(modif)
     st.container(width=300)
-    if st.button('➕**Add**', type='tertiary'):
-        st.switch_page(
-            pages.new_film_modif,
-            query_params={FILM_ID_URL_KEY: film.id}
-        )
+    # if st.button('➕**Add**', type='tertiary'):
+    #     st.switch_page(
+    #         pages.new_film_modif,
+    #         query_params={IdType.FILM: film.id}
+    #     )
+    switch_button(pages.new_film_modif, label='➕**Add**', type_='tertiary',
+                  q_params={IdType.FILM: film.id})
 
 col1, col2 = st.columns([40, 60])
 
@@ -166,11 +174,9 @@ with col1:
 with col2:
     with st.container(border=True):
         with st.container(horizontal_alignment='right'):
-            if st.button("✏️ Edit film information"):
-                st.switch_page(
-                    pages.edit_film,
-                    query_params={FILM_ID_URL_KEY: film.id},
-                )
+            switch_button(pages.edit_film,
+                          label="✏️ Edit film information",
+                          q_params={IdType.FILM: film.id})
         date_str = film.made_on.strftime("%B %d, %Y")
         st.write(f"Made on **{date_str}** by "
                  f"**{email_html(film.made_by_email)}**",
@@ -182,11 +188,13 @@ with col2:
         st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                  unsafe_allow_html=True)
         with st.container(horizontal_alignment='right'):
-            if st.button("✏️ Edit layers"):
-                st.switch_page(
-                    pages.edit_film_layers,
-                    query_params={FILM_ID_URL_KEY: film.id}
-                )
+            # if st.button("✏️ Edit layers"):
+            #     st.switch_page(
+            #         pages.edit_film_layers,
+            #         query_params={IdType.FILM: film.id}
+            #     )
+            switch_button(pages.edit_film_layers, label="✏️ Edit layers",
+                          q_params={IdType.FILM: film.id})
         st.write(f"**Layers**:")
         table_rows = [
             {

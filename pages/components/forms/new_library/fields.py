@@ -17,7 +17,7 @@ class LibLabelField(Field):
         return st.text_input("Library Label", value=prefill, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ in {'', None}:
+        if not input_:
             return False, "Please enter a label."
         is_taken = input_ in Library.already_taken_names()
         is_default = input_ == self.prefill
@@ -50,7 +50,7 @@ class MagnetronModelField(Field):
 
     def _streamlit_input(self, prefill: str, key):
         options = [m.value for m in MagnetronMachineModel]
-        if prefill in {'', None}:
+        if not prefill:
             index = None
         else:
             index = options.index(prefill)
@@ -185,7 +185,7 @@ class TargetField(Field):
                             key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ in {'', None}:
+        if not input_:
             return False, 'Please enter select a target.'
         return True, ''
 
@@ -195,7 +195,7 @@ class TargetChoiceField(Field):
 
     def _streamlit_input(self, prefill: str, key):
         options = st.session_state[Sk.SELECTED_TARGETS]
-        if prefill in {None, ''}:
+        if not prefill:
             index = None
         else:
             index = options.index(prefill)
@@ -203,7 +203,7 @@ class TargetChoiceField(Field):
                             key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ in {'', None}:
+        if not input_:
             return False, 'Please enter select a target.'
         return True, ''
 
@@ -305,7 +305,7 @@ class DepositPowerField(UnitField):
 
 
 class IsCoSputteringField(Field):
-    type = Ft.MANDATORY
+    type = Ft.OPTIONAL
 
     def _streamlit_input(self, prefill: bool, key):
         return st.checkbox("Add co-sputtering", value=prefill, key=key)
@@ -345,7 +345,7 @@ class MagnetronGeneratorField(Field):
     
     def _streamlit_input(self, prefill: str, key):
         options = [gen.value for gen in MagnetronSputteringGenerator]
-        if prefill in {None, ''}:
+        if not prefill:
             index = None
         else:
             index = options.index(prefill)

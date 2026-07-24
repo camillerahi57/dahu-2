@@ -2,18 +2,20 @@ import streamlit as st
 
 from components.forms.edit_deterioration_state.sub_forms import RootForm
 from components.forms.shared2 import PausePageRun
+from components.streamlit_tools import sess, init_page, \
+    switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, FILE_STORAGE_PATH, \
-    STATE_ID_URL_KEY, REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, ID_VALUE_URL_KEY, \
-    TARGET_ID_URL_KEY
-from logic.functions import new_session_state, save_cookies
+    IdType
+from logic.functions import save_cookies
 from logic.lab_modelization.db_models import db, Target, DeteriorationState
 from logic.page_list import pages
 
-state_id = st.query_params[STATE_ID_URL_KEY]
+init_page(pages.edit_state)
+
+state_id = current_params()[IdType.STATE]
 old_state: DeteriorationState = DeteriorationState.get_by_id(state_id)
 target: Target = old_state.target
 
-sess = new_session_state(pages.edit_state)
 st.set_page_config(layout='centered')
 
 try:
@@ -28,16 +30,12 @@ try:
             new_state.save_with_dependent()
             photo_path = FILE_STORAGE_PATH / new_state.photo_file_name
             root_form.target_img.save(photo_path)
-            save_cookies(sess)
 
-        save_cookies(sess)
-        st.switch_page(
-            pages.submission_successful,
-            query_params={
-                REDIRECT_PATH_URL_KEY: pages.inspect_target.url_path,
-                ID_KEY_URL_KEY: TARGET_ID_URL_KEY,
-                ID_VALUE_URL_KEY: target.id,
-            }
+        save_cookies()
+        switch_to_submit_successful(
+            redirect_to=pages.inspect_target,
+            id_type=IdType.TARGET,
+            object_id=target.id,
         )
 
 except PausePageRun:

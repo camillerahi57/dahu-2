@@ -17,6 +17,7 @@ from components.forms.new_target.fields import MadeAtField, \
     IsCorrectFigureField, HasCorrectOrientationField
 from components.forms.shared2 import Form, PausePageRun
 from components.pixel_helper import pixel_helper_button
+from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH
 from logic.db_enums import PixelCoordinateSystem, ShapeType
 from logic.functions import replace_file_name_extension
@@ -147,7 +148,6 @@ class PixelEquivalenceForm(Form):
 
 class UploadAndCropForm(Form):
     def __init__(self, default_state: DeteriorationState | None):
-        sess = st.session_state
 
         if default_state is not None:
             if Sk.USE_DEFAULT_TARGET_PIC not in sess:

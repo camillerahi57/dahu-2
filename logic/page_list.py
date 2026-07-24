@@ -28,9 +28,6 @@ class _Pages:
     new_substrate: StreamlitPage = Page(
         '../pages/new_substrate.py', url_path='new_substrate',
         title='Add a New Substrate', icon="🐐")
-    new_charac: StreamlitPage = Page(
-        '../pages/new_charac.py', url_path='new_charac',
-        title='Add a New Characterization', icon="🐐")
     new_film_modif: StreamlitPage = Page(
         '../pages/new_film_modif.py', url_path='new_film_modif',
         title='Add a New Film Modification', icon="🐐")
@@ -45,31 +42,9 @@ class _Pages:
         '../pages/inspect_substrate.py', url_path='inspect_substrate',
         title='Substrate', icon="🐐")
 
-    library_added: StreamlitPage = Page(
-        '../pages/added_library.py', url_path='library_added',
-        title='New Library Added', icon="🐐")
-    target_added: StreamlitPage = Page(
-        '../pages/added_target.py', url_path='target_added',
-        title='New Target Added', icon="🐐")
-    substrate_added: StreamlitPage = Page(
-        '../pages/added_substrate.py', url_path='substrate_added',
-        title='New Substrate Added', icon="🐐")
     submission_successful: StreamlitPage = Page(
         '../pages/submission_successful.py', url_path='submission_successful',
         title='Submission Successful', icon="🐐")
-
-    deleted_lib: StreamlitPage = Page(
-        '../pages/deleted_lib.py', url_path='deleted_lib',
-        title='Library Deleted', icon="🐐")
-    deleted_target: StreamlitPage = Page(
-        '../pages/deleted_target.py', url_path='deleted_target',
-        title='Target Deleted', icon="🐐")
-    deleted_sub: StreamlitPage = Page(
-        '../pages/deleted_sub.py', url_path='deleted_sub',
-        title='Substrate Deleted', icon="🐐")
-    deleted_state: StreamlitPage = Page(
-        '../pages/deleted_deterioration_state.py', url_path='deleted_state',
-        title='Deterioration State Deleted', icon="🐐")
 
     edit_target: StreamlitPage = Page(
         '../pages/edit_target.py', url_path='edit_target',

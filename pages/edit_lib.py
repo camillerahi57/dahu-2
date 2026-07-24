@@ -2,16 +2,18 @@ import streamlit as st
 
 from components.forms.new_library.sub_forms import BaseInfoForm
 from components.forms.shared2 import PausePageRun
-from logic.constants import REDIRECT_PATH_URL_KEY, ID_KEY_URL_KEY, \
-    ID_VALUE_URL_KEY, LIB_ID_URL_KEY
-from logic.functions import new_session_state, save_cookies
+from components.streamlit_tools import init_page, \
+    switch_to_submit_successful, current_params
+from logic.constants import IdType
+from logic.functions import save_cookies
 from logic.lab_modelization.db_models import db, Library
 from logic.page_list import pages
 
-lib_id = st.query_params[LIB_ID_URL_KEY]
+init_page(pages.edit_lib)
+
+lib_id = current_params()[IdType.LIB]
 old_lib: Library = Library.get_by_id(lib_id)
 
-sess = new_session_state(pages.edit_lib)
 st.set_page_config(layout='centered')
 
 try:
@@ -23,15 +25,8 @@ try:
         with db.atomic():
             new_lib.save()
 
-        save_cookies(sess)
-        st.switch_page(
-            pages.submission_successful,
-            query_params={
-                REDIRECT_PATH_URL_KEY: pages.inspect_lib.url_path,
-                ID_KEY_URL_KEY: LIB_ID_URL_KEY,
-                ID_VALUE_URL_KEY: new_lib.id,
-            }
-        )
+        save_cookies()
+        switch_to_submit_successful()
 
 except PausePageRun:
     pass

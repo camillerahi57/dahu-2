@@ -1,12 +1,16 @@
 import streamlit as st
 from pandas import DataFrame
 
+from components.streamlit_tools import init_page, switch_to_submit_successful, \
+    current_params
 from logic.components import inspect_page_header
-from logic.constants import SUB_ID_URL_KEY
+from logic.constants import IdType
 from logic.lab_modelization.db_models import Substrate, StoichioElement
 from logic.page_list import pages
 
-sub_id = st.query_params[SUB_ID_URL_KEY]
+init_page(pages.inspect_substrate)
+
+sub_id = current_params()[IdType.SUB]
 substrate: Substrate = Substrate.get_by_id(sub_id)
 
 st.set_page_config(layout="wide", page_title=substrate.label)
@@ -28,7 +32,9 @@ def confirm_deletion_dialog():
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
             substrate.delete_instance(recursive=True)
-            st.switch_page('deleted_sub.py')
+            switch_to_submit_successful(redirect_to=pages.browse_substrates)
+            # st.switch_page(pages.submission_successful,
+            #                query_params={})
 
 
 def on_delete():
@@ -37,8 +43,7 @@ def on_delete():
     else:
         dependent_lib_error()
 
-inspect_page_header('Substrate', substrate.label, on_delete, lambda: None,
-                    pages.browse_substrates)
+inspect_page_header('Substrate', substrate.label, on_delete, lambda: None)
 
 st.divider()
 st.subheader("Layers:")

@@ -20,8 +20,8 @@ from pyparsing import alphanums
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from logic.constants import FILE_STORAGE_PATH, DOMAIN, \
-    LIB_ID_URL_KEY, SUB_ID_URL_KEY, TARGET_ID_URL_KEY, PATTERN_IMAGE_PATH, \
-    ROOM_TEMPERATURE_CELSIUS
+    PATTERN_IMAGE_PATH, \
+    ROOM_TEMPERATURE_CELSIUS, IdType
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
@@ -125,7 +125,7 @@ class Substrate(_BaseModel):
     def url(self):
         page_name = pages.inspect_substrate.url_path
         # noinspection HttpUrlsUsage
-        return f"http://{DOMAIN}/{page_name}?{SUB_ID_URL_KEY}={self.id}"
+        return f"http://{DOMAIN}/{page_name}?{IdType.SUB}={self.id}"
 
     @classmethod
     def from_label(cls, label: str) -> Self:
@@ -213,7 +213,7 @@ class Target(_BaseModel):
     def url(self):
         page_name = pages.inspect_target.url_path
         # noinspection HttpUrlsUsage
-        return f"http://{DOMAIN}/{page_name}?{TARGET_ID_URL_KEY}={self.id}"
+        return f"http://{DOMAIN}/{page_name}?{IdType.TARGET}={self.id}"
 
     def can_be_deleted(self):
         return len(self.uses) == 0
@@ -221,7 +221,7 @@ class Target(_BaseModel):
     def comments(self) -> list[tuple[datetime, str]]:
         return [(state.date, state.comment) # noqa Wrong warning.
                 for state in self.states
-                if state.comment not in {None, ''}]
+                if state.comment]
 
 
 # class Disc(BaseModel):
@@ -437,7 +437,7 @@ class Library(_BaseModel):
     def url(self):
         page_name = pages.inspect_lib.url_path
         # noinspection HttpUrlsUsage
-        return f"http://{DOMAIN}/{page_name}?{LIB_ID_URL_KEY}={self.id}"
+        return f"http://{DOMAIN}/{page_name}?{IdType.LIB}={self.id}"
 
     @staticmethod
     def dependent_libraries():

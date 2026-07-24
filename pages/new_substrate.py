@@ -1,11 +1,14 @@
+from components.streamlit_tools import init_page, switch_to_submit_successful
+from logic.constants import IdType
 from logic.page_list import pages
 from components.forms.new_substrate.sub_forms import RootForm
 import streamlit as st
 
 from logic.lab_modelization.db_models import db, Substrate, SubstrateLayer
-from logic.functions import new_session_state, save_cookies
+from logic.functions import save_cookies
 
-sess = new_session_state(pages.new_substrate)
+
+init_page(pages.new_substrate)
 
 root_form = RootForm()
 substrate_name = root_form.substrate_name
@@ -37,5 +40,9 @@ if st.button("Submit", disabled=not root_form.is_valid, type='primary'):
             substrate.layers.append(layer)
         substrate.save_with_dependent()
 
-    save_cookies(sess)
-    st.switch_page(pages.substrate_added)
+    save_cookies()
+    switch_to_submit_successful(
+        redirect_to=pages.inspect_substrate,
+        id_type=IdType.SUB,
+        object_id=substrate.id,
+    )
