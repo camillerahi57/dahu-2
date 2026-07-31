@@ -1,11 +1,12 @@
 import streamlit as st
 
 from components.forms.new_film_modif.sub_forms import RootForm
-from components.forms.shared2 import PausePageRun
+from components.forms.base_classes import PausePageRun
 from components.streamlit_tools import sess, init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \
     SessionKeys as Sk, IdType
+from logic.db_enums import FilmModifType
 from logic.functions import save_cookies
 from logic.lab_modelization.db_models import (
     db, Film)
@@ -27,6 +28,12 @@ try:
         sess[Ck.LAST_EMAIL_USED] = film_modif.made_by_email
 
         with db.atomic():
+            if film_modif.modif_type == FilmModifType.ION_BEAM_ETCHING:
+                etching = film_modif.ion_beam_etchings[0]
+                pattern = etching.patterns[0] if etching.patterns else None
+                if pattern:
+                    pattern.save_bytes()
+
             film_modif.save_with_dependent()
 
         save_cookies()
@@ -35,14 +42,6 @@ try:
             id_type=IdType.LIB,
             object_id=film.library.id,
         )
-        # st.switch_page(
-        #     page=pages.submission_successful,
-        #     query_params={
-        #         REDIRECT_PATH: pages.inspect_lib.url_path,
-        #         OBJ_TYPE: LIB_ID,
-        #         OBJ_ID: film.library.id,
-        #     }
-        # )
 
 except PausePageRun:
     pass

@@ -3,8 +3,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from random import Random
+from time import sleep
 from typing import Self, get_type_hints, Iterable, Any, final
-from uuid import uuid4
 
 import chemparse
 import plotly.graph_objects as go
@@ -17,11 +17,10 @@ from playhouse.shortcuts import model_to_dict  # noqa
 from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
-from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from logic.constants import FILE_STORAGE_PATH, DOMAIN, \
     PATTERN_IMAGE_PATH, \
-    ROOM_TEMPERATURE_CELSIUS, IdType
+    ROOM_TEMPERATURE_CELSIUS, IdType, USER_UPLOAD_PATH
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
@@ -411,7 +410,6 @@ class Library(_BaseModel):
     last_inspected_at = DateTimeField()
     comment = CharField(null=True)
 
-    uploaded_files: DependentBackref[UserUploadedFile]
     films: DependentBackref[Film]  # Should be a list of exactly 1 element.
 
     # Will add charac refs in the future.
@@ -633,22 +631,43 @@ class TriodeSputtering(_BaseModel):
 
 
 class UserUploadedFile(_BaseModel):
+    label = CharField(null=True)
     file_name = CharField(unique=True)
-    library: Library = ForeignKeyField(Library, on_delete='RESTRICT',
-                              backref='uploaded_files')
     upload_date = DateField()
 
-    def __init__(self, file_name: str, library: Library, *args, **kwargs):
+    file_bytes: bytes = None  # Not in DB.
+
+    def __init__(self, label: str, file_name: str, upload_date: datetime,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    @classmethod
-    def from_streamlit_uploaded_file(
-            cls, upload_field: UploadedFile,
-            library: Library) -> UserUploadedFile:
-        extension = upload_field.name.split('.')[-1]
-        file_name = f'{uuid4()}.{extension}'
-        return cls(file_name=file_name, library=library)
+    def get_path(self):
+        return USER_UPLOAD_PATH.joinpath(self.file_name)
+
+    def delete_file(self):
+        Path.unlink(self.get_path())
+        sleep(.1)
+
+    # @classmethod
+    # def with_file_bytes(cls, label: str, file_name: str,
+    #                     upload_date: datetime, file_bytes: bytes)\
+    #         -> UserUploadedFile:
+    #     extension = file_name.split('.')[-1]
+    #     new_file_name = f'{uuid4()}.{extension}'
+    #     file_db_entity = cls(label=label, file_name=new_file_name,
+    #                          upload_date=upload_date)
+    #     file_db_entity.file_bytes = file_bytes
+    #     return file_db_entity
+
+    def retrieve_file_bytes(self):
+        with open(self.get_path(), 'rb') as file:
+            bytes_ = file.read()
+        self.file_bytes = bytes_
+
+    def save_bytes(self):
+        with open(self.get_path(), 'wb') as file:
+            file.write(self.file_bytes)
 
 
 class FilmModification(_BaseModel):
@@ -673,7 +692,7 @@ class FilmModification(_BaseModel):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    def save(self, shift_subsequent_modifs=True):
+    def save(self, shift_subsequent_modifs=True):  # noqa
         """Saves a film modification with its modif_number, and adds 1 to all
         modif_number attributes of subsequent film modifications."""
         if shift_subsequent_modifs:
@@ -691,7 +710,17 @@ class FilmModification(_BaseModel):
             if modif.modif_number >= self.modif_number:
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
+
+        # Delete pattern:
+        match self.modif_type:
+            case FilmModifType.ION_BEAM_ETCHING:
+                etching = self.ion_beam_etchings[0]
+                if etching.patterns:
+                    pattern = etching.patterns[0]
+                    pattern.delete_file()
+
         super().delete_instance(recursive, delete_nullable)
+
 
     def modification_process(self) \
             -> (Annealing | WetEtching | LiftOff | IonBeamEtching):
@@ -872,24 +901,39 @@ class IonBeamEtching(_BaseModel):
     power = FloatField(null=True)
     pressure = FloatField(null=True)
     has_a_pattern = BooleanField(null=True)
-    pattern_diagram_file_name = CharField(null=True)
 
     film_modif: FilmModification = ForeignKeyField(
         FilmModification, on_delete='RESTRICT', backref='ion_beam_etchings')
+    # pattern: UserUploadedFile = ForeignKeyField(
+    #     UserUploadedFile, on_delete='RESTRICT', null=True)
 
     constituents: DependentBackref[PlasmaConstituent]
+    patterns: DependentBackref[IonEtchingPattern]
 
     def __init__(self, duration: float | None, flow: float | None,
                  incidence_angle: float | None, rotation: float | None,
                  power: float | None, pressure: float | None,
                  has_a_pattern: bool | None,
-                 pattern_diagram_file_name: str | None,
                  film_modif: FilmModification | None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    def image_path(self):
-        return Path(PATTERN_IMAGE_PATH) / str(self.pattern_diagram_file_name)
+    # def save_pattern(self):
+    #     if self.pattern:
+    #         # self.pattern.save_with_dependent()
+    #         self.pattern.save()
+    #         img_path = USER_UPLOAD_PATH.joinpath(self.pattern.file_name)
+    #         with open(img_path, 'wb') as img_file:
+    #             img_file.write(self.pattern.file_bytes)
+
+
+class IonEtchingPattern(UserUploadedFile):
+    etching = ForeignKeyField(IonBeamEtching, backref='patterns')
+
+    def __init__(self, label: str, file_name: str, upload_date: datetime,
+                 etching: IonBeamEtching, *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class PlasmaConstituent(_BaseModel):
@@ -898,7 +942,7 @@ class PlasmaConstituent(_BaseModel):
     etching: IonBeamEtching = ForeignKeyField(
         IonBeamEtching, on_delete='RESTRICT', backref='constituents')
 
-    stoichio: DependentBackref[StoichioElement]
+    nominal_stoichio: DependentBackref[StoichioElement]
 
     def __init__(self, proportion: float, etching: IonBeamEtching,
                  *args, **kwargs):
@@ -907,7 +951,23 @@ class PlasmaConstituent(_BaseModel):
 
     @property
     def stoichio_str(self):
-        return StoichioElement.to_str(self.stoichio)
+        return StoichioElement.to_str(self.nominal_stoichio)
+
+    @classmethod
+    def from_stoichio(cls, stoichio: str, proportion: float,
+                      etching: IonBeamEtching) -> PlasmaConstituent:
+        assert 0 < proportion <= 1
+        constituent = cls(
+            proportion=proportion,
+            etching=etching,
+        )
+        stoichio = StoichioElement.from_str(
+            stoichio,
+            StoichioElement.plasma_constituent,
+            constituent,
+        )
+        constituent.nominal_stoichio = stoichio
+        return constituent
 
 
 class WetEtching(_BaseModel):

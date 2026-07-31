@@ -2,7 +2,7 @@ from enum import StrEnum
 
 import streamlit as st
 
-from components.forms.shared2 import Field, FieldType as Ft
+from components.forms.base_classes import Field, FieldType as Ft
 from logic.constants import CookieKeys as Ck
 from logic.functions import is_valid_email_address
 

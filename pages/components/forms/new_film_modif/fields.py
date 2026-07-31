@@ -2,10 +2,10 @@ from enum import StrEnum
 
 import streamlit as st
 
-from components.forms.shared2 import Field, FieldType as Ft, UnitField
+from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
-    FILM_INIT_STATE
+    FILM_INIT_STATE, EtchingPattern
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement
 from logic.functions import is_valid_email_address
 from logic.lab_modelization.db_models import FilmModification, Patch
@@ -128,7 +128,7 @@ class PressureField(UnitField):
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(f'Pressure ({self.ui_unit:P})',
-                               min_value=0., width=150)
+                               min_value=0., width=150, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ == 0:
@@ -153,7 +153,8 @@ class FlowField(UnitField):
     ui_unit_alias = 'SCCM'
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Flow ({self.ui_unit_alias})', min_value=0., )
+        return st.number_input(f'Flow ({self.ui_unit_alias})', min_value=0.,
+                               value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ == 0:
@@ -166,7 +167,8 @@ class AngleField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Angle ({self.ui_unit:P})', )
+        return st.number_input(f'Angle ({self.ui_unit:P})',
+                               value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
@@ -177,7 +179,25 @@ class RotationField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Rotation ({self.ui_unit:P})', )
+        return st.number_input(f'Rotation ({self.ui_unit:P})',
+                               value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class HasPatternField(Field):
+    type = Ft.MANDATORY
+
+    class Option(StrEnum):
+        YES = 'Yes'
+        NO = 'No'
+
+    def _streamlit_input(self, prefill: str, key):
+        options = list(self.Option)
+        index = options.index(prefill) if prefill else None
+        return st.radio('Has a pattern', options, horizontal=True,
+                        index=index)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
@@ -187,13 +207,21 @@ class PatternField(Field):
     type = Ft.ADVISED
 
     def _streamlit_input(self, prefill, key: str):
-        options = ['pattern_2025_02_19.png']
-        return st.selectbox('Pattern', options=options,
-                            )
+        return st.selectbox('Pattern', options=list(EtchingPattern))
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None or input_ == '':
             return False, 'Please select a pattern.'
+        return True, ''
+
+
+class PatternLabelField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.text_input("Pattern Label", value=prefill, max_chars=50)
+
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 
@@ -216,7 +244,8 @@ class PowerField(UnitField):
     ui_unit = ur.watt
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Power ({self.ui_unit:P})', min_value=0., )
+        return st.number_input(f'Power ({self.ui_unit:P})', min_value=0.,
+                               value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None or input_ <= 0.:
@@ -298,7 +327,7 @@ class IsRoomTemperatureField(Field):
 
 
 class PlasmaFormulaField(Field):
-    type = Ft.ADVISED
+    type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
         return st.text_input('Formula',
@@ -333,11 +362,11 @@ class AcidProportionField(Field):
 
 
 class PlasmaProportionField(Field):
-    type = Ft.ADVISED
+    type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(
-            'Proportion (will be normalized)', min_value=0., value=1,
+            'Proportion (will be normalized)', min_value=0., value=1.,
             key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -347,7 +376,7 @@ class PlasmaProportionField(Field):
 
 
 class ConstituentCountField(Field):
-    type = Ft.ADVISED
+    type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input('Number of constituents', value=1,
@@ -356,4 +385,16 @@ class ConstituentCountField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ < 1:
             return False, 'There must be at least 1 constituent.'
+        return True, ''
+
+
+class IonDurationField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.minutes
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Duration ({self.ui_unit:P})', min_value=0,
+                               value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''

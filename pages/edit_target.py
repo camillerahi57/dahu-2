@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.forms.new_target.sub_forms import BasicInfoForm
-from components.forms.shared2 import PausePageRun
+from components.forms.base_classes import PausePageRun
 from components.streamlit_tools import init_page, sess, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \

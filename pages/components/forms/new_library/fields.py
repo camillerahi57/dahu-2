@@ -1,6 +1,6 @@
 import streamlit as st
 
-from components.forms.shared2 import Field, FieldType as Ft, UnitField
+from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from logic.constants import CookieKeys as Ck, SessionKeys as Sk
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, MagnetronMachineModel

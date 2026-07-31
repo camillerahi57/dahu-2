@@ -47,7 +47,7 @@ class Field(ABC):
 
     @property
     def is_filled(self) -> bool:
-        return self._input
+        return self._input not in {'', None}
 
     @abstractmethod
     def _streamlit_input(self, prefill, key: str):

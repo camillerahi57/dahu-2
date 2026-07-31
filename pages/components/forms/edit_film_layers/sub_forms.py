@@ -3,7 +3,7 @@ import streamlit as st
 from components.forms.new_library.fields import ConfirmOrderField
 from components.forms.new_library.sub_forms import TargetListForm, \
     LayerListForm
-from components.forms.shared2 import Form
+from components.forms.base_classes import Form
 from logic.lab_modelization.db_models import Film
 
 

@@ -15,7 +15,7 @@ from components.forms.new_target.fields import MadeAtField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from components.forms.shared2 import Form, PausePageRun
+from components.forms.base_classes import Form, PausePageRun
 from components.pixel_helper import pixel_helper_button
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH

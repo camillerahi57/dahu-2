@@ -36,7 +36,7 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  TargetChoiceField,
                                                  ConfirmOrderField,
                                                  IsCoSputteringField)
-from components.forms.shared2 import Form, PausePageRun
+from components.forms.base_classes import Form, PausePageRun
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem

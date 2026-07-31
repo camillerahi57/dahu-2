@@ -4,7 +4,7 @@ from components.forms.new_substrate.fields import (HasCrystalOrientationField,
                                                    HField, \
     KField, LField, StoichiometryField, ThicknessField, LayerCountField, \
     SubstrateNameField, CommentField)
-from components.forms.shared2 import Form
+from components.forms.base_classes import Form
 
 
 class CrystalOrientationForm(Form):

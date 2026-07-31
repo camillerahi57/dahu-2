@@ -1,4 +1,3 @@
-import keyboard
 import streamlit as st
 from pandas import DataFrame
 
@@ -10,8 +9,8 @@ from logic.components import inspect_page_header
 from logic.constants import SessionKeys as Sk, DOMAIN, IdType
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
-    Library, Film, Substrate, FilmModification,\
-    Annealing, IonBeamEtching, WetEtching)
+    Library, Film, Substrate, FilmModification, \
+    Annealing, IonBeamEtching, WetEtching, db)
 from logic.functions import link_html, email_html
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -69,8 +68,9 @@ MODIF_NAMES = {
 
 @st.dialog('Modification Process')
 def film_modif_info(modif_: FilmModification):
-    st.write(f"**Made on**: {modif_.made_on}\n\n"
-             f"**Made by**: {modif_.made_by_email}")
+    st.write(f"**Made on**&ensp;{modif_.made_on}&ensp;**by**&ensp;"
+             f"{modif_.made_by_email}.\n\n"
+             f"**Comment**: {modif_.comment}")
     process = modif_.modification_process()
 
     if isinstance(process, Annealing):
@@ -79,16 +79,13 @@ def film_modif_info(modif_: FilmModification):
                  f"**Furnace:** {process.furnace}")
         st.plotly_chart(process.get_figure())
 
-    # elif isinstance(process, Patterning):
-    #     st.write(f"**Diagram name:** {process.diagram_file_name}")
-    #     st.image(process.image_path())
-
     elif isinstance(process, IonBeamEtching):
-        st.write(f"**Duration:** {process.duration}\n\n"
-                 f"**Flow:** {process.flow}\n\n"
-                 f"**Incidence angle:** {process.incidence_angle}\n\n"
-                 f"**Rotation:** {process.rotation}\n\n"
-                 f"**Power:** {process.power}\n\n"
+        st.write(f"**Duration:** {process.duration} &ensp; · &ensp;"
+                 f"**Flow:** {process.flow} &ensp; · &ensp;"
+                 f"**Incidence angle:** "
+                 f"{process.incidence_angle} &ensp; · &ensp;"
+                 f"**Rotation:** {process.rotation} &ensp; · &ensp;"
+                 f"**Power:** {process.power} &ensp; · &ensp;"
                  f"**Pressure:** {process.pressure}")
         constituents = process.constituents
         proportion_sum = sum(const.proportion for const in constituents)
@@ -97,6 +94,10 @@ def film_modif_info(modif_: FilmModification):
             percent = const.proportion / proportion_sum * 100
             constituents_str += f"\n- {const.stoichio_str}: {percent:g}%"
         st.write(f"**Plasma constituents:**{constituents_str}")
+        if process.patterns:
+            pattern = process.patterns[0]
+            pattern.retrieve_file_bytes()
+            st.image(pattern.file_bytes, width=500)
 
     elif isinstance(process, WetEtching):
         st.write(f"**Recipe:** {process.recipe_file_name}")
@@ -113,7 +114,8 @@ def film_modif_info(modif_: FilmModification):
 
     st.divider()
     if st.button("Delete film modification ❌"):
-        modif_.delete_instance(recursive=True)
+        with db.atomic():
+            modif_.delete_instance(recursive=True)
         st.rerun()
 
 def card(label_: str):
@@ -188,11 +190,6 @@ with col2:
         st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                  unsafe_allow_html=True)
         with st.container(horizontal_alignment='right'):
-            # if st.button("✏️ Edit layers"):
-            #     st.switch_page(
-            #         pages.edit_film_layers,
-            #         query_params={IdType.FILM: film.id}
-            #     )
             switch_button(pages.edit_film_layers, label="✏️ Edit layers",
                           q_params={IdType.FILM: film.id})
         st.write(f"**Layers**:")

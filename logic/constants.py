@@ -22,6 +22,11 @@ RESOURCE_TYPE = 'object_type'
 OBJ_ID = 'object_id'
 DB_UNIT_SYSTEM = 'SI'
 ROOM_TEMPERATURE_CELSIUS = 20
+USER_UPLOAD_PATH = Path('user_uploads')
+
+
+class EtchingPattern(StrEnum):
+    pattern_2025_02_19 = 'pattern_2025_02_19.png'
 
 
 class CookieKeys(StrEnum):
@@ -46,9 +51,13 @@ class SessionKeys(StrEnum):
     CURRENT_PATH = 'current_path_key'
     CROPPED_TARGET_IMG = 'cropped_target_key'
     UPLOADED_TARGET_IMG = 'uploaded_target_key'
+    UPLOADED_FILE = 'uploaded_diagram_key'
     TARGET_IMG_NAME = 'target_img_name_key'
     CROPPED_PIC = 'cropped_pic_key'
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
+    FILE_NAME = 'pattern_label_key'
+    UPLOADED_AT = 'uploaded_at_key'
+    USE_DEFAULT_PATTERN = 'use_default_pattern_key'
     PREVIOUS_PIXEL_COORDS = 'previous_pixel_coords_key'
     SELECTED_TARGETS = 'selected_targets_key'
     INSPECT_OBJ_ID = 'switch_page_request_lib_id_key'

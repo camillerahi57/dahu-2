@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.forms.new_library.sub_forms import FilmInfoForm
-from components.forms.shared2 import PausePageRun
+from components.forms.base_classes import PausePageRun
 from components.streamlit_tools import init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import IdType

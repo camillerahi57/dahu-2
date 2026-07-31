@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import streamlit as st
 
-from components.forms.shared2 import Field, FieldType as Ft, UnitField
+from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from logic.constants import CookieKeys as Ck, NEW_TARGET
 from logic.db_enums import ShapeType
 from logic.functions import is_valid_email_address
@@ -253,13 +253,12 @@ class PhotoUploadField(Field):
 
     def _streamlit_input(self, prefill, key):
         return st.file_uploader("Select target photo",
-                                type=["jpg", "png"])
+                                type=["jpg", "png", "svg"])
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None:
             return False, 'Please upload an image file.'
-        else:
-            return True, ''
+        return True, ''
 
     def new_file_name(self):
         extension = self._input.name.split('.')[-1]
