@@ -125,20 +125,6 @@ class MadeByField(Field):
             return False, 'Please enter a valid email address.'
         return True, ''
 
-#
-# class UploadField(Field):
-#     type = Ft.OPTIONAL
-#
-#     def _streamlit_input(self, prefill=None):
-#         return st.file_uploader("Upload any file related to this library.",
-#                                 accept_multiple_files=True)
-#
-#     def _validate(self) -> tuple[bool, str]:
-#         if self.value is None:
-#             return False, 'Please upload a zip file.'
-#         else:
-#             return True, ''
-
 
 class SubstrateField(Field):
     type = Ft.MANDATORY

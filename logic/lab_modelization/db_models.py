@@ -26,7 +26,7 @@ from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
 from logic.functions import letter_count
-from logic.lab_modelization.classes import MixtureConstituent
+from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
 from logic.python_tools import remove_digits, remove_random_prefix
@@ -50,7 +50,10 @@ type Backref[T] = list[T]
 
 
 class _BaseModel(Model):
-    id: int|IntegerField
+    id: int | IntegerField
+
+    # A list of attributes with title, corresponding attribute and input field.
+    title_db_value_input_fields: list[tuple[str, Any, type]] = None
 
     class Meta:
         database = db
@@ -90,6 +93,21 @@ class _BaseModel(Model):
             new_objects = self.__getattribute__(fld_name)
             objects += list(new_objects)
         return objects
+
+    def data_string(self, separator='\n\n'):
+        from components.forms.base_classes import UnitField
+        if self.title_db_value_input_fields is None:
+            raise RuntimeError('self.title_db_value_input_fields is not set.')
+        description_items = []
+        for title, db_value, field in self.title_db_value_input_fields:
+            try:
+                field: UnitField
+                quantity_str = field.db_to_ui_str(db_value) \
+                    if db_value is not None else '_None_'
+            except AttributeError:
+                quantity_str = db_value if db_value is not None else '_None_'
+            description_items.append(f"**{title}:** {quantity_str}")
+        return separator.join(description_items)
 
 
 class Substrate(_BaseModel):
@@ -140,7 +158,7 @@ class SubstrateLayer(_BaseModel):
     l = IntegerField(null=True)
     position_from_back = IntegerField()
     substrate: Substrate = ForeignKeyField(Substrate, on_delete='RESTRICT',
-                                backref='layers')
+                                           backref='layers')
 
     stoichio: DependentBackref[StoichioElement]
 
@@ -172,7 +190,7 @@ class SubstrateLayer(_BaseModel):
 class Target(_BaseModel):
     made_on = DateField()
     made_by_email = CharField()
-    label: str|ForeignKeyField = CharField(unique=True)
+    label: str | ForeignKeyField = CharField(unique=True)
     previous_version: Target = ForeignKeyField(
         'self', null=True, on_delete='SET NULL', backref='next_version')
 
@@ -201,8 +219,8 @@ class Target(_BaseModel):
 
     def old_to_recent_states(self) -> list[DeteriorationState]:
         return list(DeteriorationState.select()
-                .where(DeteriorationState.target == self)
-                .order_by(DeteriorationState.date.asc()))
+                    .where(DeteriorationState.target == self)
+                    .order_by(DeteriorationState.date.asc()))
 
     @classmethod
     def from_label(cls, label: str) -> Self:
@@ -220,7 +238,7 @@ class Target(_BaseModel):
         return len(self.uses) == 0
 
     def comments(self) -> list[tuple[datetime, str]]:
-        return [(state.date, state.comment) # noqa Wrong warning.
+        return [(state.date, state.comment)  # noqa Wrong warning.
                 for state in self.states
                 if state.comment]
 
@@ -482,15 +500,19 @@ class Film(_BaseModel):
     def ordered_modifs(self) -> list[FilmModification]:
         modifs = FilmModification.select().where(
             FilmModification.film == self)
+
         def get_modif_count(fm: FilmModification):
             return int(fm.modif_number)  # noqa
+
         return sorted(list(modifs), key=get_modif_count)
 
     @property
     def ordered_layers(self) -> list[FilmLayer]:
         layers = [l for l in self.layers]
+
         def position(layer: FilmLayer):
             return layer.position_from_buffer
+
         return sorted(layers, key=position)
 
     @property
@@ -550,7 +572,7 @@ class FilmLayer(_BaseModel):
         return str_
 
     @property
-    def sputtering(self) -> MagnetronSputtering|TriodeSputtering:
+    def sputtering(self) -> MagnetronSputtering | TriodeSputtering:
         mag_sputters = self.magnetron_sputterings
         triode_sputters = self.triode_sputterings
         if len(mag_sputters) + len(triode_sputters) != 1:
@@ -575,7 +597,7 @@ class MagnetronSputtering(_BaseModel):
     machine_model: MagnetronMachineModel = CharField(null=True)
 
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='magnetron_sputterings')
+                                            backref='magnetron_sputterings')
 
     def __init__(self, deposit_distance: float | None,
                  deposit_angle: float | None,
@@ -585,6 +607,20 @@ class MagnetronSputtering(_BaseModel):
                  film_layer: FilmLayer, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    @property
+    def title_db_value_input_fields(self):
+        from components.forms.new_library.fields import DepositDistanceField, \
+            DepositAngleField, DepositPowerField, DepositDurationField, \
+            MagnetronGeneratorField, MagnetronModelField
+        return [
+            ('Deposit distance', self.deposit_distance, DepositDistanceField),
+            ('Deposit angle', self.deposit_angle, DepositAngleField),
+            ('Power', self.deposit_power, DepositPowerField),
+            ('Duration', self.deposit_duration, DepositDurationField),
+            ('Generator', self.generator, MagnetronGeneratorField),
+            ('Machine model', self.machine_model, MagnetronModelField),
+        ]
 
 
 class TriodeSputtering(_BaseModel):
@@ -604,7 +640,7 @@ class TriodeSputtering(_BaseModel):
     presputtering_thickness = FloatField(null=True)
 
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='triode_sputterings')
+                                            backref='triode_sputterings')
 
     def __init__(self,
                  has_active_cooling: bool | None,
@@ -631,13 +667,44 @@ class TriodeSputtering(_BaseModel):
     def deposit_power(self) -> float:
         return None  # noqa TODO Can we define a power for triode?
 
+    @property
+    def title_db_value_input_fields(self):
+        from components.forms.new_library.fields import (
+            HasActiveCoolingField, RotationSpeedField,
+            FilamentCurrentStartField, FilamentCurrentEndField,
+            AnodeCurrentField, AnodeVoltageField, CathodeCurrentField,
+            CathodeVoltageField, DepositRateField, ArgonFlowField,
+            NitrogenFlowField, PressureField, DepositDurationField,
+            PresputteringThicknessField
+        )
+        return [
+            ('Has active cooling', self.has_active_cooling,
+                HasActiveCoolingField),
+            ('Rotation speed', self.rotation_speed, RotationSpeedField),
+            ('Filament current start', self.filament_current_start,
+                FilamentCurrentStartField),
+            ('Filament current end', self.filament_current_end,
+                FilamentCurrentEndField),
+            ('Anode current', self.anode_current, AnodeCurrentField),
+            ('Anode voltage', self.anode_voltage, AnodeVoltageField),
+            ('Cathode current', self.cathode_current, CathodeCurrentField),
+            ('Cathode voltage', self.cathode_voltage, CathodeVoltageField),
+            ('Deposit rate', self.deposit_rate, DepositRateField),
+            ('Argon flow', self.argon_flow, ArgonFlowField),
+            ('Nitrogen flow', self.nitrogen_flow, NitrogenFlowField),
+            ('Pressure', self.pressure, PressureField),
+            ('Deposit duration', self.deposit_duration, DepositDurationField),
+            ('Presputtering thickness', self.presputtering_thickness,
+                PresputteringThicknessField),
+        ]
+
 
 class UserUploadedFile(_BaseModel):
     label: str = CharField(null=True)
     file_name: str = CharField(unique=True)
     upload_date = DateField()
 
-    _file_bytes: bytes|None = None  # Not in DB.
+    _file_bytes: bytes | None = None  # Not in DB.
 
     def __init__(self, label: str, file_name: str, upload_date: datetime,
                  *args, **kwargs):
@@ -755,8 +822,6 @@ class FilmModification(_BaseModel):
             )
 
 
-
-
 class Annealing(_BaseModel):
     pressure = FloatField(null=True)
     pumping_duration = FloatField(null=True)
@@ -785,6 +850,7 @@ class Annealing(_BaseModel):
     def ordered_steps(self):
         def key(step: AnnealingStep):
             return step.timestamp
+
         return sorted(self.steps, key=key)
 
     def save(self, *args, **kwargs):
@@ -824,11 +890,11 @@ class AnnealingStep(_BaseModel):
     is_room_temperature: bool = BooleanField()
 
     annealing: Annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
-                                backref='steps')
+                                           backref='steps')
 
     atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self, timestamp: float, temperature: float|None,
+    def __init__(self, timestamp: float, temperature: float | None,
                  is_room_temperature: bool, annealing: Annealing,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -1316,7 +1382,7 @@ class Vertex(_BaseModel):
 class TargetUse(_BaseModel):
     target: Target = ForeignKeyField(Target, backref='uses')
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                 backref='target_uses')
+                                            backref='target_uses')
 
     def __init__(self, target: Target, film_layer: FilmLayer, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -1329,22 +1395,22 @@ class StoichioElement(_BaseModel):
     position_in_str = IntegerField()
     element: ChemicalElement = CharField()
 
-    substrate_layer: SubstrateLayer|ForeignKeyField = ForeignKeyField(
+    substrate_layer: SubstrateLayer | ForeignKeyField = ForeignKeyField(
         SubstrateLayer, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    patch: Patch|ForeignKeyField = ForeignKeyField(
+    patch: Patch | ForeignKeyField = ForeignKeyField(
         Patch, null=True, on_delete='RESTRICT',
         backref='stoichio')
-    film_layer: FilmLayer|ForeignKeyField = ForeignKeyField(
+    film_layer: FilmLayer | ForeignKeyField = ForeignKeyField(
         FilmLayer, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
-    annealing_step: AnnealingStep|ForeignKeyField = ForeignKeyField(
+    annealing_step: AnnealingStep | ForeignKeyField = ForeignKeyField(
         AnnealingStep, null=True, on_delete='RESTRICT',
         backref='atmosphere')
-    acid_constituent: AcidConstituent|ForeignKeyField = ForeignKeyField(
+    acid_constituent: AcidConstituent | ForeignKeyField = ForeignKeyField(
         AcidConstituent, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
-    plasma_constituent: PlasmaConstituent|ForeignKeyField = ForeignKeyField(
+    plasma_constituent: PlasmaConstituent | ForeignKeyField = ForeignKeyField(
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')
 

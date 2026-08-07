@@ -1,12 +1,14 @@
 import streamlit as st
 from pandas import DataFrame
 
+from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
 from components.forms.base_classes import UnitField
 from components.forms.new_film_modif.fields import PressureField, \
     IonDurationField, FlowField, AngleField, RotationField, PowerField, \
     HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField, \
     UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField
 from components.forms.new_library.fields import DepositTempField
+from components.inspect_film_layer import show_film_layer
 from components.streamlit_tools import (
     sess, init_page, current_params, switch_button, switch_to_submit_successful,
 )
@@ -16,7 +18,8 @@ from logic.db_enums import FilmModifType
 from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching)
+    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching,
+    FilmLayer)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -198,12 +201,11 @@ def film_modif_info(modif_: FilmModification):
             modif_.delete_instance(recursive=True)
         st.rerun()
 
-def card(label_: str):
+def charac_card(label_: str):
     with st.container(border=True, horizontal_alignment='center'):
         st.space()
         st.subheader(label_, text_alignment='center')
         st.space()
-
 
 inspect_page_header('Library', lib.label, on_delete, None)
 st.write(
@@ -239,12 +241,12 @@ with col1:
             st.markdown(link_html(label, url), unsafe_allow_html=True,
                         text_alignment='center')
             st.space()
-        card('MOKE')
-        card('PROFILO')
+        charac_card('MOKE')
+        charac_card('PROFILO')
     with st.container(horizontal=True, vertical_alignment='center'):
-        card('X-RAY')
-        card('MOKE-2')
-        card('EDX')
+        charac_card('X-RAY')
+        charac_card('MOKE-2')
+        charac_card('EDX')
 
 with col2:
     with st.container(border=True):
@@ -265,10 +267,26 @@ with col2:
         with st.container(horizontal_alignment='right'):
             switch_button(pages.edit_film_layers, label="✏️ Edit layers",
                           q_params={IdType.FILM: film.id})
+
         st.write(f"**Layers**:")
+
+        col_conf = st.column_config
+        column_config = {
+            ColName.function: col_conf.TextColumn(width='small'),
+            ColName.nominal_stoichio: col_conf.TextColumn(width='small'),
+            ColName.details: col_conf.ButtonColumn(
+                'Details', width='small', on_click=show_film_layer,
+                key=INSPECT_BUTTON_KEY, args=[layers]),
+            ColName.deposit_temp: col_conf.NumberColumn(width='small'),
+            ColName.deposit_duration: col_conf.NumberColumn(width='small'),
+            ColName.deposit_power: col_conf.NumberColumn(width='small'),
+        }
+
         table_rows = [
             {
+                ColName.function: lay.function,
                 ColName.nominal_stoichio: lay.nominal_stoichio_str,
+                ColName.details: 'Details',
                 ColName.deposit_temp:
                     DepositTempField.to_ui_unit(lay.deposit_temp)[0],
                 ColName.deposit_duration: lay.sputtering.deposit_duration,
@@ -276,4 +294,5 @@ with col2:
             }
             for lay in layers
         ]
-        st.dataframe(DataFrame(table_rows), hide_index=True, )
+        st.dataframe(DataFrame(table_rows), hide_index=True,
+                     column_config=column_config)

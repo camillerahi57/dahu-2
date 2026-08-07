@@ -121,8 +121,7 @@ class StoichioOf(StrEnum):
 
 
 class MagnetronMachineModel(StrEnum):
-    MODEL_1 = 'model_1'
-    MODEL_2 = 'model_2'
+    DP850 = 'Allianceconcept_DP850'
 
 
 class ChemicalElement(StrEnum):

@@ -164,9 +164,6 @@ class Form(ABC):
         raise NotImplementedError
 
 
-
-
-
 class FileUploadField(Field):
     type = FieldType.OPTIONAL
 
