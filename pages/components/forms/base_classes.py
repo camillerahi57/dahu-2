@@ -1,10 +1,15 @@
 from abc import abstractmethod, ABC
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
 import streamlit as st
 from pint.registry import Unit
 
+from components.streamlit_tools import sess
+from logic.constants import SessionKeys as Sk
+from logic.lab_modelization.db_models import UserUploadedFile
+from logic.python_tools import add_random_prefix
 from logic.units import to_db_unit, from_db_unit, ur
 
 
@@ -74,7 +79,8 @@ class UnitField(Field):
     def __init__(self, key: str|int = 'default_key', *, form_default,
                  db_default=None):
         if db_default is not None:
-            db_default = from_db_unit(db_default, target_unit=self.ui_unit)
+            db_default = from_db_unit(
+                db_default, target_unit=self.ui_unit).magnitude
         super().__init__(
             key=key,
             form_default=form_default,
@@ -86,21 +92,44 @@ class UnitField(Field):
     def ui_unit(self) -> Unit:
         raise NotImplementedError
 
+    ui_unit_alias: str = None
+
+    @property
+    def value(self) -> Any:
+        raise RuntimeError("`value` for a field that has a unit is ambiguous.")
+
     @property
     def in_db_unit(self) -> float|None:
         """Returns value but with DB unit if not None,else None."""
-        if self.value is None:
+        if super().value is None:
             return None
-        elif isinstance(self.value, int) or isinstance(self.value, float):
-            as_ui_unit = ur.Quantity(self.value, self.ui_unit)
+        elif isinstance(super().value, int) or isinstance(super().value, float):
+            as_ui_unit = ur.Quantity(super().value, self.ui_unit)
             return to_db_unit(as_ui_unit)
         else:
-            raise ValueError(f"Type {type(self.value)} cannot have a unit.")
+            raise ValueError(f"Type {type(super().value)} cannot have a unit.")
 
     @property
     def in_ui_unit(self) -> float|None:
         """Returns value but with DB unit if not None,else None."""
-        return self.value
+        return super().value
+
+    @classmethod
+    def to_ui_unit(cls, from_db: float|None) -> tuple[float|None, str|None]:
+        if from_db is None:
+            return None, None
+        ui_quantity = from_db_unit(from_db, cls.ui_unit)  # noqa Wrong warning.
+        if cls.ui_unit_alias:
+            unit_str = cls.ui_unit_alias
+        else:
+            unit_str = f'{cls.ui_unit}'
+
+        return ui_quantity.magnitude, unit_str
+
+    @classmethod
+    def db_to_ui_str(cls, from_db: float) -> str:
+        ui_value, unit_str = cls.to_ui_unit(from_db)
+        return f'{ui_value:.3g} {unit_str}'
 
 
 class Form(ABC):
@@ -133,6 +162,97 @@ class Form(ABC):
     @abstractmethod
     def _is_coherent(self) -> tuple[bool, str]:
         raise NotImplementedError
+
+
+
+
+
+class FileUploadField(Field):
+    type = FieldType.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.file_uploader('Select a file', key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ is None:
+            return False, 'Please upload a file.'
+        return True, ''
+
+
+class FileUploadForm(Form):
+    def __init__(self, default_file: UserUploadedFile|None,
+                 key: str = 'default_key'):
+        upload_fld = None
+
+        if Sk.USE_DEFAULT_FILE+key not in sess:
+            sess[Sk.USE_DEFAULT_FILE+key] = True
+
+        if default_file and sess[Sk.USE_DEFAULT_FILE+key]:
+            file_bytes = default_file.file_bytes
+            sess[Sk.UPLOADED_FILE+key] = file_bytes
+            sess[Sk.FILE_NAME+key] = default_file.file_name
+            sess[Sk.UPLOADED_AT+key] = default_file.upload_date
+
+        with st.container(horizontal=True):
+            if Sk.UPLOADED_FILE+key in sess:
+                with st.container(border=True, width='content',
+                                  horizontal=True):
+                    st.write(sess[Sk.FILE_NAME+key])
+                    if st.button('❌ Delete file', key=key):
+                        del sess[Sk.UPLOADED_FILE+key]
+                        sess[Sk.USE_DEFAULT_FILE+key] = False
+                        st.rerun()
+
+            else:
+                upload_fld = FileUploadField(key=key, form_default=None)
+                if upload_fld.value:
+                    sess[Sk.UPLOADED_FILE+key] = upload_fld.value.read()
+                    sess[Sk.FILE_NAME+key] = upload_fld.value.name
+                    sess[Sk.UPLOADED_AT+key] = datetime.now()
+                    st.rerun()
+
+            if Sk.UPLOADED_FILE+key in sess:
+                label_fld = FileLabelField(
+                    key=key,
+                    form_default='',
+                    db_default=default_file.label if default_file else None,
+                )
+            else:
+                label_fld = None
+
+        self.file_name = sess.get(Sk.FILE_NAME+key)
+        self.file_provided = bool(self.file_name)
+        self.label = label_fld.value if label_fld else ''
+        self.file_bytes = sess.get(Sk.UPLOADED_FILE+key)
+        self.upload_date = sess.get(Sk.UPLOADED_AT+key)
+        super().__init__(fields=[upload_fld, label_fld], sub_forms=[])
+
+    def _is_coherent(self) -> tuple[bool, str]:
+        return True, ''
+
+    def to_user_upload(self) -> UserUploadedFile:
+        if not self.is_valid:
+            raise PausePageRun
+        assert self.label and self.upload_date, "No file provided."
+
+        upload = UserUploadedFile(
+            label=self.label,
+            file_name=add_random_prefix(self.file_name),
+            upload_date=self.upload_date,
+        )
+        upload.file_bytes = self.file_bytes
+        return upload
+
+
+class FileLabelField(Field):
+    type = FieldType.MANDATORY
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.text_input("File Label", value=prefill, max_chars=50, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
 
 
 class PausePageRun(Exception):

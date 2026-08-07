@@ -4,7 +4,7 @@ import re
 from datetime import date as dt_date
 from pathlib import Path
 from time import sleep
-from uuid import uuid4
+from logic.python_tools import rand_str
 
 import PIL
 import numpy as np
@@ -148,25 +148,10 @@ def is_valid_email_address(email_address: str) -> bool:
     return match is not None
 
 
-def store_file(file_data: bytes, file_name: str = None) -> Path:
-    if file_name is None:
-        file_name = str(uuid4())
-    file_path = FILE_STORAGE_PATH / file_name
-    with open(file_path, "wb") as f:
-        f.write(file_data)
-    return file_path
-
-
 def replace_file_name_extension(name: str, new_extension: str):
     new_extension = new_extension.removeprefix('.')
     parts = name.split(".")
     parts[-1] = new_extension
-    return ".".join(parts)
-
-
-def remove_file_name_extension(name: str):
-    parts = name.split(".")
-    parts.pop()
     return ".".join(parts)
 
 

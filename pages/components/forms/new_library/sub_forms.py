@@ -219,7 +219,7 @@ class LayerIntroForm(Form):
             )
 
         self.deposit_temp = deposit_temp_fld.in_db_unit
-        self.nominal_thickness = nominal_thickness_fld.value
+        self.nominal_thickness = nominal_thickness_fld.in_db_unit
         self.shadow_mask_descr = shadow_mask_fld.value
         self.nominal_stoichio = nominal_stoichio_fld.value
         self.layer_function = layer_function_fld.value

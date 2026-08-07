@@ -1,19 +1,24 @@
 import streamlit as st
 from pandas import DataFrame
 
-from components.forms.new_film_modif.fields import PressureField
+from components.forms.base_classes import UnitField
+from components.forms.new_film_modif.fields import PressureField, \
+    IonDurationField, FlowField, AngleField, RotationField, PowerField, \
+    HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField, \
+    UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField
+from components.forms.new_library.fields import DepositTempField
 from components.streamlit_tools import (
-    sess, init_page, current_params, switch_button, switch_to_submit_successful)
-from logic.page_list import pages
+    sess, init_page, current_params, switch_button, switch_to_submit_successful,
+)
 from logic.components import inspect_page_header
 from logic.constants import SessionKeys as Sk, DOMAIN, IdType
 from logic.db_enums import FilmModifType
+from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    Annealing, IonBeamEtching, WetEtching, db)
-from logic.functions import link_html, email_html
+    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching)
+from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
-
 
 init_page(pages.inspect_lib)
 lib_id = current_params()[IdType.LIB]
@@ -37,6 +42,86 @@ def dependent_lib_error(lib_: Library):
     for lib_ in libs:
         markdown += f"\n- [{lib_.label}]({lib_.url()})"
     st.error(markdown)
+
+
+def etching_base_info(etching: Etching):
+    with st.container(horizontal=True, vertical_alignment='center'):
+        has_pattern_str = 'Yes' if etching.has_a_pattern else 'No'
+        st.write(f"**Has a pattern**: {has_pattern_str}.")
+        if etching.patterns:
+            etching.patterns[0].download_bttn()
+        else:
+            if etching.has_a_pattern:
+                st.write('No pattern found.')
+
+    with st.container(horizontal=True, vertical_alignment='center'):
+        st.write(f"**Recipe:**")
+        if etching.recipes:
+            etching.recipes[0].download_bttn()
+        else:
+            st.write('No recipe found.')
+
+
+def ion_beam_etch_info(process: IonBeamEtching):
+    title_db_value_input_fields: list[tuple[str, float, type[UnitField]]] = [
+        # Tuple of a title, the value from the DB, and the UI field it's
+        # been entered through (because we want to show the value with
+        # the same unit as the input unit).
+        ('Duration', process.duration, IonDurationField),
+        ('Flow', process.flow, FlowField),
+        ('Incidence angle', process.incidence_angle, AngleField),
+        ('Rotation', process.rotation, RotationField),
+        ('Power', process.power, PowerField),
+        ('Pressure', process.pressure, PressureField),
+    ]
+    description_items = []
+    for title, db_value, field in title_db_value_input_fields:
+        quantity_str = field.db_to_ui_str(db_value) if db_value is not None \
+            else '_None_'
+        description_items.append(f"**{title}:** {quantity_str}")
+    st.write(' &ensp; · &ensp;'.join(description_items))
+
+    constituents = process.constituents
+    proportion_sum = sum(const.proportion for const in constituents)
+    constituents_str = ''
+    for const in constituents:
+        percent = const.proportion / proportion_sum * 100
+        constituents_str += f"\n- {const.stoichio_str}: {percent:g}%"
+    st.write(f"**Plasma constituents:**{constituents_str}")
+
+
+def wet_etch_info(process: WetEtching):
+    title_db_value_input_fields: list[tuple[str, float, type[UnitField]]] = [
+        # Tuple of a title, the value from the DB, and the UI field it's
+        # been entered through (because we want to show the value with
+        # the same unit as the input unit).
+        ('Hard bake temperature', process.hard_bake_temperature,
+            HardBakeTempField),
+        ('Duration', process.duration, AcidEtchingDurationField),
+        ('Used ultrasound', process.used_ultrasound, UsedUltrasoundField),
+        ('Ultrasound config', process.ultrasound_config, UltrasoundConfigField),
+        ('Etching depth speed', process.acid_etching_depth_speed,
+            EtchingDepthSpeedField),
+        ('Etching lateral speed', process.acid_etching_lateral_speed,
+            EtchingLateralSpeedField),
+    ]
+    description_items = []
+    for title, db_value, field in title_db_value_input_fields:
+        if isinstance(field, UnitField):
+            quantity_str = field.db_to_ui_str(db_value) if db_value is not None\
+                else '_None_'
+        else:
+            quantity_str = db_value if db_value is not None else '_None_'
+        description_items.append(f"**{title}:** {quantity_str}")
+    st.write(' &ensp; · &ensp;'.join(description_items))
+
+    constituents = process.constituents
+    proportion_sum = sum(const.proportion for const in constituents)
+    constituents_str = ''
+    for const in constituents:
+        percent = const.proportion / proportion_sum * 100
+        constituents_str += f"- {const.stoichio_str}: {percent:g}%\n\n"
+    st.write(f"**Acid constituents:**\n\n{constituents_str}")
 
 
 @st.dialog(title="Confirm")
@@ -66,55 +151,50 @@ MODIF_NAMES = {
     FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
 }
 
+
+def annealing_info(process: Annealing):
+    if process.pressure is not None:
+        pressure_str = PressureField.db_to_ui_str(process.pressure)
+    else:
+        pressure_str = '_None_'
+    st.write(f"**Pressure:** {pressure_str}\n\n"
+             f"**Furnace:** {process.furnace}")
+    st.plotly_chart(process.get_figure())
+
+
+def lift_off_info(process: LiftOffEtching):
+    st.write(f"**Used ultrasound**: {process.used_ultrasound}\n\n"
+             f"**Ultrasound config**: {process.ultrasound_config}\n\n")
+
+
 @st.dialog('Modification Process')
 def film_modif_info(modif_: FilmModification):
     st.write(f"**Made on**&ensp;{modif_.made_on}&ensp;**by**&ensp;"
              f"{modif_.made_by_email}.\n\n"
-             f"**Comment**: {modif_.comment}")
+             f"**Comment**: _{modif_.comment}_")
     process = modif_.modification_process()
 
-    if isinstance(process, Annealing):
-        pressure_unit_str = f'{PressureField.ui_unit:P}'
-        st.write(f"**Pressure:** {process.pressure} {pressure_unit_str}\n\n"
-                 f"**Furnace:** {process.furnace}")
-        st.plotly_chart(process.get_figure())
+    if modif_.modif_type == FilmModifType.ANNEALING:
+        annealing_info(process)
 
-    elif isinstance(process, IonBeamEtching):
-        st.write(f"**Duration:** {process.duration} &ensp; · &ensp;"
-                 f"**Flow:** {process.flow} &ensp; · &ensp;"
-                 f"**Incidence angle:** "
-                 f"{process.incidence_angle} &ensp; · &ensp;"
-                 f"**Rotation:** {process.rotation} &ensp; · &ensp;"
-                 f"**Power:** {process.power} &ensp; · &ensp;"
-                 f"**Pressure:** {process.pressure}")
-        constituents = process.constituents
-        proportion_sum = sum(const.proportion for const in constituents)
-        constituents_str = ''
-        for const in constituents:
-            percent = const.proportion / proportion_sum * 100
-            constituents_str += f"\n- {const.stoichio_str}: {percent:g}%"
-        st.write(f"**Plasma constituents:**{constituents_str}")
-        if process.patterns:
-            pattern = process.patterns[0]
-            pattern.retrieve_file_bytes()
-            st.image(pattern.file_bytes, width=500)
+    elif modif_.modif_type == FilmModifType.ION_BEAM_ETCHING:
+        etching_base_info(process.etching)
+        ion_beam_etch_info(process)
 
-    elif isinstance(process, WetEtching):
-        st.write(f"**Recipe:** {process.recipe_file_name}")
-        constituents = process.constituents
-        proportion_sum = sum(const.proportion for const in constituents)
-        constituents_str = ''
-        for const in constituents:
-            percent = const.proportion / proportion_sum * 100
-            constituents_str += f"- {const.stoichio_str}: {percent:g}%\n\n"
-        st.write(f"**Acid constituents:**\n\n{constituents_str}")
+    elif modif_.modif_type == FilmModifType.WET_ETCHING:
+        etching_base_info(process.etching)
+        wet_etch_info(process)
+
+    elif modif_.modif_type == FilmModifType.LIFT_OFF:
+        etching_base_info(process.etching)
+        lift_off_info(process)
 
     else:
-        raise RuntimeError(f'Unknown modification type: {modif_}')
+        raise RuntimeError(f'Unknown modification type: {modif_.modif_type}')
 
     st.divider()
     if st.button("Delete film modification ❌"):
-        with db.atomic():
+        with (db.atomic()):
             modif_.delete_instance(recursive=True)
         st.rerun()
 
@@ -129,8 +209,6 @@ inspect_page_header('Library', lib.label, on_delete, None)
 st.write(
     f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
 
-# if st.button('✏️ Edit name or comment', key='edit_lib'):
-#     st.switch_page(page=pages.edit_lib, query_params={IdType.LIB: lib.id})
 switch_button(
     pages.edit_lib,
     label='✏️ Edit name or comment',
@@ -147,11 +225,6 @@ with (st.container(horizontal=True, vertical_alignment='center',
         if st.button(f'{MODIF_NAMES[modif.modif_type]}', key=f'btn_{i}'):
             film_modif_info(modif)
     st.container(width=300)
-    # if st.button('➕**Add**', type='tertiary'):
-    #     st.switch_page(
-    #         pages.new_film_modif,
-    #         query_params={IdType.FILM: film.id}
-    #     )
     switch_button(pages.new_film_modif, label='➕**Add**', type_='tertiary',
                   q_params={IdType.FILM: film.id})
 
@@ -196,7 +269,8 @@ with col2:
         table_rows = [
             {
                 ColName.nominal_stoichio: lay.nominal_stoichio_str,
-                ColName.deposit_temp: lay.deposit_temp,
+                ColName.deposit_temp:
+                    DepositTempField.to_ui_unit(lay.deposit_temp)[0],
                 ColName.deposit_duration: lay.sputtering.deposit_duration,
                 ColName.deposit_power: lay.sputtering.deposit_power,
             }

@@ -6,6 +6,8 @@ from components.forms.new_film_modif.annealing.sub_forms import AnnealingForm
 from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField,\
     MadeByField, CommentField, ModifTypeField
 from components.forms.base_classes import Form, PausePageRun
+from components.forms.new_film_modif.lift_off.sub_forms import LiftOffForm
+from components.forms.new_film_modif.wet_etching.sub_forms import WetEtchingForm
 from logic.constants import FILM_INIT_STATE
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
@@ -119,13 +121,30 @@ class RootForm(Form):
 
             case FilmModifType.ION_BEAM_ETCHING:
                 if default_film_modif:
-                    default_etching = default_film_modif.ion_beam_etchings[0]
+                    beam_etch = default_film_modif.etchings[0].ion_etchings[0]
                 else:
-                    default_etching = None
-                ion_etching_form = IonEtchingForm(default_etching)
-                ion_etching = (ion_etching_form
-                                            .to_ion_etching(film_modif))
-                film_modif.ion_beam_etchings = [ion_etching]
+                    beam_etch = None
+                ion_etching_form = IonEtchingForm(beam_etch)
+                etching = ion_etching_form.to_ion_etching(film_modif)
+                film_modif.etchings = [etching]
+
+            case FilmModifType.WET_ETCHING:
+                if default_film_modif:
+                    wet_etch = default_film_modif.etchings[0].wet_etchings[0]
+                else:
+                    wet_etch = None
+                wet_etch_form = WetEtchingForm(wet_etch)
+                etching = wet_etch_form.to_wet_etching(film_modif)
+                film_modif.etchings = [etching]
+
+            case FilmModifType.LIFT_OFF:
+                if default_film_modif:
+                    lift_off = default_film_modif.etchings[0].lift_offs[0]
+                else:
+                    lift_off = None
+                lift_off_form = LiftOffForm(lift_off)
+                etching = lift_off_form.to_lift_off_etching(film_modif)
+                film_modif.etchings = [etching]
 
         self.film_modif = film_modif
 

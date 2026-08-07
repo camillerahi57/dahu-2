@@ -1,6 +1,7 @@
 import streamlit as st
 from pandas import DataFrame
 
+from components.forms.new_substrate.fields import ThicknessField
 from components.streamlit_tools import init_page, switch_to_submit_successful, \
     current_params
 from logic.components import inspect_page_header
@@ -52,7 +53,7 @@ layers = reversed(substrate.layers)
 table_content = [
     {
         'Stoichiometry': StoichioElement.to_str(lay.stoichio),
-        'Thickness': lay.thickness,  # TODO add unit.
+        'Thickness': ThicknessField.db_to_ui_str(lay.thickness),
         'Crystal struct.': lay.crystal_struct_str(),
     }
     for lay in layers

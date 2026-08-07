@@ -6,7 +6,7 @@ from components.streamlit_tools import sess, init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \
     SessionKeys as Sk, IdType
-from logic.db_enums import FilmModifType
+from logic.db_enums import FilmModifType, etching_types
 from logic.functions import save_cookies
 from logic.lab_modelization.db_models import (
     db, Film)
@@ -28,11 +28,9 @@ try:
         sess[Ck.LAST_EMAIL_USED] = film_modif.made_by_email
 
         with db.atomic():
-            if film_modif.modif_type == FilmModifType.ION_BEAM_ETCHING:
-                etching = film_modif.ion_beam_etchings[0]
-                pattern = etching.patterns[0] if etching.patterns else None
-                if pattern:
-                    pattern.save_bytes()
+            if film_modif.modif_type in etching_types:
+                etching = film_modif.etchings[0]
+                etching.store_related_files()
 
             film_modif.save_with_dependent()
 

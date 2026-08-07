@@ -8,26 +8,28 @@ from typing import Self, get_type_hints, Iterable, Any, final
 
 import chemparse
 import plotly.graph_objects as go
+import streamlit as st
 from pandas import DataFrame
-from peewee import PostgresqlDatabase, Model, CharField, DateTimeField, \
+from peewee import PostgresqlDatabase, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
     BooleanField, DateField
 from pint.registry import Quantity
 from playhouse.shortcuts import model_to_dict  # noqa
+from playhouse.signals import Model
 from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
 from logic.constants import FILE_STORAGE_PATH, DOMAIN, \
-    PATTERN_IMAGE_PATH, \
     ROOM_TEMPERATURE_CELSIUS, IdType, USER_UPLOAD_PATH
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
 from logic.functions import letter_count
+from logic.lab_modelization.classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
-from logic.python_tools import remove_digits
+from logic.python_tools import remove_digits, remove_random_prefix
 from logic.units import ur, db_units
 
 # FIELD TYPES:
@@ -631,11 +633,11 @@ class TriodeSputtering(_BaseModel):
 
 
 class UserUploadedFile(_BaseModel):
-    label = CharField(null=True)
-    file_name = CharField(unique=True)
+    label: str = CharField(null=True)
+    file_name: str = CharField(unique=True)
     upload_date = DateField()
 
-    file_bytes: bytes = None  # Not in DB.
+    _file_bytes: bytes|None = None  # Not in DB.
 
     def __init__(self, label: str, file_name: str, upload_date: datetime,
                  *args, **kwargs):
@@ -649,16 +651,19 @@ class UserUploadedFile(_BaseModel):
         Path.unlink(self.get_path())
         sleep(.1)
 
-    # @classmethod
-    # def with_file_bytes(cls, label: str, file_name: str,
-    #                     upload_date: datetime, file_bytes: bytes)\
-    #         -> UserUploadedFile:
-    #     extension = file_name.split('.')[-1]
-    #     new_file_name = f'{uuid4()}.{extension}'
-    #     file_db_entity = cls(label=label, file_name=new_file_name,
-    #                          upload_date=upload_date)
-    #     file_db_entity.file_bytes = file_bytes
-    #     return file_db_entity
+    @property
+    def file_bytes(self):
+        if self._file_bytes is None:
+            try:
+                with open(self.get_path(), 'rb') as file:
+                    self._file_bytes = file.read()
+            except FileNotFoundError:
+                self._file_bytes = None
+        return self._file_bytes
+
+    @file_bytes.setter
+    def file_bytes(self, file_bytes: bytes):
+        self._file_bytes = file_bytes
 
     def retrieve_file_bytes(self):
         with open(self.get_path(), 'rb') as file:
@@ -667,7 +672,19 @@ class UserUploadedFile(_BaseModel):
 
     def save_bytes(self):
         with open(self.get_path(), 'wb') as file:
+            assert len(self.file_bytes), "File cannot be empty."
             file.write(self.file_bytes)
+
+    def download_bttn(self):
+        if self.file_bytes is None:
+            st.write('_File missing_')
+        else:
+            st.download_button(
+                label=self.label,
+                data=self.file_bytes,
+                file_name=remove_random_prefix(self.file_name),
+                icon=":material/download:",
+            )
 
 
 class FilmModification(_BaseModel):
@@ -680,9 +697,7 @@ class FilmModification(_BaseModel):
     film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='modifs')
 
     annealings: DependentBackref[Annealing]
-    wet_etchings: DependentBackref[WetEtching]
-    ion_beam_etchings: DependentBackref[IonBeamEtching]
-    lift_offs: DependentBackref[LiftOff]
+    etchings: DependentBackref[Etching]
 
     # Will add characs in the future.
 
@@ -711,29 +726,23 @@ class FilmModification(_BaseModel):
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
 
-        # Delete pattern:
-        match self.modif_type:
-            case FilmModifType.ION_BEAM_ETCHING:
-                etching = self.ion_beam_etchings[0]
-                if etching.patterns:
-                    pattern = etching.patterns[0]
-                    pattern.delete_file()
+        if self.etchings:
+            self.etchings[0].delete_related_files()
 
         super().delete_instance(recursive, delete_nullable)
 
-
     def modification_process(self) \
-            -> (Annealing | WetEtching | LiftOff | IonBeamEtching):
+            -> (Annealing | WetEtching | LiftOffEtching | IonBeamEtching):
         fmt = FilmModifType
         match self.modif_type:
             case fmt.ANNEALING:
                 return self.annealings[0]
             case fmt.WET_ETCHING:
-                return self.wet_etchings[0]
+                return self.etchings[0].wet_etchings[0]
             case fmt.ION_BEAM_ETCHING:
-                return self.ion_beam_etchings[0]
+                return self.etchings[0].ion_etchings[0]
             case fmt.LIFT_OFF:
-                return self.lift_offs[0]
+                return self.etchings[0].lift_offs[0]
 
     @property
     def previous_modif(self) -> Self:
@@ -746,25 +755,6 @@ class FilmModification(_BaseModel):
             )
 
 
-class LiftOff(_BaseModel):
-    used_ultrasound = BooleanField(null=True)
-    ultrasound_config = CharField(null=True)
-    pattern_diagram_file_name = CharField(null=True)
-    recipe_file_name = CharField(null=True)
-
-    film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT', backref='lift_offs')
-
-    def __init__(self, used_ultrasound: bool | None,
-                 ultrasound_config: str | None,
-                 pattern_diagram_file_name: str | None,
-                 recipe_file_name: str | None,
-                 film_modif: FilmModification, *args, **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
-
-    def image_path(self):
-        return Path(PATTERN_IMAGE_PATH) / str(self.pattern_diagram_file_name)
 
 
 class Annealing(_BaseModel):
@@ -826,6 +816,7 @@ class Annealing(_BaseModel):
 
     def get_figure(self) -> Figure:
         return AnnealingStep.get_figure(self.steps)
+
 
 class AnnealingStep(_BaseModel):
     timestamp: float = FloatField()
@@ -892,6 +883,37 @@ class AnnealingStep(_BaseModel):
             return ur.Quantity(self.temperature, db_units.temperature)
 
 
+class Etching(_BaseModel):
+    has_a_pattern = BooleanField()
+    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT',
+                                 backref='etchings')
+
+    ion_etchings: DependentBackref[IonBeamEtching]
+    wet_etchings: DependentBackref[WetEtching]
+    lift_offs: DependentBackref[LiftOffEtching]
+
+    patterns: DependentBackref[EtchingPattern]
+    recipes: DependentBackref[EtchingRecipe]
+
+    def __init__(self, has_a_pattern: bool, film_modif: FilmModification,
+                 *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+    def store_related_files(self):
+        if self.patterns:
+            if self.patterns[0].file_bytes:
+                self.patterns[0].save_bytes()
+        if self.recipes:
+            if self.recipes[0].file_bytes:
+                self.recipes[0].save_bytes()
+
+    def delete_related_files(self):
+        if self.patterns:
+            self.patterns[0].delete_file()
+        if self.recipes:
+            self.recipes[0].delete_file()
+
 
 class IonBeamEtching(_BaseModel):
     duration = FloatField(null=True)
@@ -900,51 +922,44 @@ class IonBeamEtching(_BaseModel):
     rotation = FloatField(null=True)
     power = FloatField(null=True)
     pressure = FloatField(null=True)
-    has_a_pattern = BooleanField(null=True)
 
-    film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT', backref='ion_beam_etchings')
-    # pattern: UserUploadedFile = ForeignKeyField(
-    #     UserUploadedFile, on_delete='RESTRICT', null=True)
+    etching: Etching = ForeignKeyField(Etching, on_delete='RESTRICT',
+                                       backref='ion_etchings')
 
     constituents: DependentBackref[PlasmaConstituent]
-    patterns: DependentBackref[IonEtchingPattern]
 
     def __init__(self, duration: float | None, flow: float | None,
                  incidence_angle: float | None, rotation: float | None,
                  power: float | None, pressure: float | None,
-                 has_a_pattern: bool | None,
-                 film_modif: FilmModification | None, *args, **kwargs):
+                 etching: Etching | None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    # def save_pattern(self):
-    #     if self.pattern:
-    #         # self.pattern.save_with_dependent()
-    #         self.pattern.save()
-    #         img_path = USER_UPLOAD_PATH.joinpath(self.pattern.file_name)
-    #         with open(img_path, 'wb') as img_file:
-    #             img_file.write(self.pattern.file_bytes)
+    def to_mixture_constituents(self) -> list[MixtureConstituent]:
+        return [
+            MixtureConstituent(proportion=c.proportion, stoichio=c.stoichio_str)
+            for c in self.constituents
+        ]
 
 
-class IonEtchingPattern(UserUploadedFile):
-    etching = ForeignKeyField(IonBeamEtching, backref='patterns')
+class EtchingPattern(UserUploadedFile):
+    etching = ForeignKeyField(Etching, backref='patterns')
 
     def __init__(self, label: str, file_name: str, upload_date: datetime,
-                 etching: IonBeamEtching, *args, **kwargs):
+                 etching: Etching, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class PlasmaConstituent(_BaseModel):
-    proportion = FloatField()
+    proportion: float = FloatField()
 
-    etching: IonBeamEtching = ForeignKeyField(
+    ion_etching: IonBeamEtching = ForeignKeyField(
         IonBeamEtching, on_delete='RESTRICT', backref='constituents')
 
     nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float, etching: IonBeamEtching,
+    def __init__(self, proportion: float, ion_etching: IonBeamEtching,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -959,7 +974,7 @@ class PlasmaConstituent(_BaseModel):
         assert 0 < proportion <= 1
         constituent = cls(
             proportion=proportion,
-            etching=etching,
+            ion_etching=etching,
         )
         stoichio = StoichioElement.from_str(
             stoichio,
@@ -970,57 +985,94 @@ class PlasmaConstituent(_BaseModel):
         return constituent
 
 
+class LiftOffEtching(_BaseModel):
+    used_ultrasound = BooleanField(null=True)
+    ultrasound_config = CharField(null=True)
+
+    etching: Etching = ForeignKeyField(
+        Etching, on_delete='RESTRICT', backref='lift_offs')
+
+    def __init__(self, used_ultrasound: bool | None,
+                 ultrasound_config: str | None,
+                 etching: Etching, *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+
 class WetEtching(_BaseModel):
     hard_bake_temperature = FloatField(null=True)
-    acid_etching_duration = FloatField(null=True)
-    acid_etching_comment = CharField(null=True)
+    duration = FloatField(null=True)
     used_ultrasound = BooleanField(null=True)
     ultrasound_config = CharField(null=True)
     acid_etching_depth_speed = FloatField(null=True)
     acid_etching_lateral_speed = FloatField(null=True)
-    has_a_pattern = BooleanField(null=True)
-    pattern_diagram_file_name = CharField(null=True)
-    recipe_file_name = CharField(null=True)
 
-    film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT', backref='wet_etchings')
+    etching: Etching = ForeignKeyField(
+        Etching, on_delete='RESTRICT', backref='wet_etchings')
 
     constituents: DependentBackref[AcidConstituent]
 
     def __init__(self,
                  hard_bake_temperature: float | None,
-                 acid_etching_duration: float | None,
-                 acid_etching_comment: str | None,
+                 duration: float | None,
                  used_ultrasound: bool | None,
                  ultrasound_config: str | None,
                  acid_etching_depth_speed: float | None,
                  acid_etching_lateral_speed: float | None,
-                 has_a_pattern: bool | None,
-                 pattern_diagram_file_name: str | None,
-                 recipe_file_name: str | None,
-                 film_modif: FilmModification,
+                 etching: Etching,
                  *args, **kwargs
                  ):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
+    def to_mixture_constituents(self) -> list[MixtureConstituent]:
+        return [
+            MixtureConstituent(proportion=c.proportion, stoichio=c.stoichio_str)
+            for c in self.constituents
+        ]
+
+
+class EtchingRecipe(UserUploadedFile):
+    etching = ForeignKeyField(Etching, backref='recipes')
+
+    def __init__(self, label: str, file_name: str, upload_date: datetime,
+                 etching: Etching, *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
 
 class AcidConstituent(_BaseModel):
-    proportion = FloatField()
+    proportion: float = FloatField()
 
-    etching: WetEtching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
-                              backref='constituents')
+    wet_etching: WetEtching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
+                                              backref='constituents')
 
-    stoichio: DependentBackref[StoichioElement]
+    nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float, etching: WetEtching, *args,
+    def __init__(self, proportion: float, wet_etching: WetEtching, *args,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @property
     def stoichio_str(self):
-        return StoichioElement.to_str(self.stoichio)
+        return StoichioElement.to_str(self.nominal_stoichio)
+
+    @classmethod
+    def from_stoichio(cls, stoichio: str, proportion: float,
+                      etching: WetEtching) -> AcidConstituent:
+        assert 0 < proportion <= 1
+        constituent = cls(
+            proportion=proportion,
+            wet_etching=etching,
+        )
+        stoichio = StoichioElement.from_str(
+            stoichio,
+            StoichioElement.acid_constituent,
+            constituent,
+        )
+        constituent.nominal_stoichio = stoichio
+        return constituent
 
 
 class DeteriorationState(_BaseModel):
@@ -1291,7 +1343,7 @@ class StoichioElement(_BaseModel):
         backref='atmosphere')
     acid_constituent: AcidConstituent|ForeignKeyField = ForeignKeyField(
         AcidConstituent, null=True, on_delete='RESTRICT',
-        backref='stoichio')
+        backref='nominal_stoichio')
     plasma_constituent: PlasmaConstituent|ForeignKeyField = ForeignKeyField(
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')

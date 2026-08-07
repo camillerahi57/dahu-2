@@ -58,15 +58,15 @@ class RampPhaseForm(Form):
                  default_is_room_temp: bool|None, key: str):
         with st.container(horizontal=True, vertical_alignment='top',
                           gap='large'):
-            room_temp_fld = IsRoomTemperatureField(
+            is_room_temp_fld = IsRoomTemperatureField(
                 key=key,
                 form_default=default_is_room_temp,
             )
-            if room_temp_fld.value is not True:
+            if is_room_temp_fld.value is not True:
                 reached_temp_fld = ReachedTempField(
                     key=key,
                     form_default=default_reached_temp,
-                    disabled=room_temp_fld.value,
+                    disabled=is_room_temp_fld.value,
                 )
 
             else:
@@ -77,14 +77,14 @@ class RampPhaseForm(Form):
                 form_default=default_duration,
             )
 
-        self.is_room_temp = room_temp_fld.value
+        self.is_room_temp = is_room_temp_fld.value
         self.temperature = reached_temp_fld.in_db_unit \
             if reached_temp_fld is not None \
             else None
         self.duration = duration_fld.in_db_unit
 
         super().__init__(
-            fields=[room_temp_fld, reached_temp_fld, duration_fld],
+            fields=[is_room_temp_fld, reached_temp_fld, duration_fld],
             sub_forms=[],
         )
 

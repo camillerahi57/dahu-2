@@ -48,7 +48,7 @@ class ThicknessField(UnitField):
 
     def _streamlit_input(self, prefill, key):
         return st.number_input(  # TODO more realistic example:
-            f"Thickness ({self.ui_unit:P}) (ex: 6e-3)",
+            f"Thickness ({self.ui_unit}) (ex: 6e-3)",
             step=1e-5, format="%.5f", key=key, width=200)
 
     def _validate(self, input_) -> tuple[bool, str]:

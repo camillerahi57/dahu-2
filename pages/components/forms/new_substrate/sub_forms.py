@@ -54,7 +54,7 @@ class LayerForm(Form):
         cryst_orient_form = CrystalOrientationForm(key)
 
         self.stoichio = stoichio_fld.value
-        self.thickness = thickness_fld.value
+        self.thickness = thickness_fld.in_db_unit
         self.cryst_orient_form = cryst_orient_form
 
         super().__init__(

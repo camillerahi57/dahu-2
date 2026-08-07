@@ -41,7 +41,6 @@ def main_page():
                       label='➕ Add New State',
                       q_params={IdType.TARGET: target_id})
 
-
     states = target.old_to_recent_states()
     last_state = states[-1]
     show_state(last_state, len(states))

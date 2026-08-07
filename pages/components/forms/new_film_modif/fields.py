@@ -5,7 +5,7 @@ import streamlit as st
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
-    FILM_INIT_STATE, EtchingPattern
+    FILM_INIT_STATE
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement
 from logic.functions import is_valid_email_address
 from logic.lab_modelization.db_models import FilmModification, Patch
@@ -99,7 +99,7 @@ class PhaseDurationField(UnitField):
     ui_unit = ur.seconds
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Phase duration ({self.ui_unit:P})',
+        return st.number_input(f'Phase duration ({self.ui_unit})',
                                min_value=0., value=prefill, key=key, width=150)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -113,7 +113,7 @@ class PumpingDurationField(UnitField):
     ui_unit = ur.minutes
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Pumping duration ({self.ui_unit:P})',
+        return st.number_input(f'Pumping duration ({self.ui_unit})',
                                min_value=0., value=prefill, width=200)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -127,7 +127,7 @@ class PressureField(UnitField):
     ui_unit = ur.millibar
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Pressure ({self.ui_unit:P})',
+        return st.number_input(f'Pressure ({self.ui_unit})',
                                min_value=0., width=150, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -167,7 +167,7 @@ class AngleField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Angle ({self.ui_unit:P})',
+        return st.number_input(f'Angle ({self.ui_unit})',
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -179,7 +179,7 @@ class RotationField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Rotation ({self.ui_unit:P})',
+        return st.number_input(f'Rotation ({self.ui_unit})',
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -200,18 +200,6 @@ class HasPatternField(Field):
                         index=index)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        return True, ''
-
-
-class PatternField(Field):
-    type = Ft.ADVISED
-
-    def _streamlit_input(self, prefill, key: str):
-        return st.selectbox('Pattern', options=list(EtchingPattern))
-
-    def _validate(self, input_) -> tuple[bool, str]:
-        if input_ is None or input_ == '':
-            return False, 'Please select a pattern.'
         return True, ''
 
 
@@ -244,7 +232,7 @@ class PowerField(UnitField):
     ui_unit = ur.watt
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Power ({self.ui_unit:P})', min_value=0.,
+        return st.number_input(f'Power ({self.ui_unit})', min_value=0.,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -393,8 +381,93 @@ class IonDurationField(UnitField):
     ui_unit = ur.minutes
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Duration ({self.ui_unit:P})', min_value=0,
+        return st.number_input(f'Duration ({self.ui_unit})', min_value=0,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
+
+
+class HardBakeTempField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.celsius
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Hard bake temperature ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if self._input <= 0:
+            return False, 'Hard bake temperature must be strictly positive.'
+        return True, ''
+
+
+class AcidEtchingDurationField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.seconds
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Acid etching duration ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if self._input <= 0:
+            return False, 'Acid etching duration must be strictly positive.'
+        return True, ''
+
+
+class UsedUltrasoundField(Field):
+    type = Ft.MANDATORY
+
+    class Option(StrEnum):
+        YES = 'Yes'
+        NO = 'No'
+
+    def _streamlit_input(self, prefill: str, key):
+        options = list(self.Option)
+        index = options.index(prefill) if prefill else None
+        return st.radio('Used ultrasound', options, horizontal=True,
+                        index=index)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class UltrasoundConfigField(Field):
+    type = Ft.ADVISED
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.text_area('Ultrasound config', value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class EtchingDepthSpeedField(UnitField):
+    type = Ft.OPTIONAL
+    ui_unit = ur.microns / ur.second
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Etching depth speed ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if self._input <= 0:
+            return False, 'Etching depth speed must be strictly positive.'
+        return True, ''
+
+
+class EtchingLateralSpeedField(UnitField):
+    type = Ft.OPTIONAL
+    ui_unit = ur.microns / ur.second
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Etching lateral speed ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if self._input <= 0:
+            return False, 'Etching lateral speed must be strictly positive.'
+        return True, ''
+
+

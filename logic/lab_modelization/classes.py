@@ -5,6 +5,7 @@
 # from plotly.graph_objs import Scatter
 #
 # from logic.functions import polygon_patch_to_scatter
+from dataclasses import dataclass
 
 
 # @dataclass
@@ -45,3 +46,9 @@
 #             fig.add_trace(scatter)
 #
 #         return fig
+
+
+@dataclass
+class MixtureConstituent:
+    proportion: float
+    stoichio: str

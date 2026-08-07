@@ -48,6 +48,10 @@ class FilmModifType(StrEnum):
     ION_BEAM_ETCHING = 'ion_etching'
 
 
+etching_types = {FilmModifType.LIFT_OFF, FilmModifType.WET_ETCHING,
+                 FilmModifType.ION_BEAM_ETCHING}
+
+
 class PixelCoordinateSystem(StrEnum):
     PLOTLY = "x,y=w,h;both-positive;top-left-origin"
 
