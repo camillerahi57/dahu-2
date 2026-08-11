@@ -122,7 +122,7 @@ class UnitField(Field):
         if cls.ui_unit_alias:
             unit_str = cls.ui_unit_alias
         else:
-            unit_str = f'{cls.ui_unit}'
+            unit_str = f'{cls.ui_unit:~P}'
 
         return ui_quantity.magnitude, unit_str
 

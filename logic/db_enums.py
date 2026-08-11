@@ -57,8 +57,8 @@ class PixelCoordinateSystem(StrEnum):
 
 
 class Furnace(StrEnum):
-    FURNACE_1 = 'furnace_1'
-    FURNACE_2 = 'furnace_2'  # TODO Replace names.
+    TUBE = 'Tube furnace'
+    RTA = 'Rapid Thermal Annealing'
 
 
 class CharacType(StrEnum):
@@ -107,9 +107,10 @@ class XrayType(StrEnum):
     ESRF = 'esrf'
 
 
-class EtchingDevelopers(StrEnum):
-    pass
-    # TODO Bases from https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
+# class EtchingDevelopers(StrEnum):
+#     pass
+#     # TODO Bases from
+#      https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
 
 
 class StoichioOf(StrEnum):

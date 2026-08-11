@@ -14,7 +14,6 @@ DOMAIN = 'localhost:8501'
 FILE_STORAGE_PATH = Path(
     r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 FILM_INIT_STATE = 'As deposited'
-PATTERN_IMAGE_PATH = 'pages/logic/images'
 NEW_TARGET = 'NOT BASED ON AN EXISTING TARGET'
 PIXEL_COORDS = 'pixel_selection'
 REDIRECT_PATH = 'redirect_path'

@@ -76,20 +76,6 @@ class EtchingForm(Form):
         return etching
 
 
-
-class PatternDiagramField(Field):
-    type = Ft.OPTIONAL
-
-    def _streamlit_input(self, prefill, key: str):
-        return st.file_uploader('Select the pattern image',
-                                type=['jpg', 'png', 'svg'], key=key)
-
-    def _validate(self, input_) -> tuple[bool, str]:
-        if input_ is None:
-            return False, 'Please upload an image of the pattern.'
-        return True, ''
-
-
 class EtchingPatternForm(Form):
     def __init__(self, default_etch: Etching|None):
         has_pattern_fld = HasPatternField(

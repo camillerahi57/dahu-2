@@ -66,8 +66,8 @@ class PatchCountField(Field):
                   step=1, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        if input_ < 1:
-            return False, 'Please add at least one patch.'
+        # if input_ < 1:
+        #     return False, 'Please add at least one patch.'
         return True, ''
 
 
@@ -198,8 +198,8 @@ class PreviousVersionField(Field):
         else:
             idx = options.index(prefill)
 
-        return st.selectbox('Built from other target:', options=options,
-                                index=idx, width=300)
+        return st.selectbox('Built using an existing target:',
+                            options=options, index=idx, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
@@ -253,7 +253,7 @@ class PhotoUploadField(Field):
 
     def _streamlit_input(self, prefill, key):
         return st.file_uploader("Select target photo",
-                                type=["jpg", "png", "svg"])
+                                type=["jpg", "png"])
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None:
@@ -282,7 +282,7 @@ class PixelEquivalenceField(Field):
 
 class MillimeterEquivalenceField(UnitField):
     type = Ft.MANDATORY
-    ui_unit = ur.mm
+    ui_unit = ur.cm
 
     def _streamlit_input(self, prefill, key):
         return st.number_input(f"Distance in {self.ui_unit}:",

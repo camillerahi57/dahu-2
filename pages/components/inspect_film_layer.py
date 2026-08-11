@@ -24,27 +24,7 @@ def show_film_layer(layers: list[FilmLayer]):
     """Show data about the layer that's been clicked on the layer table in
     the inspect library page."""
     layer = layers[sess[INSPECT_BUTTON_KEY]['row']]
-    title_db_value_input_fields: list[tuple[str, float, type[UnitField]]] = [
-        # Tuple of a title, the value from the DB, and the UI field it's
-        # been entered through (because we want to show the value with
-        # the same unit as the input unit).
-        ('Deposit temp.', layer.deposit_temp, DepositTempField),
-        ('Nominal thickness', layer.nominal_thickness, NominalThicknessField),
-        ('Shadow mask', layer.shadow_mask_description, ShadowMaskField),
-        ('Function', layer.function, FilmLayerFunctionField),
-        ('Nominal stoichio.', StoichioElement.to_str(layer.nominal_stoichio),
-            NominalStoichioField),
-    ]
-
-    description_items = []
-    for title, db_value, field in title_db_value_input_fields:
-        if isinstance(field, UnitField):
-            quantity_str = field.db_to_ui_str(db_value) if db_value is not None\
-                else '_None_'
-        else:
-            quantity_str = db_value if db_value is not None else '_None_'
-        description_items.append(f"**{title}:** {quantity_str}")
-    st.write('\n\n'.join(description_items))
+    st.write(layer.data_string())
 
     st.divider()
 

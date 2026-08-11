@@ -127,8 +127,11 @@ class PressureField(UnitField):
     ui_unit = ur.millibar
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Pressure ({self.ui_unit})',
-                               min_value=0., width=150, value=prefill, key=key)
+        return st.number_input(
+            f'Pressure ({self.ui_unit})', min_value=0., width=300,
+            value=prefill, key=key, step=0.0000000000001, format='%.12g',
+            placeholder="You can use the '3e-7' notation."
+        )
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ == 0:
@@ -137,7 +140,7 @@ class PressureField(UnitField):
 
 
 class AnnealingAtmosphereField(Field):
-    type = Ft.MANDATORY
+    type = Ft.ADVISED
 
     def _streamlit_input(self, prefill, key: str):
         return st.text_input(
@@ -145,6 +148,18 @@ class AnnealingAtmosphereField(Field):
 
     def _validate(self, input_) -> tuple[bool, str]:
         return Patch.is_valid_formula(self._input)
+
+
+class AtmosphereIsVacuumField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.checkbox('**Vacuum**',
+                           value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
 
 
 class FlowField(UnitField):

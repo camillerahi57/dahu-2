@@ -242,7 +242,7 @@ class DepositDurationField(UnitField):
     ui_unit = ur.second
     
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit duration {self.ui_unit}",
+        return st.number_input(f"Deposit duration ({self.ui_unit})",
                                min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -517,8 +517,9 @@ class PresputteringThicknessField(UnitField):
     ui_unit = ur.nm
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Presputtering thickness ({self.ui_unit})",
-                               value=prefill, key=key, min_value=0.)
+        return st.number_input(
+            f"Presputtering thickness ({self.ui_unit}), if any:",
+                value=prefill, key=key, min_value=0.)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ <= 0:

@@ -6,7 +6,7 @@ from pint.registry import Unit, Quantity
 from logic.constants import DB_UNIT_SYSTEM
 
 ur = UnitRegistry(system=DB_UNIT_SYSTEM)
-ur.default_format = '~P'
+ur.default_format = 'P'  # Or '~P' for short version.
 
 
 def to_db_unit(quantity: Quantity = None, unit: Unit = None) -> Unit|float:

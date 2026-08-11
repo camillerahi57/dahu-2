@@ -16,7 +16,7 @@ def show_pixel_helper(target_img):
     st.write("**Click on a pixel to get its coordinates.**")
     st.write(f"**Click on two different pixels to get the distance between "
              f"them in pixels.**")
-    st.write(f"You should not try to measure the diameter at a glance, "
+    st.write(f"You should not try to measure the diameter by eye, "
              f"because it's not precise enough.")
     st.write('You can zoom in and out with [Ctrl][+] and [Ctrl][-].')
     coord_container = st.container(horizontal=True, vertical_alignment='center',

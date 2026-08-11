@@ -4,7 +4,7 @@ from components.forms.new_film_modif.fields import (
     PhaseTypeField, FurnaceField, \
     PressureField, PumpingDurationField, IsRoomTemperatureField, \
     ReachedTempField, PhaseDurationField, AnnealingAtmosphereField, \
-    PhaseCountField)
+    PhaseCountField, AtmosphereIsVacuumField)
 from components.forms.base_classes import Form, PausePageRun
 from logic.lab_modelization.db_models import Annealing, FilmModification, \
     AnnealingStep, StoichioElement
@@ -114,6 +114,7 @@ class PhaseForm(Form):
                  default_is_room_temp: bool|None,
                  default_phase_type: phase_types | None,
                  default_stoichio: str|None,
+                 end_step: AnnealingStep|None,
                  phase_idx: int,
                  key: str, ):
         with st.container(border=True):
@@ -128,6 +129,12 @@ class PhaseForm(Form):
                     key=key,
                     form_default='',
                     db_default=default_stoichio,
+                )
+                is_vacuum_fld = AtmosphereIsVacuumField(
+                    key=f'vacuum_{key}',
+                    form_default=False,
+                    db_default=end_step.preceding_was_vacuum
+                        if end_step else None
                 )
 
             phase_type = phase_type_fld.value
@@ -148,6 +155,7 @@ class PhaseForm(Form):
 
         self.phase_type = phase_type
         self.atmosphere: str|None = atmosphere_fld.value
+        self.is_vacuum: bool = is_vacuum_fld.value
         if phase_type == phase_types.RAMP:
             self.ramp_form: RampPhaseForm|None = phase_form
             self.plateau_form = None
@@ -157,10 +165,15 @@ class PhaseForm(Form):
             self.ramp_form = None
             self.duration = self.plateau_form.duration
 
-        super().__init__(fields=[phase_type_fld, atmosphere_fld],
+        super().__init__(fields=[phase_type_fld, atmosphere_fld, is_vacuum_fld],
                          sub_forms=[phase_form])
 
     def _is_coherent(self) -> tuple[bool, str]:
+        if self.is_vacuum and self.atmosphere:
+            return False, ('Annealing atmosphere is vacuum but a stoichiometry '
+                           'has been provided.')
+        if not self.is_vacuum and not self.atmosphere:
+            return False, 'Missing atmosphere stoichiometry (or check vacuum).'
         return True, ''
 
     def get_stoichio(self, annealing_step: AnnealingStep) \
@@ -220,8 +233,9 @@ class PhaseListForm(Form):
                         default_step_type = phase_types.RAMP
 
                 except IndexError:
-                    pass
-
+                    db_phase_end = None
+            else:
+                db_phase_end = None
 
             form = PhaseForm(
                 default_reached_temp=default_reached_temp,
@@ -229,6 +243,7 @@ class PhaseListForm(Form):
                 default_is_room_temp=default_is_room_temp,
                 default_phase_type=default_step_type,
                 default_stoichio=default_stoichio,
+                end_step=db_phase_end,
                 phase_idx=phase_idx,
                 key=f'step_{phase_idx}',
             )
@@ -262,6 +277,7 @@ class PhaseListForm(Form):
             timestamp=0.,
             temperature=None,
             is_room_temperature=True,
+            preceding_was_vacuum=None,
             annealing=annealing,
         )
         steps = [init_step]
@@ -284,6 +300,7 @@ class PhaseListForm(Form):
                 timestamp=current_timestamp,
                 temperature=temperature,
                 is_room_temperature=last_is_room_temp,
+                preceding_was_vacuum=form.is_vacuum,
                 annealing=annealing,
             )
             step.preceding_atmosphere = form.get_stoichio(step)

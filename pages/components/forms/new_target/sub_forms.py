@@ -186,7 +186,7 @@ class UploadAndCropForm(Form):
 
         elif Sk.UPLOADED_TARGET_IMG in sess:
             photo = sess[Sk.UPLOADED_TARGET_IMG]
-            st.warning("**Crop with the base (if any) with a small margin:**")
+            st.warning("**Keep only what you think is relevant in the image.**")
             cropped_pic = st_cropperjs(
                 pic=photo, btn_text="Select target", key=Sk.CROPPED_PIC)
             if cropped_pic:
@@ -422,7 +422,7 @@ class PolygonPatchForm(Form):
 class PatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None,
-                 default_is_base_patch: bool = False):
+                 is_first_patch: bool):
         if default_patch is None:
             default_shape = None
         elif len(default_patch.vertices) > 100:
@@ -433,7 +433,10 @@ class PatchForm(Form):
         with st.container(border=True, width=99999):
             is_base_patch_fld = IsBasePatchField(
             f'is_base_{key}',
-                form_default=default_is_base_patch
+                form_default=False,
+                db_default=is_first_patch if default_patch else False,
+                # We assume that the first patch is the base patch when
+                # editing an existing target.
             )
             with st.container(horizontal=True):
                 st.write("Shape:")
@@ -531,21 +534,22 @@ class PatchListForm(Form):
             default_state: Patch | None
             patch_form = PatchForm(f'{i}', target_img,
                                    default_patch=default_state,
-                                   default_is_base_patch=(i==0))
+                                   is_first_patch=(i==0))
             patch_forms.append(patch_form)
 
-        # Putting base patch as the first one (order matters).
-        ordered_patches = [f for f in patch_forms if f.is_base_patch]
-        ordered_patches.extend([f for f in patch_forms if not f.is_base_patch])
-        self.patch_forms = ordered_patches
+        self.patch_forms = patch_forms
 
         super().__init__(fields=[patch_count_fld], sub_forms=self.patch_forms)
 
     def _is_coherent(self) -> tuple[bool, str]:
         base_patch_count = len([f for f in self.patch_forms if f.is_base_patch])
-        if base_patch_count != 1:
+        zero_patch = len(self.patch_forms) == 0
+        if base_patch_count != 1 and not zero_patch:
             return False, (f"There must be exactly one *base* patch. "
                            f"Got: {base_patch_count}.")
+        if not zero_patch and not self.patch_forms[0].is_base_patch:
+            return False, ("Base patch must be the bottom one "
+                           "(first in the list).")
         return True, ''
 
     def to_patches(self, state: DeteriorationState) \
@@ -553,7 +557,6 @@ class PatchListForm(Form):
         return [form.to_patch_or_none(state)
                 for form in self.patch_forms]
 
-# On continue d'enlever les Default de merde
 
 class DeteriorationStateForm(Form):
     def __init__(self, target: Target, email: str = None,

@@ -1,7 +1,7 @@
 import streamlit as st
 from pandas import DataFrame
 
-from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
+from components.browse import INSPECT_BUTTON_KEY
 from components.forms.base_classes import UnitField
 from components.forms.new_film_modif.fields import PressureField, \
     IonDurationField, FlowField, AngleField, RotationField, PowerField, \
@@ -19,7 +19,7 @@ from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
     IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching,
-    FilmLayer, StoichioElement)
+    StoichioElement)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -66,23 +66,8 @@ def etching_base_info(etching: Etching):
 
 
 def ion_beam_etch_info(process: IonBeamEtching):
-    title_db_value_input_fields: list[tuple[str, float, type[UnitField]]] = [
-        # Tuple of a title, the value from the DB, and the UI field it's
-        # been entered through (because we want to show the value with
-        # the same unit as the input unit).
-        ('Duration', process.duration, IonDurationField),
-        ('Flow', process.flow, FlowField),
-        ('Incidence angle', process.incidence_angle, AngleField),
-        ('Rotation', process.rotation, RotationField),
-        ('Power', process.power, PowerField),
-        ('Pressure', process.pressure, PressureField),
-    ]
-    description_items = []
-    for title, db_value, field in title_db_value_input_fields:
-        quantity_str = field.db_to_ui_str(db_value) if db_value is not None \
-            else '_None_'
-        description_items.append(f"**{title}:** {quantity_str}")
-    st.write(' &ensp; · &ensp;'.join(description_items))
+    st.header(f"**Ion Beam Etching**")
+    st.write(process.data_string(separator=' &ensp; · &ensp;'))
 
     constituents = process.constituents
     proportion_sum = sum(const.proportion for const in constituents)
@@ -94,29 +79,8 @@ def ion_beam_etch_info(process: IonBeamEtching):
 
 
 def wet_etch_info(process: WetEtching):
-    title_db_value_input_fields: list[tuple[str, float, type[UnitField]]] = [
-        # Tuple of a title, the value from the DB, and the UI field it's
-        # been entered through (because we want to show the value with
-        # the same unit as the input unit).
-        ('Hard bake temperature', process.hard_bake_temperature,
-            HardBakeTempField),
-        ('Duration', process.duration, AcidEtchingDurationField),
-        ('Used ultrasound', process.used_ultrasound, UsedUltrasoundField),
-        ('Ultrasound config', process.ultrasound_config, UltrasoundConfigField),
-        ('Etching depth speed', process.acid_etching_depth_speed,
-            EtchingDepthSpeedField),
-        ('Etching lateral speed', process.acid_etching_lateral_speed,
-            EtchingLateralSpeedField),
-    ]
-    description_items = []
-    for title, db_value, field in title_db_value_input_fields:
-        if isinstance(field, UnitField):
-            quantity_str = field.db_to_ui_str(db_value) if db_value is not None\
-                else '_None_'
-        else:
-            quantity_str = db_value if db_value is not None else '_None_'
-        description_items.append(f"**{title}:** {quantity_str}")
-    st.write(' &ensp; · &ensp;'.join(description_items))
+    st.header(f"**Wet Etching**")
+    st.write(process.data_string(separator=' &ensp; · &ensp;'))
 
     constituents = process.constituents
     proportion_sum = sum(const.proportion for const in constituents)
@@ -137,7 +101,6 @@ def confirm_deletion_dialog(lib_: Library):
         if st.button('I confirm'):
             lib_.delete_with_parts()
             switch_to_submit_successful(pages.browse_libs)
-            # st.switch_page('deleted_lib.py')
 
 
 def on_delete():
@@ -156,20 +119,12 @@ MODIF_NAMES = {
 
 
 def annealing_info(process: Annealing):
-    if process.pressure is not None:
-        pressure_str = PressureField.db_to_ui_str(process.pressure)
-    else:
-        pressure_str = '_None_'
-    st.write(f"**Pressure:** {pressure_str}\n\n"
-             f"**Pumping duration:** {process.pumping_duration}\n\n"
-             f"**Furnace:** {process.furnace}\n\n")
+    st.header('Annealing')
+    st.write(process.data_string(separator=' &ensp; · &ensp;'))
 
     atmosphere_str = "**Atmosphere:**"
-    for i_, step in enumerate(process.steps):
-        if i_ == 0:
-            continue  # First step has no preceding atmosphere.
-        stoichio_str = StoichioElement.to_str(step.preceding_atmosphere)
-        atmosphere_str += f"\n- Phase {i_}: {stoichio_str}"
+    for i_, stoichio in enumerate(process.phase_stoichio_strings()):
+        atmosphere_str += f"\n- Phase {i_+1}: {stoichio}"
     st.write(atmosphere_str)
 
     st.plotly_chart(process.get_figure())

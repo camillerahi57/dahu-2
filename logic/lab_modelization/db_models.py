@@ -483,6 +483,22 @@ class FilmLayer(_BaseModel):
     def target_labels(self) -> list[str]:
         return [u.target.label for u in self.target_uses]
 
+    @property
+    def title_db_value_input_fields(self)\
+            -> list[tuple[str, float|str, type[Any]]]:
+        from components.forms.new_library.fields import (
+            DepositTempField, ArgonFlowField, ShadowMaskField,
+            FilmLayerFunctionField, NominalStoichioField,
+        )
+        return [
+            ('Deposit temp.', self.deposit_temp, DepositTempField),
+            ('Nominal thickness', self.nominal_thickness, ArgonFlowField),
+            ('Shadow mask', self.shadow_mask_description, ShadowMaskField),
+            ('Function', self.function, FilmLayerFunctionField),
+            ('Nominal stoichio.', StoichioElement.to_str(self.nominal_stoichio),
+             NominalStoichioField),
+        ]
+
 
 class MagnetronSputtering(_BaseModel):
     deposit_distance = FloatField(null=True)
@@ -800,20 +816,46 @@ class Annealing(_BaseModel):
     def get_figure(self) -> Figure:
         return AnnealingStep.get_figure(self.steps)
 
+    @property
+    def title_db_value_input_fields(self):
+        from components.forms.new_film_modif.fields import PressureField, \
+            PumpingDurationField, FurnaceField
+        return [
+            ('Pressure', self.pressure, PressureField),
+            ('Pumping duration', self.pumping_duration, PumpingDurationField),
+            ('Furnace', self.furnace, FurnaceField),
+        ]
+
+    def phase_stoichio_strings(self):
+        stoichio_strings = []
+        for i_, step in enumerate(self.steps):
+            if i_ == 0:
+                continue  # First step has no preceding atmosphere.
+            if step.preceding_was_vacuum:
+                stoichio_str = 'vacuum'
+            else:
+                stoichio_str = StoichioElement.to_str(step.preceding_atmosphere)
+            stoichio_strings.append(stoichio_str)
+        return stoichio_strings
+
 
 class AnnealingStep(_BaseModel):
     timestamp: float = FloatField()
     temperature: float = FloatField(null=True)
     is_room_temperature: bool = BooleanField()
+    preceding_was_vacuum: bool|None = BooleanField(null=True)
 
     annealing: Annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
                                            backref='steps')
 
     preceding_atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self, timestamp: float = None,
+    def __init__(self,
+                 timestamp: float = None,
                  temperature: float | None = None,
-                 is_room_temperature: bool = None, annealing: Annealing = None,
+                 is_room_temperature: bool = None,
+                 preceding_was_vacuum: bool = None,
+                 annealing: Annealing = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -951,6 +993,21 @@ class IonBeamEtching(_BaseModel):
             for c in self.constituents
         ]
 
+    @property
+    def title_db_value_input_fields(self):
+        from components.forms.new_film_modif.fields import (
+            IonDurationField,FlowField, AngleField, RotationField, PowerField,
+            PressureField,
+        )
+        return [
+            ('Duration', self.duration, IonDurationField),
+            ('Flow', self.flow, FlowField),
+            ('Incidence angle', self.incidence_angle, AngleField),
+            ('Rotation', self.rotation, RotationField),
+            ('Power', self.power, PowerField),
+            ('Pressure', self.pressure, PressureField),
+        ]
+
 
 class EtchingPattern(UserUploadedFile):
     etching = ForeignKeyField(Etching, backref='patterns')
@@ -1055,6 +1112,26 @@ class WetEtching(_BaseModel):
         return [
             MixtureConstituent(proportion=c.proportion, stoichio=c.stoichio_str)
             for c in self.constituents
+        ]
+
+    @property
+    def title_db_value_input_fields(self):
+        from components.forms.new_film_modif.fields import (
+            HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField,
+            UltrasoundConfigField, EtchingDepthSpeedField,
+            EtchingLateralSpeedField,
+        )
+        return [
+            ('Hard bake temperature', self.hard_bake_temperature,
+             HardBakeTempField),
+            ('Duration', self.duration, AcidEtchingDurationField),
+            ('Used ultrasound', self.used_ultrasound, UsedUltrasoundField),
+            ('Ultrasound config', self.ultrasound_config,
+             UltrasoundConfigField),
+            ('Etching depth speed', self.acid_etching_depth_speed,
+             EtchingDepthSpeedField),
+            ('Etching lateral speed', self.acid_etching_lateral_speed,
+             EtchingLateralSpeedField),
         ]
 
 
