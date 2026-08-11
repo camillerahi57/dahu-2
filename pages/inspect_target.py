@@ -145,7 +145,7 @@ def confirm_deletion_dialog(target_: Target):
              f"target **\"{target_.label}\"**?")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('Yes', key=f"target_confirm_{target_.id}"):
-            target_.delete_instance(recursive=True)
+            target_.delete_with_parts()
             # st.switch_page('deleted_target.py')
             switch_to_submit_successful(pages.browse_targets)
 
@@ -172,7 +172,7 @@ def confirm_state_deletion_dialog(state: DeteriorationState):
              f"the **{extensive_date_str(state.date)}** state?")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('Yes', key=f'state_confirm_{state.id}'):
-            state.delete_instance(recursive=True)
+            state.delete_with_parts()
             st.rerun()
 
 

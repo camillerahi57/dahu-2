@@ -1,28 +1,46 @@
 import streamlit as st
 
-from components.forms.new_substrate.fields import (HasCrystalOrientationField,
-                                                   HField, \
-    KField, LField, StoichiometryField, ThicknessField, LayerCountField, \
-    SubstrateNameField, CommentField)
 from components.forms.base_classes import Form
+from components.forms.new_substrate.fields import (
+    HasCrystalOrientationField, HField, KField, LField, StoichiometryField,
+    ThicknessField, LayerCountField, SubstrateLabelField, CommentField
+)
+from logic.lab_modelization.db_models import Substrate, SubstrateLayer, \
+    StoichioElement
 
 
 class CrystalOrientationForm(Form):
-    def __init__(self, key: str):
+    def __init__(self, key: str, default_layer: SubstrateLayer|None):
         fields = []
         st.write(f"**Crystal Orientation**")
         with st.container(horizontal=True, vertical_alignment='top'):
-            has_orientation_fld = HasCrystalOrientationField(key,
-                                                             form_default=None)
+            has_orientation_fld = HasCrystalOrientationField(
+                key,
+                form_default=None,
+                db_default=default_layer.h is not None
+                    if default_layer else None,
+            )
             fields.append(has_orientation_fld)
             if has_orientation_fld.value is True:
                 col1_, col2_, col3_, col4_ = st.columns(4)
                 with col2_:
-                    h_fld = HField(form_default=None)
+                    h_fld = HField(
+                        key=f'h_{key}',
+                        form_default=0,
+                        db_default=default_layer.h if default_layer else None,
+                    )
                 with col3_:
-                    k_fld = KField(form_default=None)
+                    k_fld = KField(
+                        key=f'k_{key}',
+                        form_default=0,
+                        db_default=default_layer.k if default_layer else None,
+                    )
                 with col4_:
-                    l_fld = LField(form_default=None)
+                    l_fld = LField(
+                        key=f'l_{key}',
+                        form_default=0,
+                        db_default=default_layer.l if default_layer else None,
+                    )
                 h, k, l = h_fld.value, k_fld.value, l_fld.value
                 fields.extend([h_fld, k_fld, l_fld])
             else:
@@ -44,14 +62,20 @@ class CrystalOrientationForm(Form):
 
 
 class LayerForm(Form):
-    def __init__(self, key: str):
+    def __init__(self, key: str, default_layer: SubstrateLayer|None):
         with st.container(horizontal=True, vertical_alignment='center'):
-            stoichio_fld = StoichiometryField(key, form_default=None)
-            thickness_fld = ThicknessField(
+            stoichio_fld = StoichiometryField(
                 key,
                 form_default=None,
+                db_default=StoichioElement.to_str(default_layer.stoichio)
+                    if default_layer else None,
             )
-        cryst_orient_form = CrystalOrientationForm(key)
+            thickness_fld = ThicknessField(
+                key,
+                form_default=0.,
+                db_default=default_layer.thickness if default_layer else 0.,
+            )
+        cryst_orient_form = CrystalOrientationForm(key, default_layer)
 
         self.stoichio = stoichio_fld.value
         self.thickness = thickness_fld.in_db_unit
@@ -67,10 +91,13 @@ class LayerForm(Form):
 
 
 class LayerListForm(Form):
-    def __init__(self):
+    def __init__(self, default_sub: Substrate|None):
         st.subheader("Layers:")
 
-        layer_count_fld = LayerCountField(form_default=None)
+        layer_count_fld = LayerCountField(
+            form_default=0,
+            db_default=len(default_sub.layers) if default_sub else None,
+        )
         st.divider()
         layer_count = layer_count_fld.value
 
@@ -85,7 +112,15 @@ class LayerListForm(Form):
                     layer_label = f"Layer {i+1}"
                 with st.container(border=True):
                     st.subheader(layer_label)
-                    layer_forms.append(LayerForm(key=str(i)))
+                    try:
+                        default_layer = default_sub.layers[i]
+                    except IndexError, AttributeError:
+                        default_layer = None
+                    layer_form = LayerForm(
+                        key=str(i),
+                        default_layer=default_layer,
+                    )
+                    layer_forms.append(layer_form)
 
         self.layer_forms = layer_forms
         super().__init__(
@@ -100,19 +135,56 @@ class LayerListForm(Form):
 
 
 class RootForm(Form):
-    def __init__(self):
-        sub_name_fld = SubstrateNameField(form_default=None)
-        comment_fld = CommentField(form_default=None)
-        layer_list_form = LayerListForm()
+    def __init__(self, default_sub: Substrate|None):
+        sub_label_fld = SubstrateLabelField(
+            form_default=None,
+            db_default=default_sub.label if default_sub else None,
+        )
+        comment_fld = CommentField(
+            form_default=None,
+            db_default=default_sub.comment if default_sub else None,
+        )
+        layer_list_form = LayerListForm(default_sub)
 
-        self.substrate_name = sub_name_fld.value
+        self.substrate_name = sub_label_fld.value
         self.comment = comment_fld.value
         self.layer_list_form = layer_list_form
 
         super().__init__(
-            [sub_name_fld, comment_fld],
+            [sub_label_fld, comment_fld],
             [layer_list_form]
         )
 
     def _is_coherent(self):
         return True, ''
+
+    def show_layers(self):
+        st.divider()
+        layer_forms = self.layer_list_form.layer_forms
+        if self.is_valid:
+            layer_strings = []
+            for f in reversed(layer_forms):
+                layer_strings.append(f'――――――――――― {f.stoichio}')
+            with st.container(border=True, width='content'):
+                st.write("⬇️ Top layer")
+                st.text('\n'.join(layer_strings))
+                st.write("⬆️ Bottom layer")
+
+    def to_substrate(self, id_: int = None) -> Substrate:
+        substrate = Substrate(
+            id=id_ if id_ is not None else None,
+            label=self.substrate_name,
+            comment=self.comment,
+        )
+        substrate.layers = []
+
+        layer_forms = self.layer_list_form.layer_forms
+        for i, form in enumerate(layer_forms):
+            cryst_orient = form.cryst_orient_form
+            h, k, l = cryst_orient.h, cryst_orient.k, cryst_orient.l
+            layer = SubstrateLayer.from_stoichio(
+                form.stoichio, form.thickness, h, k, l,
+                substrate, position_from_back=i)
+            substrate.layers.append(layer)
+
+        return substrate

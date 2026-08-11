@@ -23,7 +23,7 @@ try:
 
     if st.button("Submit", disabled=not form_is_valid, type='primary'):
         for old_layer in film.layers:
-            old_layer.delete_instance(recursive=True)
+            old_layer.delete_with_parts()
 
         with db.atomic():
             for new_layer in new_layers:

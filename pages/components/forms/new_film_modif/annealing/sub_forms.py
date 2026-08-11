@@ -147,7 +147,7 @@ class PhaseForm(Form):
                 raise RuntimeError(f'Unknown phase type: {phase_type}.')
 
         self.phase_type = phase_type
-        self.atmosphere = atmosphere_fld.value
+        self.atmosphere: str|None = atmosphere_fld.value
         if phase_type == phase_types.RAMP:
             self.ramp_form: RampPhaseForm|None = phase_form
             self.plateau_form = None
@@ -165,6 +165,8 @@ class PhaseForm(Form):
 
     def get_stoichio(self, annealing_step: AnnealingStep) \
             -> list[StoichioElement]:
+        if not self.atmosphere:
+            return []
         return StoichioElement.from_str(
             formula=self.atmosphere,
             fk_field=StoichioElement.annealing_step,
@@ -176,8 +178,8 @@ class PhaseListForm(Form):
     def __init__(self, default_annealing: Annealing|None):
         st.header("Annealing Phases")
         phase_count_fld = PhaseCountField(
-            form_default=None,
-            db_default=None if default_annealing is None
+            form_default=0,
+            db_default=0 if default_annealing is None
                 else len(default_annealing.steps) - 1,
         )
         phase_count = phase_count_fld.value
@@ -196,10 +198,13 @@ class PhaseListForm(Form):
 
             if default_annealing is not None:
                 db_steps = default_annealing.steps
-                default_stoichio = default_annealing.atmosphere_formula
                 try:
                     db_phase_start = db_steps[phase_idx]
                     db_phase_end = db_steps[phase_idx + 1]
+
+                    default_stoichio = StoichioElement.to_str(
+                        elements=db_steps[phase_idx + 1].preceding_atmosphere
+                    )
 
                     default_reached_temp = db_phase_end.temperature
 
@@ -281,7 +286,7 @@ class PhaseListForm(Form):
                 is_room_temperature=last_is_room_temp,
                 annealing=annealing,
             )
-            step.atmosphere = form.get_stoichio(step)
+            step.preceding_atmosphere = form.get_stoichio(step)
             steps.append(step)
 
         return steps

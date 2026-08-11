@@ -26,7 +26,7 @@ try:
         sess[Ck.LAST_EMAIL_USED] = new_state.made_by_email
 
         with db.atomic():
-            old_state.delete_instance(recursive=True)
+            old_state.delete_with_parts()
             new_state.save_with_dependent()
             photo_path = FILE_STORAGE_PATH / new_state.photo_file_name
             root_form.target_img.save(photo_path)

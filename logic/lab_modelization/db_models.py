@@ -108,6 +108,15 @@ class _BaseModel(Model):
                 quantity_str = db_value if db_value is not None else '_None_'
             description_items.append(f"**{title}:** {quantity_str}")
         return separator.join(description_items)
+    
+    def delete_parts(self):
+        raise NotImplementedError
+    
+    def delete_with_parts(self, *args, **kwargs):
+        """Recursive delete but safe (only deleting parts, not other dependent
+        objects)."""
+        self.delete_parts()
+        self.delete_instance(*args, **kwargs)
 
 
 class Substrate(_BaseModel):
@@ -116,9 +125,13 @@ class Substrate(_BaseModel):
 
     layers: DependentBackref[SubstrateLayer]
 
-    def __init__(self, label: str, comment: str, *args, **kwargs):
+    def __init__(self, label: str = None, comment: str = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+        
+    def delete_parts(self):
+        for l in self.layers:
+            l.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
@@ -162,11 +175,16 @@ class SubstrateLayer(_BaseModel):
 
     stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, thickness: float | None, h: int | None, k: int | None,
-                 l: int | None, substrate: Substrate | None,
-                 position_from_back: int | None, *args, **kwargs):
+    def __init__(self, thickness: float | None = None, h: int | None = None,
+                 k: int | None = None,
+                 l: int | None = None, substrate: Substrate | None = None,
+                 position_from_back: int | None = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+        
+    def delete_parts(self):
+        for s in self.stoichio:
+            s.delete_with_parts()
 
     @classmethod
     def from_stoichio(cls, stoichio: str, thickness: float | None,
@@ -197,11 +215,15 @@ class Target(_BaseModel):
     states: DependentBackref[DeteriorationState]
     uses: DependentBackref[TargetUse]
 
-    def __init__(self, made_on: datetime, made_by_email: str,
-                 label: str, previous_version: Target | None,
+    def __init__(self, made_on: datetime = None, made_by_email: str = None,
+                 label: str = None, previous_version: Target | None = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+        
+    def delete_parts(self):
+        for s in self.states:
+            s.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
@@ -243,166 +265,20 @@ class Target(_BaseModel):
                 if state.comment]
 
 
-# class Disc(BaseModel):
-#     center_px_x = FloatField()
-#     center_px_y = FloatField()
-#     radius_in_px = FloatField()
-#     patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='disc')
-#
-#     @classmethod
-#     def new(cls, center_px_x: float, center_px_y: float, radius_in_px: float,
-#             patch: Patch):
-#         init_kwargs = self.get_init_kwargs(locals())
-#         super().__init__(*args, **model_kwargs, **kwargs)
-#
-#     def __str__(self):
-#         return (f"Center: ({self.center_px_x:g}, {self.center_px_y:g})"
-#                 f"  |  Radius: {self.radius_in_px:g}")
-#
-#     @classmethod
-#     def from_circumference_points(cls, points: list[tuple[int, int]],
-#                                   patch: Patch) -> Self:
-#         assert len(points) == 3, \
-#             f"Circumference must contain exactly 3 points. Got {len(points)}."
-#         (cx, cy), r = cls.circumference_points_to_center_and_radius(*points)
-#         return cls(cx, cy, r, patch)
-#
-#     Point = tuple[float, float]
-#
-#     @staticmethod
-#     def circumference_points_to_center_and_radius(
-#             p1: Disc.Point, p2: Disc.Point, p3: Disc.Point) \
-#             -> tuple[Disc.Point, float]:
-#         """
-#         Given three (X, Y) points on a circle's circumference,
-#         returns the (X, Y) center and radius of the circle.
-#         """
-#         ax, ay = p1
-#         bx, by = p2
-#         cx, cy = p3
-#
-#         d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-#         if d == 0:
-#             raise ValueError("The three points are collinear "
-#                              "— no unique circle exists.")
-#         ux = (
-#                      (ax ** 2 + ay ** 2) * (by - cy)
-#                      + (bx ** 2 + by ** 2) * (cy - ay)
-#                      + (cx ** 2 + cy ** 2) * (ay - by)
-#              ) / d
-#         uy = (
-#                      (ax ** 2 + ay ** 2) * (cx - bx)
-#                      + (bx ** 2 + by ** 2) * (ax - cx)
-#                      + (cx ** 2 + cy ** 2) * (bx - ax)
-#              ) / d
-#
-#         radius = ((ax - ux) ** 2 + (ay - uy) ** 2) ** 0.5
-#         return (ux, uy), radius
-
-# class Polygon(BaseModel):
-#     patch = ForeignKeyField(Patch, on_delete='RESTRICT', backref='polygon')
-#
-#     vertices: list[Vertex]
-#
-#     @classmethod
-#     def new(cls, patch: Patch):
-#         init_kwargs = self.get_init_kwargs(locals())
-#         super().__init__(*args, **model_kwargs, **kwargs)
-
-
-#
-#     def __str__(self):
-#         str_ = 'Vertices:'
-#         for v in self.ordered_vertices():
-#             str_ += f' {v}'
-#         return str_
-#
-#     def ordered_vertices(self) -> list[Vertex]:
-#         def get_rank(v: Vertex):
-#             return int(v.clockwise_rank)  # noqa I don't understand the warning.
-#
-#         return sorted(self.vertices, key=get_rank)
-#
-#     def to_scatter(self, color: str, name: str) -> Scatter:
-#         vertex_list: list[tuple[float, float]] = [
-#             (v.pixel_x, v.pixel_y)
-#             for v in self.ordered_vertices()
-#         ]
-#         if vertex_list[-1] != vertex_list[0]:
-#             vertex_list.append(vertex_list[0])  # Close de loop.
-#         x_list, y_list = zip(*vertex_list)
-#         return Scatter(
-#             x=x_list, y=y_list,
-#             mode='lines',
-#             fill='toself',
-#             fillcolor=color,
-#             opacity=1,
-#             line=dict(width=1, color='black'),
-#             showlegend=False,
-#             name=name,
-#         )
-#
-#     @classmethod
-#     def from_text(cls, text: str, patch: Patch) -> Self:
-#         vertex_tuples = cls.polygon_text_to_vertices(text)
-#         polygon = Polygon.from_ordered_vertices(vertex_tuples, patch)
-#         return polygon
-#
-#     @staticmethod
-#     def polygon_text_to_vertices(text: str) -> list[tuple[float, float]]:
-#         """
-#         The input must be a list of vertices, one on each line. Each vertex
-#         is an X,Y couple. Example of a triangle: 12.3, 48.3 78, 15.6 6.1, 5
-#         """
-#         text = (text
-#                 .replace(' ', '')  # Removes all white spaces.
-#                 .strip(',\n')  # Allow dots at the start or end.
-#                 )
-#         vertex_lines = filter(None, text.split('\n')) # Removes empty as well.
-#         vertex_tuples: list[tuple[float, float]] = []
-#         for vertex_line in vertex_lines:
-#             x, y = vertex_line.removesuffix(',').split(',')
-#             vertex_tuples.append((float(x), float(y)))
-#         return vertex_tuples
-#
-#     @classmethod
-#     def from_ordered_vertices(cls,
-#                               clockwise_vertices: list[tuple[float, float]],
-#                               patch: Patch) -> Self:
-#         polygon = cls(patch=patch)
-#         vertices = []
-#         for i, (x, y) in enumerate(clockwise_vertices):
-#             vertices.append(
-#                 Vertex(pixel_x=x, pixel_y=y, clockwise_rank=i,
-#                            polygon=polygon))
-#         polygon.vertices = vertices
-#         return polygon
-#
-#     @classmethod
-#     def from_aligned_rectangle_data(cls, first_vertex: tuple[float, float],
-#                                     opposite_vertex: tuple[float, float],
-#                                     patch: Patch) -> Self:
-#         return Polygon.from_ordered_vertices(
-#             [
-#                 (first_vertex[0], first_vertex[1]),
-#                 (first_vertex[0], opposite_vertex[1]),
-#                 (opposite_vertex[0], opposite_vertex[1]),
-#                 (opposite_vertex[0], first_vertex[1]),
-#             ],
-#             patch=patch,
-#         )
-
-
 class MokeCoilFactor(_BaseModel):
     validity_start = DateField()
     validity_end = DateField()
     factor = FloatField()
     comment = CharField(null=True)
 
-    def __init__(self, validity_start: datetime, validity_end: datetime,
-                 factor: float, comment: str, *args, **kwargs):
+    def __init__(self, validity_start: datetime = None,
+                 validity_end: datetime = None,
+                 factor: float = None, comment: str = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+        
+    def delete_parts(self):
+        pass
 
 
 class EsrfPoni(_BaseModel):
@@ -417,12 +293,18 @@ class EsrfPoni(_BaseModel):
     wavelength = FloatField()
     comment = CharField(null=True)
 
-    def __init__(self, validity_start: datetime, validity_end: datetime,
-                 distance: float, poni1: float,
-                 poni2: float, rot1: float, rot2: float, rot3: float,
-                 wavelength: float, comment: str, *args, **kwargs):
+    def __init__(self, validity_start: datetime = None,
+                 validity_end: datetime = None,
+                 distance: float = None, poni1: float = None,
+                 poni2: float = None, rot1: float = None, rot2: float = None,
+                 rot3: float = None,
+                 wavelength: float = None, comment: str = None,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+        
+    def delete_parts(self):
+        pass
 
 
 class Library(_BaseModel):
@@ -434,14 +316,15 @@ class Library(_BaseModel):
 
     # Will add charac refs in the future.
 
-    def __init__(self, label: str, last_inspected_at: datetime, comment: str,
-                 *args, **kwargs):
+    def __init__(self, label: str = None, last_inspected_at: datetime = None,
+                 comment: str = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-
-    # def cascading_children_obsolete(self) -> list[BaseModel]:
-    #     return self.film + self.uploaded_files
-
+        
+    def delete_parts(self):
+        for f in self.films:
+            f.delete_with_parts()
+            
     @classmethod
     def already_taken_names(cls):
         query = cls.select(
@@ -478,15 +361,18 @@ class Film(_BaseModel):
 
     # Will add characterization.
 
-    def __init__(self, label: str, made_on: datetime,
-                 made_by_email: str,
-                 substrate: Substrate, library: Library,
+    def __init__(self, label: str = None, made_on: datetime = None,
+                 made_by_email: str = None,
+                 substrate: Substrate = None, library: Library = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    # def cascading_children_obsolete(self) -> list[BaseModel]:
-    #     return self.layers + self.modifs
+    def delete_parts(self):
+        for l in self.layers:
+            l.delete_with_parts()
+        for m in self.modifs:
+            m.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
@@ -550,16 +436,26 @@ class FilmLayer(_BaseModel):
     triode_sputterings: DependentBackref[TriodeSputtering]  # List of 1.
 
     def __init__(self,
-                 position_from_buffer: int | None,
-                 deposit_temp: float | None,
-                 nominal_thickness: float | None,
-                 shadow_mask_description: str | None,
-                 function: FilmLayerFunction,
-                 sputtering_system: SputteringSystem | None,
-                 film: Film,
+                 position_from_buffer: int | None = None,
+                 deposit_temp: float | None = None,
+                 nominal_thickness: float | None = None,
+                 shadow_mask_description: str | None = None,
+                 function: FilmLayerFunction = None,
+                 sputtering_system: SputteringSystem | None = None,
+                 film: Film = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for ns in self.nominal_stoichio:
+            ns.delete_with_parts()
+        for tu in self.target_uses:
+            tu.delete_with_parts()
+        for ms in self.magnetron_sputterings:
+            ms.delete_with_parts()
+        for ts in self.triode_sputterings:
+            ts.delete_with_parts()
 
     @property
     def element_str(self) -> str:
@@ -599,14 +495,19 @@ class MagnetronSputtering(_BaseModel):
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                             backref='magnetron_sputterings')
 
-    def __init__(self, deposit_distance: float | None,
-                 deposit_angle: float | None,
-                 deposit_power: float | None, deposit_duration: float | None,
-                 generator: MagnetronSputteringGenerator | None,
-                 machine_model: MagnetronMachineModel | None,
-                 film_layer: FilmLayer, *args, **kwargs):
+    def __init__(self, deposit_distance: float | None = None,
+                 deposit_angle: float | None = None,
+                 deposit_power: float | None = None,
+                 deposit_duration: float | None = None,
+                 generator: MagnetronSputteringGenerator | None = None,
+                 machine_model: MagnetronMachineModel | None = None,
+                 film_layer: FilmLayer = None
+                 , *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
     @property
     def title_db_value_input_fields(self):
@@ -643,25 +544,28 @@ class TriodeSputtering(_BaseModel):
                                             backref='triode_sputterings')
 
     def __init__(self,
-                 has_active_cooling: bool | None,
-                 rotation_speed: float | None,
-                 filament_current_start: float | None,
-                 filament_current_end: float | None,
-                 anode_current: float | None,
-                 anode_voltage: float | None,
-                 cathode_current: float | None,
-                 cathode_voltage: float | None,
-                 deposit_rate: float | None,
-                 argon_flow: float | None,
-                 nitrogen_flow: float | None,
-                 pressure: float | None,
-                 deposit_duration: float | None,
-                 presputtering_thickness: float | None,
-                 film_layer: FilmLayer,
+                 has_active_cooling: bool | None = None,
+                 rotation_speed: float | None = None,
+                 filament_current_start: float | None = None,
+                 filament_current_end: float | None = None,
+                 anode_current: float | None = None,
+                 anode_voltage: float | None = None,
+                 cathode_current: float | None = None,
+                 cathode_voltage: float | None = None,
+                 deposit_rate: float | None = None,
+                 argon_flow: float | None = None,
+                 nitrogen_flow: float | None = None,
+                 pressure: float | None = None,
+                 deposit_duration: float | None = None,
+                 presputtering_thickness: float | None = None,
+                 film_layer: FilmLayer = None,
                  *args, **kwargs
                  ):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
     @property
     def deposit_power(self) -> float:
@@ -706,10 +610,14 @@ class UserUploadedFile(_BaseModel):
 
     _file_bytes: bytes | None = None  # Not in DB.
 
-    def __init__(self, label: str, file_name: str, upload_date: datetime,
+    def __init__(self, label: str = None, file_name: str = None,
+                 upload_date: datetime = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
     def get_path(self):
         return USER_UPLOAD_PATH.joinpath(self.file_name)
@@ -768,11 +676,19 @@ class FilmModification(_BaseModel):
 
     # Will add characs in the future.
 
-    def __init__(self, made_on: datetime, modif_number: int, made_by_email: str,
-                 comment: str, modif_type: FilmModifType, film: Film,
+    def __init__(self, made_on: datetime = None, modif_number: int = None,
+                 made_by_email: str = None,
+                 comment: str = None, modif_type: FilmModifType = None,
+                 film: Film = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for a in self.annealings:
+            a.delete_with_parts()
+        for e in self.etchings:
+            e.delete_with_parts()
 
     def save(self, shift_subsequent_modifs=True):  # noqa
         """Saves a film modification with its modif_number, and adds 1 to all
@@ -830,13 +746,18 @@ class Annealing(_BaseModel):
         FilmModification, on_delete='RESTRICT', backref='annealings')
 
     steps: DependentBackref[AnnealingStep]
-    atmosphere: list[StoichioElement]
 
-    def __init__(self, pumping_duration: float | None, pressure: float | None,
-                 furnace: Furnace | None,
-                 film_modif: FilmModification, *args, **kwargs):
+    def __init__(self, pumping_duration: float | None = None,
+                 pressure: float | None = None,
+                 furnace: Furnace | None = None,
+                 film_modif: FilmModification = None,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for s in self.steps:
+            s.delete_with_parts()
 
     @property
     def temperatures(self) -> set[Quantity]:
@@ -876,10 +797,6 @@ class Annealing(_BaseModel):
             'First and last steps must be at room temperature.')
         assert steps[0].timestamp == 0, "First step must have timestamp 0."
 
-    @property
-    def atmosphere_formula(self):
-        return StoichioElement.to_str(self.atmosphere)
-
     def get_figure(self) -> Figure:
         return AnnealingStep.get_figure(self.steps)
 
@@ -892,13 +809,18 @@ class AnnealingStep(_BaseModel):
     annealing: Annealing = ForeignKeyField(Annealing, on_delete='RESTRICT',
                                            backref='steps')
 
-    atmosphere: DependentBackref[StoichioElement]
+    preceding_atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self, timestamp: float, temperature: float | None,
-                 is_room_temperature: bool, annealing: Annealing,
+    def __init__(self, timestamp: float = None,
+                 temperature: float | None = None,
+                 is_room_temperature: bool = None, annealing: Annealing = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for se in self.preceding_atmosphere:
+            se.delete_with_parts()
 
     def is_plateau(self, previous_step: AnnealingStep) -> bool:
         both_room_temp = (self.is_room_temperature
@@ -961,10 +883,23 @@ class Etching(_BaseModel):
     patterns: DependentBackref[EtchingPattern]
     recipes: DependentBackref[EtchingRecipe]
 
-    def __init__(self, has_a_pattern: bool, film_modif: FilmModification,
+    def __init__(self, has_a_pattern: bool = None,
+                 film_modif: FilmModification = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for ie in self.ion_etchings:
+            ie.delete_with_parts()
+        for we in self.wet_etchings:
+            we.delete_with_parts()
+        for lo in self.lift_offs:
+            lo.delete_with_parts()
+        for p in self.patterns:
+            p.delete_with_parts()
+        for r in self.recipes:
+            r.delete_with_parts()
 
     def store_related_files(self):
         if self.patterns:
@@ -994,12 +929,21 @@ class IonBeamEtching(_BaseModel):
 
     constituents: DependentBackref[PlasmaConstituent]
 
-    def __init__(self, duration: float | None, flow: float | None,
-                 incidence_angle: float | None, rotation: float | None,
-                 power: float | None, pressure: float | None,
-                 etching: Etching | None, *args, **kwargs):
+    def __init__(self,
+                 duration: float | None = None,
+                 flow: float | None = None,
+                 incidence_angle: float | None = None,
+                 rotation: float | None = None,
+                 power: float | None = None,
+                 pressure: float | None = None,
+                 etching: Etching | None = None,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for c in self.constituents:
+            c.delete_with_parts()
 
     def to_mixture_constituents(self) -> list[MixtureConstituent]:
         return [
@@ -1011,10 +955,14 @@ class IonBeamEtching(_BaseModel):
 class EtchingPattern(UserUploadedFile):
     etching = ForeignKeyField(Etching, backref='patterns')
 
-    def __init__(self, label: str, file_name: str, upload_date: datetime,
-                 etching: Etching, *args, **kwargs):
+    def __init__(self, label: str = None, file_name: str = None,
+                 upload_date: datetime = None,
+                 etching: Etching = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
 
 class PlasmaConstituent(_BaseModel):
@@ -1025,10 +973,15 @@ class PlasmaConstituent(_BaseModel):
 
     nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float, ion_etching: IonBeamEtching,
+    def __init__(self, proportion: float = None,
+                 ion_etching: IonBeamEtching = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for se in self.nominal_stoichio:
+            se.delete_with_parts()
 
     @property
     def stoichio_str(self):
@@ -1058,11 +1011,14 @@ class LiftOffEtching(_BaseModel):
     etching: Etching = ForeignKeyField(
         Etching, on_delete='RESTRICT', backref='lift_offs')
 
-    def __init__(self, used_ultrasound: bool | None,
-                 ultrasound_config: str | None,
-                 etching: Etching, *args, **kwargs):
+    def __init__(self, used_ultrasound: bool | None = None,
+                 ultrasound_config: str | None = None,
+                 etching: Etching = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
 
 class WetEtching(_BaseModel):
@@ -1079,17 +1035,21 @@ class WetEtching(_BaseModel):
     constituents: DependentBackref[AcidConstituent]
 
     def __init__(self,
-                 hard_bake_temperature: float | None,
-                 duration: float | None,
-                 used_ultrasound: bool | None,
-                 ultrasound_config: str | None,
-                 acid_etching_depth_speed: float | None,
-                 acid_etching_lateral_speed: float | None,
-                 etching: Etching,
+                 hard_bake_temperature: float | None = None,
+                 duration: float | None = None,
+                 used_ultrasound: bool | None = None,
+                 ultrasound_config: str | None = None,
+                 acid_etching_depth_speed: float | None = None,
+                 acid_etching_lateral_speed: float | None = None,
+                 etching: Etching = None,
                  *args, **kwargs
                  ):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for c in self.constituents:
+            c.delete_with_parts()
 
     def to_mixture_constituents(self) -> list[MixtureConstituent]:
         return [
@@ -1101,10 +1061,14 @@ class WetEtching(_BaseModel):
 class EtchingRecipe(UserUploadedFile):
     etching = ForeignKeyField(Etching, backref='recipes')
 
-    def __init__(self, label: str, file_name: str, upload_date: datetime,
-                 etching: Etching, *args, **kwargs):
+    def __init__(self, label: str = None, file_name: str = None,
+                 upload_date: datetime = None,
+                 etching: Etching = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
 
 class AcidConstituent(_BaseModel):
@@ -1115,10 +1079,14 @@ class AcidConstituent(_BaseModel):
 
     nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float, wet_etching: WetEtching, *args,
-                 **kwargs):
+    def __init__(self, proportion: float = None, wet_etching: WetEtching = None,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for se in self.nominal_stoichio:
+            se.delete_with_parts()
 
     @property
     def stoichio_str(self):
@@ -1156,14 +1124,22 @@ class DeteriorationState(_BaseModel):
 
     patches: DependentBackref[Patch]
 
-    def __init__(self, date: datetime, length_per_px: float | None,
-                 photo_file_name: str | None,
-                 calibration_factor_comment: float | None, comment: str | None,
-                 pixel_coordinate_system: PixelCoordinateSystem | None,
-                 target: Target, made_by_email: str,
+    def __init__(self,
+                 date: datetime,
+                 length_per_px: float | None = None,
+                 photo_file_name: str | None = None,
+                 calibration_factor_comment: float | None = None,
+                 comment: str | None = None,
+                 pixel_coordinate_system: PixelCoordinateSystem | None = None,
+                 target: Target = None,
+                 made_by_email: str = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        for p in self.patches:
+            p.delete_with_parts()
 
     def photo_path(self):
         return FILE_STORAGE_PATH / self.photo_file_name
@@ -1199,7 +1175,6 @@ class DeteriorationState(_BaseModel):
         return fig
 
 
-# TODO assert all FK have a backref.
 # TODO assert all the unique are correct.
 
 
@@ -1212,14 +1187,20 @@ class Patch(_BaseModel):
     stoichio: DependentBackref[StoichioElement]
     vertices: DependentBackref[Vertex]
 
-    def __init__(self, stack_idx: int,
-                 deterioration_state: DeteriorationState,
+    def __init__(self, stack_idx: int = None,
+                 deterioration_state: DeteriorationState = None,
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def __str__(self):
         return f'Patch of stoichiometry {self.stoichio}'
+
+    def delete_parts(self):
+        for se in self.stoichio:
+            se.delete_with_parts()
+        for v in self.vertices:
+            v.delete_with_parts()
 
     @classmethod
     def from_polygon(cls, stoichio_str: str,
@@ -1309,56 +1290,6 @@ class Patch(_BaseModel):
         )
 
 
-# @classmethod
-# def from_patch_text(cls, text: str,
-#                     deterioration_state: DeteriorationState) \
-#         -> list[Self]:
-#     text = text.replace(' ', '')
-#     lines = text.split('\n')
-#     lines = [l for l in lines if l != '']  # Remove empty lines.
-#     assert len(lines) >= 1, f"Patch data cannot be empty. Got '{lines}'."
-#     return [cls._from_text_line(line, deterioration_state, i)
-#             for i, line in enumerate(lines)]
-#
-# @classmethod
-# def _from_text_line(cls, line: str, deterioration_state: DeteriorationState,
-#                     stack_idx: int) \
-#         -> Self:
-#     line = line.replace(' ', '').removesuffix('/')
-#     text_elements: list[str] = line.split('/')
-#     assert len(text_elements) >= 5, f"Not enough info on the line: {line}"
-#     shape_type_str = text_elements[0].lower()
-#     try:
-#         shape_type = ShapeType(shape_type_str)
-#     except ValueError:
-#         msg = (f"Each line must start with a valid shape name. "
-#                f"Got '{shape_type_str}' instead.")
-#         raise ValueError(msg)
-#     stoichio = text_elements[1]
-#     is_valid, msg = cls.is_valid_formula(stoichio)
-#     assert is_valid, f"Invalid stoichiometry for line '{line}'."
-#     coord_strings = text_elements[2:]
-#     coords: list[tuple[int, int]] = []
-#     for s in coord_strings:
-#         try:
-#             x, y = make_tuple(s)
-#         except (ValueError, SyntaxError):
-#             raise RuntimeError(f"Invalid coordinates '{s}'.")
-#         assert isinstance(x, int) and isinstance(y, int), \
-#             f'Pixel coordinates must be integers. Got {x},{y} instead.'
-#         assert x >= 0 and y >= 0, f"Coordinates must be positive."
-#         coords.append((x, y))
-#
-#     match shape_type:
-#         case ShapeType.DISC:
-#             return cls.from_circumference_points(coords, stoichio,
-#                                                  stack_idx,
-#                                                  deterioration_state)
-#         case ShapeType.POLYGON:
-#             return cls.from_vertices(stoichio, coords, stack_idx,
-#                                      deterioration_state)
-
-
 class Vertex(_BaseModel):
     pixel_x: float = FloatField()
     pixel_y: float = FloatField()
@@ -1367,10 +1298,14 @@ class Vertex(_BaseModel):
     patch: Patch = ForeignKeyField(
         Patch, on_delete='RESTRICT', backref='vertices')
 
-    def __init__(self, pixel_x: float, pixel_y: float, clockwise_rank: int,
-                 patch: Patch, *args, **kwargs):
+    def __init__(self, pixel_x: float = None, pixel_y: float = None,
+                 clockwise_rank: int = None,
+                 patch: Patch = None, *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
     def __str__(self):
         return f'({self.pixel_x:g}, {self.pixel_y:g})'
@@ -1384,9 +1319,13 @@ class TargetUse(_BaseModel):
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                             backref='target_uses')
 
-    def __init__(self, target: Target, film_layer: FilmLayer, *args, **kwargs):
+    def __init__(self, target: Target = None, film_layer: FilmLayer = None,
+                 *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
 
 class StoichioElement(_BaseModel):
@@ -1406,7 +1345,7 @@ class StoichioElement(_BaseModel):
         backref='nominal_stoichio')
     annealing_step: AnnealingStep | ForeignKeyField = ForeignKeyField(
         AnnealingStep, null=True, on_delete='RESTRICT',
-        backref='atmosphere')
+        backref='preceding_atmosphere')
     acid_constituent: AcidConstituent | ForeignKeyField = ForeignKeyField(
         AcidConstituent, null=True, on_delete='RESTRICT',
         backref='nominal_stoichio')
@@ -1414,8 +1353,8 @@ class StoichioElement(_BaseModel):
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')
 
-    def __init__(self, quantity: float, position_in_str: int,
-                 element: ChemicalElement,
+    def __init__(self, quantity: float = None, position_in_str: int = None,
+                 element: ChemicalElement = None,
                  substrate_layer: SubstrateLayer = None,
                  patch: Patch = None, film_layer: FilmLayer = None,
                  annealing: Annealing = None,
@@ -1423,6 +1362,9 @@ class StoichioElement(_BaseModel):
                  *args, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
     @classmethod
     def from_str(cls, formula: str, fk_field: ForeignKeyField,

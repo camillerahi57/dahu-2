@@ -19,7 +19,7 @@ from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
     IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching,
-    FilmLayer)
+    FilmLayer, StoichioElement)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -135,7 +135,7 @@ def confirm_deletion_dialog(lib_: Library):
              f"- Uploaded data for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
-            lib_.delete_instance(recursive=True)
+            lib_.delete_with_parts()
             switch_to_submit_successful(pages.browse_libs)
             # st.switch_page('deleted_lib.py')
 
@@ -161,7 +161,17 @@ def annealing_info(process: Annealing):
     else:
         pressure_str = '_None_'
     st.write(f"**Pressure:** {pressure_str}\n\n"
-             f"**Furnace:** {process.furnace}")
+             f"**Pumping duration:** {process.pumping_duration}\n\n"
+             f"**Furnace:** {process.furnace}\n\n")
+
+    atmosphere_str = "**Atmosphere:**"
+    for i_, step in enumerate(process.steps):
+        if i_ == 0:
+            continue  # First step has no preceding atmosphere.
+        stoichio_str = StoichioElement.to_str(step.preceding_atmosphere)
+        atmosphere_str += f"\n- Phase {i_}: {stoichio_str}"
+    st.write(atmosphere_str)
+
     st.plotly_chart(process.get_figure())
 
 
@@ -198,7 +208,7 @@ def film_modif_info(modif_: FilmModification):
     st.divider()
     if st.button("Delete film modification ❌"):
         with (db.atomic()):
-            modif_.delete_instance(recursive=True)
+            modif_.delete_with_parts()
         st.rerun()
 
 def charac_card(label_: str):

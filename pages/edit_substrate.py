@@ -1,5 +1,6 @@
 from components.forms.base_classes import PausePageRun
-from components.streamlit_tools import init_page, switch_to_submit_successful
+from components.streamlit_tools import init_page, switch_to_submit_successful, \
+    current_params
 from logic.constants import IdType
 from logic.page_list import pages
 from components.forms.new_substrate.sub_forms import RootForm
@@ -8,26 +9,29 @@ import streamlit as st
 from logic.lab_modelization.db_models import db, Substrate, SubstrateLayer
 from logic.functions import save_cookies
 
-
 init_page(pages.new_substrate)
 
+substrate_id = current_params()[IdType.SUB]
+old_substrate: Substrate = Substrate.get_by_id(substrate_id)
+
 try:
-    root_form = RootForm(default_sub=None)
+    root_form = RootForm(old_substrate)
     root_form.show_layers()
 
     st.divider()
 
     if st.button("Submit", disabled=not root_form.is_valid, type='primary'):
-        substrate = root_form.to_substrate()
+        new_substrate = root_form.to_substrate(old_substrate.id)
 
         with db.atomic():
-            substrate.save_with_dependent()
+            old_substrate.delete_with_parts()
+            new_substrate.save_with_dependent(force_insert=True)
 
         save_cookies()
         switch_to_submit_successful(
             redirect_to=pages.inspect_substrate,
             id_type=IdType.SUB,
-            object_id=substrate.id,
+            object_id=new_substrate.id,
         )
 
 except PausePageRun:

@@ -61,6 +61,9 @@ class _Pages:
     edit_film_layers: StreamlitPage = Page(
         '../pages/edit_film_layers.py', url_path='edit_film_layers',
         title='Edit Film Layers', icon='🐐')
+    edit_substrate: StreamlitPage = Page(
+        '../pages/edit_substrate.py', url_path='edit_substrate',
+        title='Edit Substrate', icon='🐐')
 
     test: StreamlitPage = Page(
         '../pages/test.py', url_path='test',

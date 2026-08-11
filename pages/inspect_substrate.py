@@ -3,7 +3,7 @@ from pandas import DataFrame
 
 from components.forms.new_substrate.fields import ThicknessField
 from components.streamlit_tools import init_page, switch_to_submit_successful, \
-    current_params
+    current_params, switch_button
 from logic.components import inspect_page_header
 from logic.constants import IdType
 from logic.lab_modelization.db_models import Substrate, StoichioElement
@@ -32,10 +32,8 @@ def confirm_deletion_dialog():
              f"substrate **\"{substrate.label}\"**?")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
-            substrate.delete_instance(recursive=True)
+            substrate.delete_with_parts()
             switch_to_submit_successful(redirect_to=pages.browse_substrates)
-            # st.switch_page(pages.submission_successful,
-            #                query_params={})
 
 
 def on_delete():
@@ -44,7 +42,17 @@ def on_delete():
     else:
         dependent_lib_error()
 
-inspect_page_header('Substrate', substrate.label, on_delete, lambda: None)
+
+inspect_page_header('Substrate', substrate.label, on_delete)
+
+with st.container(horizontal_alignment='right'):
+    switch_button(
+        pages.edit_substrate,
+        label="Edit ✏️",
+        q_params={IdType.SUB: substrate.id},
+        key='edit_bttn',
+    )
+
 
 st.divider()
 st.subheader("Layers:")
