@@ -4,13 +4,12 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from components.browse import INSPECT_BUTTON_KEY, on_inspect_click
 from components.streamlit_tools import init_page, switch_button, sess
-from logic.page_list import pages
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, IdType, SessionKeys as Sk
-from logic.lab_modelization.db_models import Substrate
-from logic.table_columns import SubstrateBrowserColumnName as ColName
 from logic.functions import save_cookies
-
+from logic.lab_modelization.db_models import Substrate
+from logic.page_list import pages
+from logic.table_columns import SubstrateBrowserColumnName as ColName
 
 init_page(pages.browse_substrates, show_home_btn=False)
 

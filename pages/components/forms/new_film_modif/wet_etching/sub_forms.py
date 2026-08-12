@@ -1,15 +1,13 @@
-from logic.python_tools import rand_str
-
 import streamlit as st
 
-from components.forms.base_classes import Form, PausePageRun, FileUploadForm
+from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.fields import HardBakeTempField, \
     AcidEtchingDurationField, UsedUltrasoundField, \
     UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField
 from components.forms.new_film_modif.shared import ConstituentListForm, \
-    EtchingPatternForm, EtchingForm
+    EtchingForm
 from logic.lab_modelization.db_models import WetEtching, \
-    Etching, FilmModification, EtchingRecipe
+    Etching, FilmModification
 
 
 class WetEtchingForm(Form):

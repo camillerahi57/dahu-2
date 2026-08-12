@@ -125,10 +125,10 @@ class Substrate(_BaseModel):
 
     layers: DependentBackref[SubstrateLayer]
 
-    def __init__(self, label: str = None, comment: str = None, *args, **kwargs):
+    def __init__(self, *args, label: str = None, comment: str = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         for l in self.layers:
             l.delete_with_parts()
@@ -175,13 +175,14 @@ class SubstrateLayer(_BaseModel):
 
     stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, thickness: float | None = None, h: int | None = None,
+    def __init__(self, *args, thickness: float | None = None,
+                 h: int | None = None,
                  k: int | None = None,
                  l: int | None = None, substrate: Substrate | None = None,
-                 position_from_back: int | None = None, *args, **kwargs):
+                 position_from_back: int | None = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         for s in self.stoichio:
             s.delete_with_parts()
@@ -215,12 +216,13 @@ class Target(_BaseModel):
     states: DependentBackref[DeteriorationState]
     uses: DependentBackref[TargetUse]
 
-    def __init__(self, made_on: datetime = None, made_by_email: str = None,
+    def __init__(self, *args, made_on: datetime = None,
+                 made_by_email: str = None,
                  label: str = None, previous_version: Target | None = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         for s in self.states:
             s.delete_with_parts()
@@ -271,12 +273,12 @@ class MokeCoilFactor(_BaseModel):
     factor = FloatField()
     comment = CharField(null=True)
 
-    def __init__(self, validity_start: datetime = None,
+    def __init__(self, *args, validity_start: datetime = None,
                  validity_end: datetime = None,
-                 factor: float = None, comment: str = None, *args, **kwargs):
+                 factor: float = None, comment: str = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         pass
 
@@ -293,16 +295,16 @@ class EsrfPoni(_BaseModel):
     wavelength = FloatField()
     comment = CharField(null=True)
 
-    def __init__(self, validity_start: datetime = None,
+    def __init__(self, *args, validity_start: datetime = None,
                  validity_end: datetime = None,
                  distance: float = None, poni1: float = None,
                  poni2: float = None, rot1: float = None, rot2: float = None,
                  rot3: float = None,
                  wavelength: float = None, comment: str = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         pass
 
@@ -311,20 +313,22 @@ class Library(_BaseModel):
     label = CharField(unique=True)
     last_inspected_at = DateTimeField()
     comment = CharField(null=True)
+    is_archived = BooleanField()
 
     films: DependentBackref[Film]  # Should be a list of exactly 1 element.
 
     # Will add charac refs in the future.
 
-    def __init__(self, label: str = None, last_inspected_at: datetime = None,
-                 comment: str = None, *args, **kwargs):
+    def __init__(self, *args, label: str = None,
+                 last_inspected_at: datetime = None,
+                 comment: str = None, is_archived: bool = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-        
+
     def delete_parts(self):
         for f in self.films:
             f.delete_with_parts()
-            
+
     @classmethod
     def already_taken_names(cls):
         query = cls.select(
@@ -361,10 +365,10 @@ class Film(_BaseModel):
 
     # Will add characterization.
 
-    def __init__(self, label: str = None, made_on: datetime = None,
+    def __init__(self, *args, label: str = None, made_on: datetime = None,
                  made_by_email: str = None,
                  substrate: Substrate = None, library: Library = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -435,7 +439,7 @@ class FilmLayer(_BaseModel):
     magnetron_sputterings: DependentBackref[MagnetronSputtering]  # List of 1.
     triode_sputterings: DependentBackref[TriodeSputtering]  # List of 1.
 
-    def __init__(self,
+    def __init__(self, *args,
                  position_from_buffer: int | None = None,
                  deposit_temp: float | None = None,
                  nominal_thickness: float | None = None,
@@ -443,7 +447,7 @@ class FilmLayer(_BaseModel):
                  function: FilmLayerFunction = None,
                  sputtering_system: SputteringSystem | None = None,
                  film: Film = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -511,14 +515,14 @@ class MagnetronSputtering(_BaseModel):
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                             backref='magnetron_sputterings')
 
-    def __init__(self, deposit_distance: float | None = None,
+    def __init__(self, *args, deposit_distance: float | None = None,
                  deposit_angle: float | None = None,
                  deposit_power: float | None = None,
                  deposit_duration: float | None = None,
                  generator: MagnetronSputteringGenerator | None = None,
                  machine_model: MagnetronMachineModel | None = None,
                  film_layer: FilmLayer = None
-                 , *args, **kwargs):
+                 , **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -559,7 +563,7 @@ class TriodeSputtering(_BaseModel):
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                             backref='triode_sputterings')
 
-    def __init__(self,
+    def __init__(self, *args,
                  has_active_cooling: bool | None = None,
                  rotation_speed: float | None = None,
                  filament_current_start: float | None = None,
@@ -575,7 +579,7 @@ class TriodeSputtering(_BaseModel):
                  deposit_duration: float | None = None,
                  presputtering_thickness: float | None = None,
                  film_layer: FilmLayer = None,
-                 *args, **kwargs
+                 **kwargs
                  ):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -626,9 +630,9 @@ class UserUploadedFile(_BaseModel):
 
     _file_bytes: bytes | None = None  # Not in DB.
 
-    def __init__(self, label: str = None, file_name: str = None,
+    def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -692,11 +696,12 @@ class FilmModification(_BaseModel):
 
     # Will add characs in the future.
 
-    def __init__(self, made_on: datetime = None, modif_number: int = None,
+    def __init__(self, *args, made_on: datetime = None,
+                 modif_number: int = None,
                  made_by_email: str = None,
                  comment: str = None, modif_type: FilmModifType = None,
                  film: Film = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -763,11 +768,11 @@ class Annealing(_BaseModel):
 
     steps: DependentBackref[AnnealingStep]
 
-    def __init__(self, pumping_duration: float | None = None,
+    def __init__(self, *args, pumping_duration: float | None = None,
                  pressure: float | None = None,
                  furnace: Furnace | None = None,
                  film_modif: FilmModification = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -850,13 +855,13 @@ class AnnealingStep(_BaseModel):
 
     preceding_atmosphere: DependentBackref[StoichioElement]
 
-    def __init__(self,
+    def __init__(self, *args,
                  timestamp: float = None,
                  temperature: float | None = None,
                  is_room_temperature: bool = None,
                  preceding_was_vacuum: bool = None,
                  annealing: Annealing = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -925,9 +930,9 @@ class Etching(_BaseModel):
     patterns: DependentBackref[EtchingPattern]
     recipes: DependentBackref[EtchingRecipe]
 
-    def __init__(self, has_a_pattern: bool = None,
+    def __init__(self, *args, has_a_pattern: bool = None,
                  film_modif: FilmModification = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -971,7 +976,7 @@ class IonBeamEtching(_BaseModel):
 
     constituents: DependentBackref[PlasmaConstituent]
 
-    def __init__(self,
+    def __init__(self, *args,
                  duration: float | None = None,
                  flow: float | None = None,
                  incidence_angle: float | None = None,
@@ -979,7 +984,7 @@ class IonBeamEtching(_BaseModel):
                  power: float | None = None,
                  pressure: float | None = None,
                  etching: Etching | None = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1012,9 +1017,9 @@ class IonBeamEtching(_BaseModel):
 class EtchingPattern(UserUploadedFile):
     etching = ForeignKeyField(Etching, backref='patterns')
 
-    def __init__(self, label: str = None, file_name: str = None,
+    def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
-                 etching: Etching = None, *args, **kwargs):
+                 etching: Etching = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1027,9 +1032,9 @@ class PlasmaConstituent(_BaseModel):
 
     nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float = None,
+    def __init__(self, *args, proportion: float = None,
                  ion_etching: IonBeamEtching = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1065,9 +1070,9 @@ class LiftOffEtching(_BaseModel):
     etching: Etching = ForeignKeyField(
         Etching, on_delete='RESTRICT', backref='lift_offs')
 
-    def __init__(self, used_ultrasound: bool | None = None,
+    def __init__(self, *args, used_ultrasound: bool | None = None,
                  ultrasound_config: str | None = None,
-                 etching: Etching = None, *args, **kwargs):
+                 etching: Etching = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1088,7 +1093,7 @@ class WetEtching(_BaseModel):
 
     constituents: DependentBackref[AcidConstituent]
 
-    def __init__(self,
+    def __init__(self, *args,
                  hard_bake_temperature: float | None = None,
                  duration: float | None = None,
                  used_ultrasound: bool | None = None,
@@ -1096,7 +1101,7 @@ class WetEtching(_BaseModel):
                  acid_etching_depth_speed: float | None = None,
                  acid_etching_lateral_speed: float | None = None,
                  etching: Etching = None,
-                 *args, **kwargs
+                 **kwargs
                  ):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1135,9 +1140,9 @@ class WetEtching(_BaseModel):
 class EtchingRecipe(UserUploadedFile):
     etching = ForeignKeyField(Etching, backref='recipes')
 
-    def __init__(self, label: str = None, file_name: str = None,
+    def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
-                 etching: Etching = None, *args, **kwargs):
+                 etching: Etching = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1150,8 +1155,9 @@ class AcidConstituent(_BaseModel):
 
     nominal_stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, proportion: float = None, wet_etching: WetEtching = None,
-                 *args, **kwargs):
+    def __init__(self, *args, proportion: float = None,
+                 wet_etching: WetEtching = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1195,7 +1201,7 @@ class DeteriorationState(_BaseModel):
     patches: DependentBackref[Patch]
     photos: DependentBackref[TargetPhoto]
 
-    def __init__(self,
+    def __init__(self, *args,
                  date: datetime,
                  length_per_px: float | None = None,
                  calibration_factor_comment: float | None = None,
@@ -1203,7 +1209,7 @@ class DeteriorationState(_BaseModel):
                  pixel_coordinate_system: PixelCoordinateSystem | None = None,
                  target: Target = None,
                  made_by_email: str = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1248,9 +1254,9 @@ class TargetPhoto(UserUploadedFile):
     target_state: DeteriorationState = ForeignKeyField(
         DeteriorationState, backref='photos', on_delete='RESTRICT', )
 
-    def __init__(self, label: str = None, file_name: str = None,
+    def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
-                 target_state: DeteriorationState = None, *args, **kwargs):
+                 target_state: DeteriorationState = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1267,9 +1273,9 @@ class Patch(_BaseModel):
     stoichio: DependentBackref[StoichioElement]
     vertices: DependentBackref[Vertex]
 
-    def __init__(self, stack_idx: int = None,
+    def __init__(self, *args, stack_idx: int = None,
                  deterioration_state: DeteriorationState = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1378,9 +1384,9 @@ class Vertex(_BaseModel):
     patch: Patch = ForeignKeyField(
         Patch, on_delete='RESTRICT', backref='vertices')
 
-    def __init__(self, pixel_x: float = None, pixel_y: float = None,
+    def __init__(self, *args, pixel_x: float = None, pixel_y: float = None,
                  clockwise_rank: int = None,
-                 patch: Patch = None, *args, **kwargs):
+                 patch: Patch = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1399,8 +1405,9 @@ class TargetUse(_BaseModel):
     film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
                                             backref='target_uses')
 
-    def __init__(self, target: Target = None, film_layer: FilmLayer = None,
-                 *args, **kwargs):
+    def __init__(self, *args, target: Target = None,
+                 film_layer: FilmLayer = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -1433,13 +1440,14 @@ class StoichioElement(_BaseModel):
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')
 
-    def __init__(self, quantity: float = None, position_in_str: int = None,
+    def __init__(self, *args, quantity: float = None,
+                 position_in_str: int = None,
                  element: ChemicalElement = None,
                  substrate_layer: SubstrateLayer = None,
                  patch: Patch = None, film_layer: FilmLayer = None,
                  annealing: Annealing = None,
                  acid_constituent: AcidConstituent = None,
-                 *args, **kwargs):
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 

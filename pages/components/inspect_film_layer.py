@@ -1,21 +1,10 @@
 import streamlit as st
 
 from components.browse import INSPECT_BUTTON_KEY
-from components.forms.base_classes import UnitField
-from components.forms.new_library.fields import DepositTempField, \
-    NominalThicknessField, ShadowMaskField, FilmLayerFunctionField, \
-    NominalStoichioField, DepositDistanceField, DepositAngleField, \
-    DepositPowerField, DepositDurationField, MagnetronGeneratorField, \
-    MagnetronModelField, HasActiveCoolingField, RotationSpeedField, \
-    FilamentCurrentStartField, FilamentCurrentEndField, AnodeCurrentField, \
-    AnodeVoltageField, CathodeCurrentField, CathodeVoltageField, \
-    DepositRateField, ArgonFlowField, NitrogenFlowField, PressureField, \
-    PresputteringThicknessField
 from components.streamlit_tools import sess, switch_button
 from logic.constants import IdType
 from logic.db_enums import SputteringSystem
-from logic.lab_modelization.db_models import FilmLayer, StoichioElement, \
-    MagnetronSputtering, TriodeSputtering, Target, TargetUse
+from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse
 from logic.page_list import pages
 
 

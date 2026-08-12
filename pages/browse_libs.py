@@ -17,22 +17,31 @@ init_page(pages.browse_libs, show_home_btn=False)
 
 st.set_page_config(layout="wide")
 
-switch_button(pages.new_lib, label="➕ Add a new library")
+with st.container(horizontal=True):
+    switch_button(pages.new_lib, label="➕ Add a new library")
+    show_archived = st.checkbox('Show archived 📦')
 
 query = Library.select(
     Library.label.alias(ColName.lib_name),
     Library.id.alias(IdType.LIB),
     Library.comment.alias(ColName.comment),
     Film.made_on.alias(ColName.made_on),
-    Film.made_by_email.alias(ColName.experimenter)
+    Film.made_by_email.alias(ColName.experimenter),
+    Library.is_archived.alias(ColName.is_archived),
 ).join(Film).dicts()
 
 
 for row in query:
-    row[ColName.experimenter] = get_email_user_name(row[ColName.experimenter])
+    experimenter = row[ColName.experimenter]
+    row[ColName.experimenter] = get_email_user_name(experimenter)
     row[ColName.inspect_link] = 'Inspect'
+    if row[ColName.is_archived]:
+        row[ColName.lib_name] += ' · 📦 ARCHIVED'
 
 rows = [row for row in query]
+if not show_archived:
+    rows = [row for row in query if not row[ColName.is_archived]]
+
 lib_id_list = [row[IdType.LIB] for row in query]
 
 column_config = {
@@ -42,9 +51,6 @@ column_config = {
     ColName.inspect_link: st.column_config.ButtonColumn(
         label='Inspect', width='small', key=INSPECT_BUTTON_KEY,
         on_click=on_inspect_click, args=[lib_id_list]),
-    # ColName.inspect_link: st.column_config.LinkColumn(display_text='Inspect',
-    #                                                   width='small'),
-    # ColName.characs: st.column_config.ListColumn(width='medium'),
     ColName.experimenter: st.column_config.TextColumn(width='small'),
     ColName.comment: st.column_config.TextColumn(width='large'),
 }

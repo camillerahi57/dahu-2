@@ -1,16 +1,16 @@
 import pandas as pd
-from streamlit_dynamic_filters import DynamicFilters
 import streamlit as st
+from streamlit_dynamic_filters import DynamicFilters
 
 from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
 from components.streamlit_tools import init_page, switch_button, sess
-from logic.page_list import pages
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, IdType, SessionKeys as Sk
-from logic.lab_modelization.db_models import Target
-from logic.table_columns import TargetBrowserColumnName as ColName
 from logic.functions import save_cookies, \
     get_email_user_name
+from logic.lab_modelization.db_models import Target
+from logic.page_list import pages
+from logic.table_columns import TargetBrowserColumnName as ColName
 
 init_page(pages.browse_targets, show_home_btn=False)
 

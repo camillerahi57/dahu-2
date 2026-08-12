@@ -11,6 +11,7 @@ class LibraryBrowserColumnName(StrEnum):
     experimenter = 'Experimenter'
     comment = 'Comment'
     target = 'Target'
+    is_archived = 'Is Archived'
 
 
 class TargetBrowserColumnName(StrEnum):

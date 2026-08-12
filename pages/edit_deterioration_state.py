@@ -1,7 +1,7 @@
 import streamlit as st
 
-from components.forms.edit_deterioration_state.sub_forms import RootForm
 from components.forms.base_classes import PausePageRun
+from components.forms.edit_deterioration_state.sub_forms import RootForm
 from components.streamlit_tools import sess, init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, IdType

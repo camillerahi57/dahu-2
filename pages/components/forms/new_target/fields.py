@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import StrEnum
-from logic.python_tools import rand_str, add_random_prefix
 
 import streamlit as st
 
@@ -9,6 +8,7 @@ from logic.constants import CookieKeys as Ck, NEW_TARGET
 from logic.db_enums import ShapeType
 from logic.functions import is_valid_email_address
 from logic.lab_modelization.db_models import Target, Patch
+from logic.python_tools import add_random_prefix
 from logic.units import ur
 
 

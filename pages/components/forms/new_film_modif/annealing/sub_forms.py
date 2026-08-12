@@ -1,11 +1,11 @@
 import streamlit as st
 
+from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.fields import (
     PhaseTypeField, FurnaceField, \
     PressureField, PumpingDurationField, IsRoomTemperatureField, \
     ReachedTempField, PhaseDurationField, AnnealingAtmosphereField, \
     PhaseCountField, AtmosphereIsVacuumField)
-from components.forms.base_classes import Form, PausePageRun
 from logic.lab_modelization.db_models import Annealing, FilmModification, \
     AnnealingStep, StoichioElement
 

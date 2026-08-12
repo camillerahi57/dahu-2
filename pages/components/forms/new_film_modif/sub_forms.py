@@ -1,11 +1,11 @@
 import streamlit as st
 
+from components.forms.base_classes import Form, PausePageRun
+from components.forms.new_film_modif.annealing.sub_forms import AnnealingForm
+from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField, \
+    MadeByField, CommentField, ModifTypeField
 from components.forms.new_film_modif.ion_beam_etching.sub_forms import \
     IonEtchingForm
-from components.forms.new_film_modif.annealing.sub_forms import AnnealingForm
-from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField,\
-    MadeByField, CommentField, ModifTypeField
-from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.lift_off.sub_forms import LiftOffForm
 from components.forms.new_film_modif.wet_etching.sub_forms import WetEtchingForm
 from logic.constants import FILM_INIT_STATE

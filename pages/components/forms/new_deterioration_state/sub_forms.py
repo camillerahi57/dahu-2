@@ -1,9 +1,10 @@
+import streamlit as st
+
+from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_deterioration_state.fields import UpdaterEmailField, \
     IsItReallyDeteriorationField as Iirdf
 from components.forms.new_target.sub_forms import DeteriorationStateForm
-from components.forms.base_classes import Form, PausePageRun
 from logic.lab_modelization.db_models import Target, DeteriorationState
-import streamlit as st
 
 
 class RootForm(Form):

@@ -1,10 +1,7 @@
-import streamlit as st
-
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.fields import UsedUltrasoundField, \
     UltrasoundConfigField
 from components.forms.new_film_modif.shared import EtchingForm
-from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import LiftOffEtching, FilmModification, \
     Etching
 

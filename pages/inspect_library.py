@@ -2,11 +2,6 @@ import streamlit as st
 from pandas import DataFrame
 
 from components.browse import INSPECT_BUTTON_KEY
-from components.forms.base_classes import UnitField
-from components.forms.new_film_modif.fields import PressureField, \
-    IonDurationField, FlowField, AngleField, RotationField, PowerField, \
-    HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField, \
-    UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField
 from components.forms.new_library.fields import DepositTempField
 from components.inspect_film_layer import show_film_layer
 from components.streamlit_tools import (
@@ -18,8 +13,7 @@ from logic.db_enums import FilmModifType
 from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching,
-    StoichioElement)
+    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -96,7 +90,7 @@ def confirm_deletion_dialog(lib_: Library):
     st.error(f"Are you sure you want to **permanently** delete the "
              f"library **\"{lib_.label}\"**?\n\n**This will also delete:**\n"
              f"- Film data\n- Film characterizations\n- Film modifications\n"
-             f"- Uploaded data for this library")
+             f"- Uploaded files for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
             lib_.delete_with_parts()
@@ -108,14 +102,6 @@ def on_delete():
         confirm_deletion_dialog(lib)
     else:
         dependent_lib_error(lib)
-
-
-MODIF_NAMES = {
-    FilmModifType.LIFT_OFF: 'Lift off',
-    FilmModifType.ANNEALING: 'Annealing',
-    FilmModifType.WET_ETCHING: 'Wet etching',
-    FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
-}
 
 
 def annealing_info(process: Annealing):
@@ -166,98 +152,135 @@ def film_modif_info(modif_: FilmModification):
             modif_.delete_with_parts()
         st.rerun()
 
+
 def charac_card(label_: str):
     with st.container(border=True, horizontal_alignment='center'):
         st.space()
         st.subheader(label_, text_alignment='center')
         st.space()
 
-inspect_page_header('Library', lib.label, on_delete, None)
-st.write(
-    f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
 
-switch_button(
-    pages.edit_lib,
-    label='✏️ Edit name or comment',
-    q_params={IdType.LIB: lib.id},
-)
+@st.dialog(title='Archive?')
+def archive_dialog():
+    st.write("This will not delete the library, no data will be lost.")
+    st.write("The library will simply be marked as 'Archived'.")
+    if st.button("Confim"):
+        lib.is_archived = True
+        lib.save()
+        st.rerun()
 
-with (st.container(horizontal=True, vertical_alignment='center',
-                  horizontal_alignment='left', border=True)):
-    st.write("**Film modifications:**")
-    modifs = film.ordered_modifs()
-    for i, modif in enumerate(modifs):
-        if i != 0:
-            st.write("->")
-        if st.button(f'{MODIF_NAMES[modif.modif_type]}', key=f'btn_{i}'):
-            film_modif_info(modif)
-    st.container(width=300)
-    switch_button(pages.new_film_modif, label='➕**Add**', type_='tertiary',
-                  q_params={IdType.FILM: film.id})
 
-col1, col2 = st.columns([40, 60])
+def page_body():
+    if lib.is_archived:
+        st.warning("📦 Archived", width=10_000)
 
-with col1:
-    with st.container(horizontal=True, vertical_alignment='center'):
-        with st.container(border=True, horizontal_alignment='center'):
-            label = '➕**Add new characterization**'
-            url = f'http://{DOMAIN}/new_charac'  # noqa
-            st.space()
-            st.markdown(link_html(label, url), unsafe_allow_html=True,
-                        text_alignment='center')
-            st.space()
-        charac_card('MOKE')
-        charac_card('PROFILO')
-    with st.container(horizontal=True, vertical_alignment='center'):
-        charac_card('X-RAY')
-        charac_card('MOKE-2')
-        charac_card('EDX')
-
-with col2:
-    with st.container(border=True):
+    inspect_page_header('Library', lib.label, on_delete, None)
+    if not lib.is_archived:
         with st.container(horizontal_alignment='right'):
-            switch_button(pages.edit_film,
-                          label="✏️ Edit film information",
-                          q_params={IdType.FILM: film.id})
-        date_str = film.made_on.strftime("%B %d, %Y")
-        st.write(f"Made on **{date_str}** by "
-                 f"**{email_html(film.made_by_email)}**",
-                 unsafe_allow_html=True)
-        st.write(f"**Label written on sample:** {film.label}")
-        st.write(f"**Substrate:** "
-                 f"{link_html(substrate.label, substrate.url())}",
-                 unsafe_allow_html=True)
-        st.write(f"**Targets:** {', '.join(target_link_htmls)}",
-                 unsafe_allow_html=True)
+            if st.button("Archive 📦"):
+                archive_dialog()
+    else:
         with st.container(horizontal_alignment='right'):
-            switch_button(pages.edit_film_layers, label="✏️ Edit layers",
-                          q_params={IdType.FILM: film.id})
+            if st.button("Unarchive 📤"):
+                lib.is_archived = False
+                lib.save()
+                st.rerun()
 
-        st.write(f"**Layers**:")
+    st.write(
+        f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
 
-        col_conf = st.column_config
-        column_config = {
-            ColName.function: col_conf.TextColumn(width='small'),
-            ColName.nominal_stoichio: col_conf.TextColumn(width='small'),
-            ColName.details: col_conf.ButtonColumn(
-                'Details', width='small', on_click=show_film_layer,
-                key=INSPECT_BUTTON_KEY, args=[layers]),
-            ColName.deposit_temp: col_conf.NumberColumn(width='small'),
-            ColName.deposit_duration: col_conf.NumberColumn(width='small'),
-            ColName.deposit_power: col_conf.NumberColumn(width='small'),
+    switch_button(
+        pages.edit_lib,
+        label='✏️ Edit name or comment',
+        q_params={IdType.LIB: lib.id},
+    )
+
+    with (st.container(horizontal=True, vertical_alignment='center',
+                      horizontal_alignment='left', border=True)):
+        st.write("**Film modifications:**")
+
+        modif_names = {
+            FilmModifType.LIFT_OFF: 'Lift off',
+            FilmModifType.ANNEALING: 'Annealing',
+            FilmModifType.WET_ETCHING: 'Wet etching',
+            FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
         }
+        modifs = film.ordered_modifs()
+        for i, modif in enumerate(modifs):
+            if i != 0:
+                st.write("->")
+            if st.button(f'{modif_names[modif.modif_type]}', key=f'btn_{i}'):
+                film_modif_info(modif)
+        st.container(width=300)
+        switch_button(pages.new_film_modif, label='➕**Add**', type_='tertiary',
+                      q_params={IdType.FILM: film.id})
 
-        table_rows = [
-            {
-                ColName.function: lay.function,
-                ColName.nominal_stoichio: lay.nominal_stoichio_str,
-                ColName.details: 'Details',
-                ColName.deposit_temp:
-                    DepositTempField.to_ui_unit(lay.deposit_temp)[0],
-                ColName.deposit_duration: lay.sputtering.deposit_duration,
-                ColName.deposit_power: lay.sputtering.deposit_power,
+    col1, col2 = st.columns([40, 60])
+
+    with col1:
+        with st.container(horizontal=True, vertical_alignment='center'):
+            with st.container(border=True, horizontal_alignment='center'):
+                label = '➕**Add new characterization**'
+                url = f'http://{DOMAIN}/new_charac'  # noqa
+                st.space()
+                st.markdown(link_html(label, url), unsafe_allow_html=True,
+                            text_alignment='center')
+                st.space()
+            charac_card('MOKE')
+            charac_card('PROFILO')
+        with st.container(horizontal=True, vertical_alignment='center'):
+            charac_card('X-RAY')
+            charac_card('MOKE-2')
+            charac_card('EDX')
+
+    with col2:
+        with st.container(border=True):
+            with st.container(horizontal_alignment='right'):
+                switch_button(pages.edit_film,
+                              label="✏️ Edit film information",
+                              q_params={IdType.FILM: film.id})
+            date_str = film.made_on.strftime("%B %d, %Y")
+            st.write(f"Made on **{date_str}** by "
+                     f"**{email_html(film.made_by_email)}**",
+                     unsafe_allow_html=True)
+            st.write(f"**Label written on sample:** {film.label}")
+            st.write(f"**Substrate:** "
+                     f"{link_html(substrate.label, substrate.url())}",
+                     unsafe_allow_html=True)
+            st.write(f"**Targets:** {', '.join(target_link_htmls)}",
+                     unsafe_allow_html=True)
+            with st.container(horizontal_alignment='right'):
+                switch_button(pages.edit_film_layers, label="✏️ Edit layers",
+                              q_params={IdType.FILM: film.id})
+
+            st.write(f"**Layers**:")
+
+            col_conf = st.column_config
+            column_config = {
+                ColName.function: col_conf.TextColumn(width='small'),
+                ColName.nominal_stoichio: col_conf.TextColumn(width='small'),
+                ColName.details: col_conf.ButtonColumn(
+                    'Details', width='small', on_click=show_film_layer,
+                    key=INSPECT_BUTTON_KEY, args=[layers]),
+                ColName.deposit_temp: col_conf.NumberColumn(width='small'),
+                ColName.deposit_duration: col_conf.NumberColumn(width='small'),
+                ColName.deposit_power: col_conf.NumberColumn(width='small'),
             }
-            for lay in layers
-        ]
-        st.dataframe(DataFrame(table_rows), hide_index=True,
-                     column_config=column_config)
+
+            table_rows = [
+                {
+                    ColName.function: lay.function,
+                    ColName.nominal_stoichio: lay.nominal_stoichio_str,
+                    ColName.details: 'Details',
+                    ColName.deposit_temp:
+                        DepositTempField.to_ui_unit(lay.deposit_temp)[0],
+                    ColName.deposit_duration: lay.sputtering.deposit_duration,
+                    ColName.deposit_power: lay.sputtering.deposit_power,
+                }
+                for lay in layers
+            ]
+            st.dataframe(DataFrame(table_rows), hide_index=True,
+                         column_config=column_config)
+
+
+page_body()

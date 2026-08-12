@@ -7,7 +7,6 @@ from logic.constants import REDIRECT_PATH, RESOURCE_TYPE, \
     OBJ_ID
 from logic.page_list import pages
 
-
 init_page(pages.submission_successful)
 
 

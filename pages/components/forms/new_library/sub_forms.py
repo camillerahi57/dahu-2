@@ -2,6 +2,7 @@ from datetime import datetime
 
 import streamlit as st
 
+from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  FilmLabelField, MadeOnField,
                                                  MadeByField, SubstrateField, \
@@ -36,7 +37,6 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  TargetChoiceField,
                                                  ConfirmOrderField,
                                                  IsCoSputteringField)
-from components.forms.base_classes import Form, PausePageRun
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem
@@ -69,7 +69,7 @@ class BaseInfoForm(Form):
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
-    def to_library(self, id_: int = None) -> Library:
+    def to_library(self, is_archived: bool, id_: int = None) -> Library:
         if not self.is_valid:
             raise PausePageRun
 
@@ -78,6 +78,7 @@ class BaseInfoForm(Form):
             last_inspected_at=datetime.now(),
             comment=self.comment,
             hdf5_file_name=None,
+            is_archived=is_archived,
         )
         if id_ is not None:
             lib.id = id_
@@ -604,7 +605,9 @@ class RootForm(Form):
         layer_list_form = LayerListForm(default_film)
         confirm_order_fld = ConfirmOrderField(form_default=False)
 
-        library = base_info_form.to_library()
+        library = base_info_form.to_library(
+            is_archived=default_lib.is_archived if default_lib else False,
+        )
         film_info_form.add_to_library(library)
 
         layers = layer_list_form.to_layers(library.films[0])

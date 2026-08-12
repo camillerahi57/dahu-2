@@ -1,14 +1,14 @@
 from math import sqrt
 
 import pyperclip
+import streamlit as st
 from PIL.ImageFile import ImageFile
 from streamlit import dialog
 from streamlit_image_coordinates import streamlit_image_coordinates
-import streamlit as st
 
 from components.streamlit_tools import sess
-from logic.constants import SessionKeys as Sk
 from logic.constants import PIXEL_COORDS
+from logic.constants import SessionKeys as Sk
 
 
 @dialog("Pixel Helper")

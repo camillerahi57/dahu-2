@@ -1,9 +1,9 @@
 from typing import Literal
 
-from logic.lab_modelization.db_models import Patch, Substrate
-from components.forms.base_classes import Field, FieldType as Ft, UnitField
 import streamlit as st
 
+from components.forms.base_classes import Field, FieldType as Ft, UnitField
+from logic.lab_modelization.db_models import Patch, Substrate
 from logic.units import ur
 
 

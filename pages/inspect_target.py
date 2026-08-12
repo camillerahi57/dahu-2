@@ -10,8 +10,6 @@ from logic.lab_modelization.db_models import Target, DeteriorationState
 from logic.math_tools import get_constrained_size
 from logic.page_list import pages
 
-
-
 init_page(pages.inspect_target)
 
 

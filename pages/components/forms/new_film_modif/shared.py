@@ -1,14 +1,14 @@
 import streamlit as st
 
-from components.forms.base_classes import Field, FieldType as Ft, Form, \
+from components.forms.base_classes import Form, \
     PausePageRun, FileUploadForm
 from components.forms.new_film_modif.fields import ConstituentCountField, \
     PlasmaFormulaField, PlasmaProportionField, \
     HasPatternField
-from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.lab_modelization.db_models import EtchingPattern, IonBeamEtching, \
     PlasmaConstituent, WetEtching, \
     AcidConstituent, FilmModification, Etching, EtchingRecipe
+from logic.lab_modelization.other_classes import MixtureConstituent
 
 
 class EtchingForm(Form):
