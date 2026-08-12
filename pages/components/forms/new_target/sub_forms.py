@@ -84,7 +84,7 @@ class BasicInfoForm(Form):
                                "target.")
         return True, ''
 
-    def to_target(self, id_: int = None) -> Target:
+    def to_target(self, is_archived: bool, id_: int = None) -> Target:
         if not self.is_valid:
             raise PausePageRun
 
@@ -93,6 +93,7 @@ class BasicInfoForm(Form):
             made_by_email=self.made_by_email,
             label=self.label,
             previous_version=self.built_from,
+            is_archived=is_archived,
         )
         if id_ is not None:
             target.id = id_
@@ -616,7 +617,7 @@ class DeteriorationStateForm(Form):
 class RootForm(Form):
     def __init__(self):
         basic_info_form = BasicInfoForm()
-        target = basic_info_form.to_target()
+        target = basic_info_form.to_target(is_archived=False)
 
         state_form = DeteriorationStateForm(target)
 

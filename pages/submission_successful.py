@@ -2,7 +2,7 @@ import streamlit as st
 
 from components.streamlit_tools import (
     init_page, current_params, close_button, \
-    switch_button)
+    switch_page_bttn)
 from logic.constants import REDIRECT_PATH, RESOURCE_TYPE, \
     OBJ_ID
 from logic.page_list import pages
@@ -26,7 +26,7 @@ else:
 st.title('Submission Successful ✔')
 
 if redirect_path:
-    switch_button(redirect_path, label='Continue', q_params=redirect_q_params,
-                  force_same_tab=True)
+    switch_page_bttn(redirect_path, label='Continue', q_params=redirect_q_params,
+                     force_same_tab=True)
 else:
     close_button()

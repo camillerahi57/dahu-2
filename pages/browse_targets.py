@@ -3,7 +3,7 @@ import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
 from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
-from components.streamlit_tools import init_page, switch_button, sess
+from components.streamlit_tools import init_page, switch_page_bttn, sess
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, IdType, SessionKeys as Sk
 from logic.functions import save_cookies, \
@@ -16,13 +16,16 @@ init_page(pages.browse_targets, show_home_btn=False)
 
 st.set_page_config(layout="wide")
 
-switch_button(pages.new_target, label="➕ Add a new target")
+with st.container(horizontal=True, vertical_alignment='center'):
+    switch_page_bttn(pages.new_target, label="➕ Add a new target")
+    show_archived = st.checkbox('Show archived 📦')
+
 
 query = Target.select(
     Target.made_on.alias(ColName.made_on),
     Target.made_by_email.alias(ColName.made_by),
     Target.label.alias(ColName.label),
-    # TargetModel.comment.alias(ColName.comment),
+    Target.is_archived.alias(ColName.is_archived),
     Target.id.alias(IdType.TARGET),
 ).dicts()
 
@@ -30,20 +33,22 @@ query = Target.select(
 for row in query:
     row[ColName.made_by] = get_email_user_name(row[ColName.made_by])
     row[ColName.inspect_link] = 'Inspect'
+    if row[ColName.is_archived]:
+        row[ColName.label] += ' · 📦 ARCHIVED'
 
 rows = [row for row in query]
+if not show_archived:
+    rows = [row for row in rows if not row[ColName.is_archived]]
+
 target_id_list = [row[IdType.TARGET] for row in query]
 
 column_config = {
     ColName.made_on: st.column_config.DateColumn(width='small'),
     ColName.label: st.column_config.TextColumn(width='large'),
-    # ColName.inspect_link: st.column_config.LinkColumn(display_text='Inspect',
-    #                                                   width='small'),
     ColName.inspect_link: st.column_config.ButtonColumn(
         label='Inspect', width='small', key=INSPECT_BUTTON_KEY,
         on_click=on_inspect_click, args=[target_id_list]),
     ColName.made_by: st.column_config.TextColumn(width='small'),
-    # ColName.comment: st.column_config.TextColumn(width='large'),
 }
 
 # If we clicked on an inspect button:

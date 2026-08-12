@@ -5,7 +5,7 @@ from components.browse import INSPECT_BUTTON_KEY
 from components.forms.new_library.fields import DepositTempField
 from components.inspect_film_layer import show_film_layer
 from components.streamlit_tools import (
-    sess, init_page, current_params, switch_button, switch_to_submit_successful,
+    sess, init_page, current_params, switch_page_bttn, switch_to_submit_successful,
 )
 from logic.components import inspect_page_header
 from logic.constants import SessionKeys as Sk, DOMAIN, IdType
@@ -189,7 +189,7 @@ def page_body():
     st.write(
         f"**Comment:** {lib.comment if lib.comment else '*empty*'}")
 
-    switch_button(
+    switch_page_bttn(
         pages.edit_lib,
         label='✏️ Edit name or comment',
         q_params={IdType.LIB: lib.id},
@@ -212,8 +212,8 @@ def page_body():
             if st.button(f'{modif_names[modif.modif_type]}', key=f'btn_{i}'):
                 film_modif_info(modif)
         st.container(width=300)
-        switch_button(pages.new_film_modif, label='➕**Add**', type_='tertiary',
-                      q_params={IdType.FILM: film.id})
+        switch_page_bttn(pages.new_film_modif, label='➕**Add**', type_='tertiary',
+                         q_params={IdType.FILM: film.id})
 
     col1, col2 = st.columns([40, 60])
 
@@ -236,9 +236,9 @@ def page_body():
     with col2:
         with st.container(border=True):
             with st.container(horizontal_alignment='right'):
-                switch_button(pages.edit_film,
-                              label="✏️ Edit film information",
-                              q_params={IdType.FILM: film.id})
+                switch_page_bttn(pages.edit_film,
+                                 label="✏️ Edit film information",
+                                 q_params={IdType.FILM: film.id})
             date_str = film.made_on.strftime("%B %d, %Y")
             st.write(f"Made on **{date_str}** by "
                      f"**{email_html(film.made_by_email)}**",
@@ -250,8 +250,8 @@ def page_body():
             st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                      unsafe_allow_html=True)
             with st.container(horizontal_alignment='right'):
-                switch_button(pages.edit_film_layers, label="✏️ Edit layers",
-                              q_params={IdType.FILM: film.id})
+                switch_page_bttn(pages.edit_film_layers, label="✏️ Edit layers",
+                                 q_params={IdType.FILM: film.id})
 
             st.write(f"**Layers**:")
 

@@ -1,7 +1,7 @@
 import streamlit as st
 from PIL import Image
 
-from components.streamlit_tools import init_page, switch_button, \
+from components.streamlit_tools import init_page, switch_page_bttn, \
     switch_to_submit_successful
 from logic.components import inspect_page_header
 from logic.constants import IdType
@@ -19,24 +19,31 @@ def main_page():
     target: Target = Target.get_by_id(target_id)
 
     st.set_page_config(layout="wide", page_title=target.label)
+    if target.is_archived:
+        st.warning("📦 Archived", width=10_000)
     on_delete = get_on_delete_callback(target)
-    # on_edit = get_target_edit_callback(target)
 
     inspect_page_header('Target', target.label, on_delete)
+    if not target.is_archived:
+        with st.container(horizontal_alignment='right'):
+            if st.button("Archive 📦"):
+                archive_dialog(target)
+    else:
+        with st.container(horizontal_alignment='right'):
+            if st.button("Unarchive 📤"):
+                target.is_archived = False
+                target.save()
+                st.rerun()
 
     show_target_info(target)
-    switch_button(pages.edit_target, label="✏️ Edit base info",
-              q_params={IdType.TARGET: str(target.id)})
+    switch_page_bttn(pages.edit_target, label="✏️ Edit base info",
+                     q_params={IdType.TARGET: str(target.id)})
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.subheader('Most Recent Deterioration State', width='content')
-        # if st.button('➕ Add New State'):
-        #     query_params = {IdType.TARGET: target_id}
-        #     st.switch_page('new_deterioration_state.py',
-        #                    query_params=query_params)
-        switch_button(pages.new_state,
-                      label='➕ Add New State',
-                      q_params={IdType.TARGET: target_id})
+        switch_page_bttn(pages.new_state,
+                         label='➕ Add New State',
+                         q_params={IdType.TARGET: target_id})
 
     states = target.old_to_recent_states()
     last_state = states[-1]
@@ -59,16 +66,10 @@ def show_target_info(target: Target):
             if target.previous_version is not None:
                 previous: Target = target.previous_version
                 st.write("Based on previous target:")
-                # if st.button(previous.label, type='tertiary',
-                #              key='previous'):
-                #     switch_page(
-                #         pages.inspect_target,
-                #         query_params={IdType.TARGET: f'{previous.id}'}
-                #     )
-                switch_button(pages.inspect_target,
-                              label=previous.label,
-                              q_params={IdType.TARGET: f'{previous.id}'},
-                              type_='tertiary', key='previous')
+                switch_page_bttn(pages.inspect_target,
+                                 label=previous.label,
+                                 q_params={IdType.TARGET: f'{previous.id}'},
+                                 type_='tertiary', key='previous')
         comments = target.comments()
         if len(comments) > 0:
             st.write(f"**Comments:**")
@@ -99,14 +100,10 @@ def show_state(state: DeteriorationState, state_count: int):
         with st.container():
             show_state_info(state)
             with st.container(horizontal=True, vertical_alignment="center"):
-                # if st.button("✏️ Edit State",
-                #              key=f'state_edit_{state.id}'):
-                #     params = {IdType.STATE: f'{state.id}'}
-                #     st.switch_page(pages.edit_state, query_params=params)
-                switch_button(pages.edit_state,
-                              label="✏️ Edit State",
-                              q_params={IdType.STATE: f'{state.id}'},
-                              key=f'state_edit_{state.id}')
+                switch_page_bttn(pages.edit_state,
+                                 label="✏️ Edit State",
+                                 q_params={IdType.STATE: f'{state.id}'},
+                                 key=f'state_edit_{state.id}')
                 if state_count > 1:
                     if st.button("❌ Delete State",
                                  key=f'state_del_{state.id}'):
@@ -173,6 +170,16 @@ def confirm_state_deletion_dialog(state: DeteriorationState):
         if st.button('Yes', key=f'state_confirm_{state.id}'):
             state.delete_with_parts()
             st.rerun()
+
+
+@st.dialog(title='Archive?')
+def archive_dialog(target: Target):
+    st.write("This will not delete the target, no data will be lost.")
+    st.write("The target will simply be marked as 'Archived'.")
+    if st.button("Confim"):
+        target.is_archived = True
+        target.save()
+        st.rerun()
 
 
 main_page()

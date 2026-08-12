@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.browse import INSPECT_BUTTON_KEY
-from components.streamlit_tools import sess, switch_button
+from components.streamlit_tools import sess, switch_page_bttn
 from logic.constants import IdType
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse
@@ -39,6 +39,6 @@ def show_film_layer(layers: list[FilmLayer]):
     for t in targets_used:
         target_label = t[Target.label.name]
         q_params = {IdType.TARGET: t['id']}
-        switch_button(
+        switch_page_bttn(
             pages.inspect_target, label=target_label, q_params=q_params,
         )

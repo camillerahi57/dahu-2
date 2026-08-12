@@ -20,7 +20,8 @@ st.set_page_config(layout='centered')
 try:
     root_form = BasicInfoForm(default_target=old_target)
     # Copying the ID to keep the old one and update it:
-    new_target = root_form.to_target(id_=old_target.id)
+    new_target = root_form.to_target(id_=old_target.id,
+                                     is_archived=old_target.is_archived)
 
     if st.button("Submit", disabled=not root_form.is_valid, type="primary"):
         sess[Ck.LAST_EMAIL_USED] = new_target.made_by_email

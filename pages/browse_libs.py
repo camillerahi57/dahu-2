@@ -3,7 +3,7 @@ import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
 from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
-from components.streamlit_tools import init_page, sess, switch_button
+from components.streamlit_tools import init_page, sess, switch_page_bttn
 from logic.components import browser_side_bar
 from logic.constants import CookieKeys as Ck, \
     SessionKeys as Sk, IdType
@@ -17,8 +17,8 @@ init_page(pages.browse_libs, show_home_btn=False)
 
 st.set_page_config(layout="wide")
 
-with st.container(horizontal=True):
-    switch_button(pages.new_lib, label="➕ Add a new library")
+with st.container(horizontal=True, vertical_alignment='center'):
+    switch_page_bttn(pages.new_lib, label="➕ Add a new library")
     show_archived = st.checkbox('Show archived 📦')
 
 query = Library.select(
@@ -40,7 +40,7 @@ for row in query:
 
 rows = [row for row in query]
 if not show_archived:
-    rows = [row for row in query if not row[ColName.is_archived]]
+    rows = [row for row in rows if not row[ColName.is_archived]]
 
 lib_id_list = [row[IdType.LIB] for row in query]
 

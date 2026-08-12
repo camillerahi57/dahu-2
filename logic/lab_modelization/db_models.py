@@ -212,12 +212,13 @@ class Target(_BaseModel):
     label: str | ForeignKeyField = CharField(unique=True)
     previous_version: Target = ForeignKeyField(
         'self', null=True, on_delete='SET NULL', backref='next_version')
+    is_archived = BooleanField()
 
     states: DependentBackref[DeteriorationState]
     uses: DependentBackref[TargetUse]
 
     def __init__(self, *args, made_on: datetime = None,
-                 made_by_email: str = None,
+                 made_by_email: str = None, is_archived: bool = None,
                  label: str = None, previous_version: Target | None = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())

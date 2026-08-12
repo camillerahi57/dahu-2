@@ -17,7 +17,7 @@ sess = st.session_state  # Shorthand.
 def init_page(page: StreamlitPage, show_home_btn = True):
     from logic.functions import reset_session, add_cookie_data_to_session
     if show_home_btn:
-        switch_button(pages.browse_libs, label='🏠 Home', force_same_tab=True)
+        switch_page_bttn(pages.browse_libs, label='🏠 Home', force_same_tab=True)
     page_paged = sess.get(Sk.CURRENT_PATH) != page.url_path
     if page_paged:
         reset_session()
@@ -44,7 +44,7 @@ def switch_to_submit_successful(
     st.switch_page(pages.submission_successful, query_params=params)
 
 
-def switch_button(
+def switch_page_bttn(
         page: StreamlitPage | str, *, label: str,
         q_params: dict[str, str|int] = None, key: str = None,
         type_: Literal["primary", "secondary", "tertiary"] = 'secondary',
