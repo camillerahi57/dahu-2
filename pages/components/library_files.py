@@ -36,7 +36,7 @@ def file_list_container(files: list[GeneralLibraryFile], lib: Library):
     with st.container(border=True):
         st.subheader('Uploaded Files:')
         if not files:
-            st.write('_No files uploaded yet_')
+            st.write('_No file uploaded yet._')
         for file in files:
             file_list_item(file, key=file.id)
 

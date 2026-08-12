@@ -360,7 +360,8 @@ class Film(_BaseModel):
     label = CharField(unique=True)
     made_on = DateField()
     made_by_email = CharField()
-    substrate: Substrate = ForeignKeyField(Substrate)
+    substrate: Substrate = ForeignKeyField(Substrate,
+                                           deferrable='INITIALLY DEFERRED')
     library: Library = ForeignKeyField(Library, on_delete='RESTRICT',
                                        backref='films')
 
