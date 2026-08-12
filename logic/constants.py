@@ -11,8 +11,6 @@ class IdType(StrEnum):
 
 
 DOMAIN = 'localhost:8501'
-FILE_STORAGE_PATH = Path(
-    r"C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2-storage")
 FILM_INIT_STATE = 'As deposited'
 NEW_TARGET = 'NOT BASED ON AN EXISTING TARGET'
 PIXEL_COORDS = 'pixel_selection'

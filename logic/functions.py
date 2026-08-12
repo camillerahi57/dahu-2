@@ -1,10 +1,9 @@
 import base64
 import io
+import os
 import re
 from datetime import date as dt_date
-from pathlib import Path
 from time import sleep
-from logic.python_tools import rand_str
 
 import PIL
 import numpy as np
@@ -14,8 +13,7 @@ from streamlit_cookies_controller import CookieController
 from streamlit_js_eval import streamlit_js_eval
 
 from components.streamlit_tools import sess
-from logic.constants import (CookieKeys as Ck,
-                             SessionKeys as Sk, FILE_STORAGE_PATH)
+from logic.constants import CookieKeys as Ck, SessionKeys as Sk
 
 
 def highlight_rows(row) -> list[str]:
@@ -153,6 +151,10 @@ def replace_file_name_extension(name: str, new_extension: str):
     parts = name.split(".")
     parts[-1] = new_extension
     return ".".join(parts)
+
+
+def get_file_extension(file_name: str):
+    return os.path.splitext(file_name)[1].removeprefix('.')
 
 
 def link_html(label: str, url: str):

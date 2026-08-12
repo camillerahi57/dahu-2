@@ -18,11 +18,11 @@ from components.forms.new_target.fields import MadeAtField, \
 from components.forms.base_classes import Form, PausePageRun
 from components.pixel_helper import pixel_helper_button
 from components.streamlit_tools import sess
-from logic.constants import SessionKeys as Sk, NEW_TARGET, FILE_STORAGE_PATH
+from logic.constants import SessionKeys as Sk, NEW_TARGET
 from logic.db_enums import PixelCoordinateSystem, ShapeType
-from logic.functions import replace_file_name_extension
+from logic.functions import get_file_extension
 from logic.lab_modelization.db_models import Target, \
-    DeteriorationState, Patch, Vertex
+    DeteriorationState, Patch, Vertex, TargetPhoto
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
 from logic.units import ur, to_db_unit
 
@@ -153,7 +153,8 @@ class UploadAndCropForm(Form):
             if Sk.USE_DEFAULT_TARGET_PIC not in sess:
                 sess[Sk.USE_DEFAULT_TARGET_PIC] = True
             if sess[Sk.USE_DEFAULT_TARGET_PIC]:
-                path = FILE_STORAGE_PATH / default_state.photo_file_name
+                photo_upload = default_state.photos[0]
+                path = photo_upload.get_path()
                 img = Image.open(path)
                 sess[Sk.CROPPED_TARGET_IMG] = img
                 sess[Sk.UPLOADED_TARGET_IMG] = img.tobytes()
@@ -262,6 +263,12 @@ class StateInfoForm(Form):
 
         self.length_per_px = pixel_equivalence_form.ratio
         self.target_img = target_img
+
+        self.img_format = get_file_extension(photo_upload_form.file_name)
+        buffer = io.BytesIO()
+        target_img.save(buffer, format=self.img_format)
+        self.img_bytes = buffer.getvalue()
+
         self.photo_file_name = photo_upload_form.file_name
         self.state_date = date_fld.value
         self.calibration_factor = calibration_fld.value
@@ -284,20 +291,27 @@ class StateInfoForm(Form):
         if not self.is_valid:
             raise PausePageRun
         coord_system = PixelCoordinateSystem.PLOTLY
-        photo_file_name = replace_file_name_extension(
-            self.photo_file_name, 'png'
-        )
         made_by_email = target.made_by_email if email is None else email
-        return DeteriorationState(
+        state = DeteriorationState(
             date=self.state_date,
             length_per_px=self.length_per_px,
-            photo_file_name=photo_file_name,
             calibration_factor_comment=self.calibration_factor,
             comment=self.comment,
             pixel_coordinate_system=coord_system,
             target=target,
             made_by_email=made_by_email,
         )
+        photo_label = (f'target_state_{target.label}_'
+                       f'{self.state_date:%Y-%m-%d_%H-%M-%S}')
+        photo_upload = TargetPhoto(
+            label=photo_label,
+            file_name=f'{photo_label}.{self.img_format}',
+            upload_date=datetime.now(),
+            target_state=state,
+        )
+        photo_upload.file_bytes = self.img_bytes
+        state.photos = [photo_upload]
+        return state
 
 
 class XYCoordinatesForm(Form):

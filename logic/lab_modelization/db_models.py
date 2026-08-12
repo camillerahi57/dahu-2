@@ -20,8 +20,8 @@ from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
-from logic.constants import FILE_STORAGE_PATH, DOMAIN, \
-    ROOM_TEMPERATURE_CELSIUS, IdType, USER_UPLOAD_PATH
+from logic.constants import (DOMAIN, ROOM_TEMPERATURE_CELSIUS, IdType,
+                             USER_UPLOAD_PATH)
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
@@ -633,7 +633,7 @@ class UserUploadedFile(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
-        pass
+        self.delete_file()
 
     def get_path(self):
         return USER_UPLOAD_PATH.joinpath(self.file_name)
@@ -725,8 +725,8 @@ class FilmModification(_BaseModel):
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
 
-        if self.etchings:
-            self.etchings[0].delete_related_files()
+        # if self.etchings:
+        #     self.etchings[0].delete_related_files()
 
         super().delete_instance(recursive, delete_nullable)
 
@@ -1018,9 +1018,6 @@ class EtchingPattern(UserUploadedFile):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    def delete_parts(self):
-        pass
-
 
 class PlasmaConstituent(_BaseModel):
     proportion: float = FloatField()
@@ -1144,9 +1141,6 @@ class EtchingRecipe(UserUploadedFile):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    def delete_parts(self):
-        pass
-
 
 class AcidConstituent(_BaseModel):
     proportion: float = FloatField()
@@ -1190,7 +1184,6 @@ class DeteriorationState(_BaseModel):
     date = DateField()
     made_by_email = CharField()
     length_per_px = FloatField(null=True)
-    photo_file_name = CharField(null=True)
     # TODO Relevant for triode only, should we fill it in the triode form? :
     calibration_factor_comment = CharField(null=True)
     comment = CharField(null=True)
@@ -1200,11 +1193,11 @@ class DeteriorationState(_BaseModel):
         Target, on_delete='RESTRICT', backref='states')
 
     patches: DependentBackref[Patch]
+    photos: DependentBackref[TargetPhoto]
 
     def __init__(self,
                  date: datetime,
                  length_per_px: float | None = None,
-                 photo_file_name: str | None = None,
                  calibration_factor_comment: float | None = None,
                  comment: str | None = None,
                  pixel_coordinate_system: PixelCoordinateSystem | None = None,
@@ -1217,9 +1210,8 @@ class DeteriorationState(_BaseModel):
     def delete_parts(self):
         for p in self.patches:
             p.delete_with_parts()
-
-    def photo_path(self):
-        return FILE_STORAGE_PATH / self.photo_file_name
+        for p in self.photos:
+            p.delete_with_parts()
 
     def libraries(self) -> set[Library]:
         uses = (
@@ -1250,6 +1242,17 @@ class DeteriorationState(_BaseModel):
             scatter = patch.to_scatter()
             fig.add_trace(scatter)
         return fig
+
+
+class TargetPhoto(UserUploadedFile):
+    target_state: DeteriorationState = ForeignKeyField(
+        DeteriorationState, backref='photos', on_delete='RESTRICT', )
+
+    def __init__(self, label: str = None, file_name: str = None,
+                 upload_date: datetime = None,
+                 target_state: DeteriorationState = None, *args, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 # TODO assert all the unique are correct.

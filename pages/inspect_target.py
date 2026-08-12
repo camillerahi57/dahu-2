@@ -1,6 +1,5 @@
 import streamlit as st
 from PIL import Image
-from streamlit import switch_page
 
 from components.streamlit_tools import init_page, switch_button, \
     switch_to_submit_successful
@@ -82,12 +81,15 @@ def show_target_info(target: Target):
 
 
 def display_target_state(state: DeteriorationState):
-    photo = state.photo_path()
+    photo = state.photos[0].get_path()
     with st.container(horizontal=True, vertical_alignment="center",
                       width='content'):
-        img = Image.open(photo)
-        w, h = get_constrained_size(img.width, img.height, 450, 450)
-        st.image(photo, width=w, clamp=True)
+        try:
+            img = Image.open(photo)
+            w, h = get_constrained_size(img.width, img.height, 450, 450)
+            st.image(photo, width=w, clamp=True)
+        except FileNotFoundError:
+            st.write("_Photo file missing_")
         st.plotly_chart(state.to_figure(), width=300,
                         key=f'state_plot_{state.id}')
 
@@ -146,7 +148,6 @@ def confirm_deletion_dialog(target_: Target):
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('Yes', key=f"target_confirm_{target_.id}"):
             target_.delete_with_parts()
-            # st.switch_page('deleted_target.py')
             switch_to_submit_successful(pages.browse_targets)
 
 

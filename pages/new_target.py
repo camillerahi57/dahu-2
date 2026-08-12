@@ -4,7 +4,7 @@ from components.forms.new_target.sub_forms import RootForm
 from components.forms.base_classes import PausePageRun
 from components.streamlit_tools import sess, init_page, \
     switch_to_submit_successful
-from logic.constants import CookieKeys as Ck, FILE_STORAGE_PATH, IdType
+from logic.constants import CookieKeys as Ck, IdType
 from logic.functions import save_cookies
 from logic.lab_modelization.db_models import (
     db)
@@ -24,8 +24,7 @@ try:
 
         with db.atomic():
             target.save_with_dependent()
-            photo_path = FILE_STORAGE_PATH / state.photo_file_name
-            root_form.target_img.save(photo_path)
+            target.states[0].photos[0].save_bytes()
         save_cookies()
         switch_to_submit_successful(
             redirect_to=pages.inspect_target,

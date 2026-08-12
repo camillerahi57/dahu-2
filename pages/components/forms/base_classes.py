@@ -40,7 +40,6 @@ class Field(ABC):
                     is_valid, err_msg = False, 'Mandatory field.'
                 elif self.type == FieldType.ADVISED:
                     is_valid, err_msg = True, ''
-                    # is_valid, err_msg = True, 'Advised field.'
                 else:
                     is_valid, err_msg = True, ''
 

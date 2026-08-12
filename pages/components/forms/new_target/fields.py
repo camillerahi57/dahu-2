@@ -240,7 +240,6 @@ class PhotoDateField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key):
-        prefill = 'today' if prefill is None else prefill
         return st.date_input("Picture taken on", max_value='today',
                              value=prefill, width=150)
 
