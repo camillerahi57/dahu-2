@@ -167,7 +167,7 @@ class FileUploadField(Field):
     type = FieldType.OPTIONAL
 
     def _streamlit_input(self, prefill, key: str):
-        return st.file_uploader('Select a file', key=key)
+        return st.file_uploader('Select a file', key=key, max_upload_size=2**16)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None:

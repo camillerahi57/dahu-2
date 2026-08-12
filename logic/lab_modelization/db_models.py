@@ -317,6 +317,7 @@ class Library(_BaseModel):
     is_archived = BooleanField()
 
     films: DependentBackref[Film]  # Should be a list of exactly 1 element.
+    general_files: DependentBackref[GeneralLibraryFile]
 
     # Will add charac refs in the future.
 
@@ -329,6 +330,8 @@ class Library(_BaseModel):
     def delete_parts(self):
         for f in self.films:
             f.delete_with_parts()
+        for gf in self.general_files:
+            gf.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
@@ -1144,6 +1147,16 @@ class EtchingRecipe(UserUploadedFile):
     def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
                  etching: Etching = None, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+
+class GeneralLibraryFile(UserUploadedFile):
+    library = ForeignKeyField(Library, backref='general_files')
+
+    def __init__(self, *args, label: str = None, file_name: str = None,
+                 upload_date: datetime = None, library: Library = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 

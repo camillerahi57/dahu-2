@@ -31,6 +31,9 @@ class _Pages:
     new_film_modif: StreamlitPage = Page(
         '../pages/new_film_modif.py', url_path='new_film_modif',
         title='Add a New Film Modification', icon="🐐")
+    new_lib_file_upload: StreamlitPage = Page(
+        '../pages/new_lib_file_upload.py', url_path='new_lib_file_upload',
+        title='Add a New File to Library', icon="🐐")
 
     inspect_lib: StreamlitPage = Page(
         '../pages/inspect_library.py', url_path='inspect_lib',
