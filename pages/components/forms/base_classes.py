@@ -18,8 +18,6 @@ class FieldType(StrEnum):
     ADVISED = 'advised'
     OPTIONAL = 'optional'
 
-# TODO In validation in subclasses, it's better to use arguments like input
-#  and key, other than self._input and self.key.
 
 class Field(ABC):
     def __init__(self, key: str|int = 'default_key', *, form_default,

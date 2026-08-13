@@ -6,7 +6,8 @@ from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
     FILM_INIT_STATE
-from logic.db_enums import FilmModifType, Furnace, ChemicalElement
+from logic.db_enums import FilmModifType, Furnace, ChemicalElement, \
+    EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion
 from logic.functions import is_valid_email_address
 from logic.lab_modelization.db_models import FilmModification, Patch
 from logic.units import ur
@@ -340,30 +341,6 @@ class PlasmaFormulaField(Field):
         return Patch.is_valid_formula(input_)
 
 
-class AcidFormulaField(Field):
-    type = Ft.ADVISED
-
-    def _streamlit_input(self, prefill, key: str):
-        return st.text_input('Formula',
-                             key=key, placeholder='H2O')
-
-    def _validate(self, input_) -> tuple[bool, str]:
-        return Patch.is_valid_formula(input_)
-
-
-class AcidProportionField(Field):
-    type = Ft.ADVISED
-
-    def _streamlit_input(self, prefill, key: str):
-        return st.number_input('Proportion (will be normalized)', min_value=0.,
-                               key=key)
-
-    def _validate(self, input_) -> tuple[bool, str]:
-        if input_ <= 0:
-            return False, 'Proportion must be strictly positive.'
-        return True, ''
-
-
 class PlasmaProportionField(Field):
     type = Ft.MANDATORY
 
@@ -375,6 +352,54 @@ class PlasmaProportionField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ <= 0:
             return False, 'Proportion must be strictly positive.'
+        return True, ''
+
+
+class BaseField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        options = list(EtchingBaseSuggestion)
+        if prefill is None:
+            index = None
+        else:
+            index = options.index(prefill)
+        return st.selectbox('Base', options=options, index=index, key=key,
+                            accept_new_options=True)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class AcidField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        options = list(EtchingAcidSuggestion)
+        if prefill is None:
+            index = None
+        else:
+            index = options.index(prefill)
+        return st.selectbox('Acid', options=options, index=index, key=key,
+                            accept_new_options=True)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class SolventField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        options = list(EtchingSolventSuggestion)
+        if prefill is None:
+            index = None
+        else:
+            index = options.index(prefill)
+        return st.selectbox('Solvent', options=options, index=index, key=key,
+                            accept_new_options=True)
+
+    def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
 
 

@@ -45,5 +45,4 @@ class _DatabaseUnits:
     angle = to_db_unit(unit=ur.rad)
     rot_speed = to_db_unit(unit=ur.rad / ur.s)
 
-# TODO Stop using this.
 db_units = _DatabaseUnits()

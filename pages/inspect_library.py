@@ -63,7 +63,7 @@ def etching_base_info(etching: Etching):
 
 def ion_beam_etch_info(process: IonBeamEtching):
     st.header(f"**Ion Beam Etching**")
-    st.write(process.data_string(separator=' &ensp; · &ensp;'))
+    st.write(process.data_string(separator='\n\n'))
 
     constituents = process.constituents
     proportion_sum = sum(const.proportion for const in constituents)
@@ -76,16 +76,7 @@ def ion_beam_etch_info(process: IonBeamEtching):
 
 def wet_etch_info(process: WetEtching):
     st.header(f"**Wet Etching**")
-    st.write(process.data_string(separator=' &ensp; · &ensp;'))
-
-    constituents = process.constituents
-    proportion_sum = sum(const.proportion for const in constituents)
-    constituents_str = ''
-    for const in constituents:
-        percent = const.proportion / proportion_sum * 100
-        constituents_str += f"- {const.stoichio_str}: {percent:g}%\n\n"
-    st.write(f"**Acid constituents:**\n\n{constituents_str}")
-
+    st.write(process.data_string(separator='\n\n'))
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(lib_: Library):
@@ -108,7 +99,7 @@ def on_delete():
 
 def annealing_info(process: Annealing):
     st.header('Annealing')
-    st.write(process.data_string(separator=' &ensp; · &ensp;'))
+    st.write(process.data_string(separator='\n\n'))
 
     atmosphere_str = "**Atmosphere:**"
     for i_, stoichio in enumerate(process.phase_stoichio_strings()):
@@ -202,10 +193,10 @@ def page_body():
         st.write("**Film modifications:**")
 
         modif_names = {
-            FilmModifType.LIFT_OFF: 'Lift off',
-            FilmModifType.ANNEALING: 'Annealing',
-            FilmModifType.WET_ETCHING: 'Wet etching',
-            FilmModifType.ION_BEAM_ETCHING: 'Ion beam etching',
+            FilmModifType.LIFT_OFF: '🔦 Lift off',
+            FilmModifType.ANNEALING: '♨️ Annealing',
+            FilmModifType.WET_ETCHING: '🧪 Wet etching',
+            FilmModifType.ION_BEAM_ETCHING: '☄️ Ion beam etching',
         }
         modifs = film.ordered_modifs()
         for i, modif in enumerate(modifs):

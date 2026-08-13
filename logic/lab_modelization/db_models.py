@@ -39,11 +39,6 @@ db = PostgresqlDatabase(
     'dahu2', user='postgres', password='postgres', host='localhost', port=5432
 )
 
-# Be careful, if an attribute is a foreignkey, you have to add '_id' at the
-# end of the name of the column, in the DB table. This is because in the
-# table, the key is actually store as an ID. The Model.create method is
-# overridden to have argument autocompletion.
-
 
 type DependentBackref[T] = list[T]
 type Backref[T] = list[T]
@@ -517,8 +512,10 @@ class MagnetronSputtering(_BaseModel):
     generator: MagnetronSputteringGenerator = CharField(null=True)
     machine_model: MagnetronMachineModel = CharField(null=True)
 
-    film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                            backref='magnetron_sputterings')
+    film_layer: FilmLayer = ForeignKeyField(
+        FilmLayer, on_delete='RESTRICT', backref='magnetron_sputterings',
+        unique=True,
+    )
 
     def __init__(self, *args, deposit_distance: float | None = None,
                  deposit_angle: float | None = None,
@@ -565,8 +562,10 @@ class TriodeSputtering(_BaseModel):
     deposit_duration = FloatField(null=True)
     presputtering_thickness = FloatField(null=True)
 
-    film_layer: FilmLayer = ForeignKeyField(FilmLayer, on_delete='RESTRICT',
-                                            backref='triode_sputterings')
+    film_layer: FilmLayer = ForeignKeyField(
+        FilmLayer, on_delete='RESTRICT', backref='triode_sputterings',
+        unique=True,
+    )
 
     def __init__(self, *args,
                  has_active_cooling: bool | None = None,
@@ -769,7 +768,9 @@ class Annealing(_BaseModel):
     pumping_duration = FloatField(null=True)
     furnace: Furnace = CharField(null=True)
     film_modif: FilmModification = ForeignKeyField(
-        FilmModification, on_delete='RESTRICT', backref='annealings')
+        FilmModification, on_delete='RESTRICT', backref='annealings',
+        unique=True,
+    )
 
     steps: DependentBackref[AnnealingStep]
 
@@ -925,8 +926,10 @@ class AnnealingStep(_BaseModel):
 
 class Etching(_BaseModel):
     has_a_pattern = BooleanField()
-    film_modif = ForeignKeyField(FilmModification, on_delete='RESTRICT',
-                                 backref='etchings')
+    film_modif = ForeignKeyField(
+        FilmModification, on_delete='RESTRICT', backref='etchings',
+        unique=True,
+    )
 
     ion_etchings: DependentBackref[IonBeamEtching]
     wet_etchings: DependentBackref[WetEtching]
@@ -976,8 +979,10 @@ class IonBeamEtching(_BaseModel):
     power = FloatField(null=True)
     pressure = FloatField(null=True)
 
-    etching: Etching = ForeignKeyField(Etching, on_delete='RESTRICT',
-                                       backref='ion_etchings')
+    etching: Etching = ForeignKeyField(
+        Etching, on_delete='RESTRICT', backref='ion_etchings',
+        unique=True,
+    )
 
     constituents: DependentBackref[PlasmaConstituent]
 
@@ -1020,7 +1025,7 @@ class IonBeamEtching(_BaseModel):
 
 
 class EtchingPattern(UserUploadedFile):
-    etching = ForeignKeyField(Etching, backref='patterns')
+    etching = ForeignKeyField(Etching, backref='patterns', unique=True)
 
     def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
@@ -1071,9 +1076,9 @@ class PlasmaConstituent(_BaseModel):
 class LiftOffEtching(_BaseModel):
     used_ultrasound = BooleanField(null=True)
     ultrasound_config = CharField(null=True)
-
     etching: Etching = ForeignKeyField(
-        Etching, on_delete='RESTRICT', backref='lift_offs')
+        Etching, on_delete='RESTRICT', backref='lift_offs', unique=True,
+    )
 
     def __init__(self, *args, used_ultrasound: bool | None = None,
                  ultrasound_config: str | None = None,
@@ -1090,19 +1095,23 @@ class WetEtching(_BaseModel):
     duration = FloatField(null=True)
     used_ultrasound = BooleanField(null=True)
     ultrasound_config = CharField(null=True)
+    base = CharField(null=True)
+    acid = CharField(null=True)
+    solvent = CharField(null=True)
     acid_etching_depth_speed = FloatField(null=True)
     acid_etching_lateral_speed = FloatField(null=True)
 
     etching: Etching = ForeignKeyField(
-        Etching, on_delete='RESTRICT', backref='wet_etchings')
-
-    constituents: DependentBackref[AcidConstituent]
+        Etching, on_delete='RESTRICT', backref='wet_etchings', unique=True)
 
     def __init__(self, *args,
                  hard_bake_temperature: float | None = None,
                  duration: float | None = None,
                  used_ultrasound: bool | None = None,
                  ultrasound_config: str | None = None,
+                 base: str | None = None,
+                 acid: str | None = None,
+                 solvent: str | None = None,
                  acid_etching_depth_speed: float | None = None,
                  acid_etching_lateral_speed: float | None = None,
                  etching: Etching = None,
@@ -1112,21 +1121,14 @@ class WetEtching(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
-        for c in self.constituents:
-            c.delete_with_parts()
-
-    def to_mixture_constituents(self) -> list[MixtureConstituent]:
-        return [
-            MixtureConstituent(proportion=c.proportion, stoichio=c.stoichio_str)
-            for c in self.constituents
-        ]
+        pass
 
     @property
     def title_db_value_input_fields(self):
         from components.forms.new_film_modif.fields import (
             HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField,
             UltrasoundConfigField, EtchingDepthSpeedField,
-            EtchingLateralSpeedField,
+            EtchingLateralSpeedField, BaseField, AcidField, SolventField,
         )
         return [
             ('Hard bake temperature', self.hard_bake_temperature,
@@ -1135,6 +1137,9 @@ class WetEtching(_BaseModel):
             ('Used ultrasound', self.used_ultrasound, UsedUltrasoundField),
             ('Ultrasound config', self.ultrasound_config,
              UltrasoundConfigField),
+            ('Base', self.base, BaseField),
+            ('Acid', self.acid, AcidField),
+            ('Solvent', self.solvent, SolventField),
             ('Etching depth speed', self.acid_etching_depth_speed,
              EtchingDepthSpeedField),
             ('Etching lateral speed', self.acid_etching_lateral_speed,
@@ -1143,7 +1148,7 @@ class WetEtching(_BaseModel):
 
 
 class EtchingRecipe(UserUploadedFile):
-    etching = ForeignKeyField(Etching, backref='recipes')
+    etching = ForeignKeyField(Etching, backref='recipes', unique=True)
 
     def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
@@ -1160,45 +1165,6 @@ class GeneralLibraryFile(UserUploadedFile):
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-
-
-class AcidConstituent(_BaseModel):
-    proportion: float = FloatField()
-
-    wet_etching: WetEtching = ForeignKeyField(WetEtching, on_delete='RESTRICT',
-                                              backref='constituents')
-
-    nominal_stoichio: DependentBackref[StoichioElement]
-
-    def __init__(self, *args, proportion: float = None,
-                 wet_etching: WetEtching = None,
-                 **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
-
-    def delete_parts(self):
-        for se in self.nominal_stoichio:
-            se.delete_with_parts()
-
-    @property
-    def stoichio_str(self):
-        return StoichioElement.to_str(self.nominal_stoichio)
-
-    @classmethod
-    def from_stoichio(cls, stoichio: str, proportion: float,
-                      etching: WetEtching) -> AcidConstituent:
-        assert 0 < proportion <= 1
-        constituent = cls(
-            proportion=proportion,
-            wet_etching=etching,
-        )
-        stoichio = StoichioElement.from_str(
-            stoichio,
-            StoichioElement.acid_constituent,
-            constituent,
-        )
-        constituent.nominal_stoichio = stoichio
-        return constituent
 
 
 class DeteriorationState(_BaseModel):
@@ -1267,16 +1233,13 @@ class DeteriorationState(_BaseModel):
 
 class TargetPhoto(UserUploadedFile):
     target_state: DeteriorationState = ForeignKeyField(
-        DeteriorationState, backref='photos', on_delete='RESTRICT', )
+        DeteriorationState, backref='photos', on_delete='RESTRICT', unique=True)
 
     def __init__(self, *args, label: str = None, file_name: str = None,
                  upload_date: datetime = None,
                  target_state: DeteriorationState = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
-
-
-# TODO assert all the unique are correct.
 
 
 class Patch(_BaseModel):
@@ -1448,9 +1411,6 @@ class StoichioElement(_BaseModel):
     annealing_step: AnnealingStep | ForeignKeyField = ForeignKeyField(
         AnnealingStep, null=True, on_delete='RESTRICT',
         backref='preceding_atmosphere')
-    acid_constituent: AcidConstituent | ForeignKeyField = ForeignKeyField(
-        AcidConstituent, null=True, on_delete='RESTRICT',
-        backref='nominal_stoichio')
     plasma_constituent: PlasmaConstituent | ForeignKeyField = ForeignKeyField(
         PlasmaConstituent, on_delete='RESTRICT', null=True,
         backref='nominal_stoichio')
@@ -1461,7 +1421,6 @@ class StoichioElement(_BaseModel):
                  substrate_layer: SubstrateLayer = None,
                  patch: Patch = None, film_layer: FilmLayer = None,
                  annealing: Annealing = None,
-                 acid_constituent: AcidConstituent = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)

@@ -2,13 +2,19 @@ from enum import StrEnum
 from typing import Self
 
 
-# BE CAREFUL:
-#
-# Modifying string values can cause DB mismatch. For example, if you rename
-# 'polygon' to 'Polygon', all [shape_type == 'polygon'] comparisons,
-# where shape_type is ShapeType.POLYGON (which is now 'Polygon'), could fail
-# because of this change. That's why, if you rename an enum value (key is
-# ok), you must rename it everywhere in the DB
+
+
+
+###################################################################
+############################# WARNING #############################
+###################################################################
+# Modifying or deleting string values can cause DB mismatch. For example,
+# if you rename 'polygon' to 'Polygon', all [shape_in_db ==
+# ShapeType.POLYGON] comparisons will fail because it's comparing 'polygon'
+# to 'Polygon'. That's why, if you rename an enum value (key/variable name
+# change is ok), you must rename it everywhere in the DB (with a Python
+# script). However, you can add new values without any problem.
+
 
 class ShapeType(StrEnum):
     POLYGON = 'polygon'
@@ -77,7 +83,7 @@ class MokeMachine(StrEnum):
 
 class CoilModel(StrEnum):
     COIL_1 = 'coil_1'
-    COIL_2 = 'coil_2'  # TODO Replace names.
+    COIL_2 = 'coil_2'
 
 
 class XLine(StrEnum):
@@ -102,15 +108,79 @@ class VsmSquidOrientation(StrEnum):
     OUT_OF_PLANE = 'out_of_plane'
 
 
+# Usage order: base -> acid -> solvent
+# Available products: https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
+class EtchingBaseSuggestion(StrEnum):
+    AMMONIA = "Ammonia"
+    AR_300_44 = "AR 300-44"
+    AR_300_46 = "AR 300-46"
+    AR_300_47 = "AR 300-47"
+    AZ_351_B = "AZ 351 B"
+    AZ_400_K = "AZ 400 K"
+    AZ_Developer = "AZ Developer"
+    POTASSIUM_HYDROXIDE = "Potassium Hydroxide"
+    KC_265 = "KC 265"
+    KOH = "KOH"
+    MA_D_533_S = "ma-D 533 S"
+    MF_26_A = "MF 26 A"
+    MF_319 = "MF 319"
+    MICROPOSIT_CONCENTRATED_DEVELOPER = "Microposit Concentrated Developer"
+    MR_D_526_S = "mr-D 526 S"
+    MR_REM_700 = "mr-Rem 700"
+    TECHNISTRIP_NF52 = "Technistrip NF52"
+    TMAH = "TMAH"
+
+
+class EtchingAcidSuggestion(StrEnum):
+    ACETIC_ACID_CH3COOH_100 = "100% Acetic Acid (CH3COOH)"
+    HYDROCHLORIC_ACID_HCL_36 = "36% Hydrochloric Acid (HCl)"
+    CITRIC_ACID_MONOHYDRATE_C6H8O7 = "Citric Acid Monohydrate (C6H8O7)"
+    ORTHOPHOSPHORIC_ACID_H3PO4 = "Orthophosphoric Acid (H3PO4)"
+    HYDROFLUORIC_ACID_HF = "Hydrofluoric Acid (HF)"
+    NITRIC_ACID_65_HNO3 = "Nitric Acid 65% (HNO3)"
+    PERCHLORIC_ACID_HCLO4 = "Perchloric Acid (HClO4)"
+    PHOSPHORIC_ACID_85 = "Phosphoric Acid (85%)"
+    SULFURIC_ACID_95_H2SO4 = "Sulfuric Acid (95%) (H2SO4)"
+    ALUMINUM_ETCH_TYPE_A = "Aluminum Etch Type A"
+    ALUMINUM_ETCH_TYPE_B = "Aluminum Etch Type B"
+    ALUMINUM_ETCH_TYPE_D = "Aluminum Etch Type D"
+    AMMONIA_NH3 = "Ammonia (NH3)"
+    OXIDE_ETCHING_BUFFER_NH4F_HF_7_1 = "Oxide Etching Buffer (NH4F/HF) 7:1"
+    OXIDE_ETCHING_BUFFER_NH4F_HF_10_1 = "Oxide Etching Buffer (NH4F/HF) 10:1"
+    CHROME_ETCH_18 = "Chrome Etch 18"
+    FECL3 = "FeCl3"
+    AMMONIUM_FLUORIDE_NH4F = "Ammonium Fluoride (NH4F)"
+    GOLD_ETCH_TYPE_TFA = "Gold Etch Type TFA"
+    KI_I2 = "KI + I2"
+    NICKEL_ETCH_TFB = "Nickel Etch TFB"
+    NICKEL_ETCH_TFG = "Nickel Etch TFG"
+    HYDROGEN_PEROXIDE_30_H2O2 = "Hydrogen Peroxide 30% (H2O2)"
+    SILOX_VAPOX_ETCHANT_III = "Silox Vapox Etchant III"
+    AMMONIUM_SULFIDE_NH4_2S = "Ammonium Sulfide ((NH4)2S)"
+    TANTALUM_NITRIDE_ETCH_1_1_1 = "Tantalum Nitride Etch  1-1-1"
+    TANTALUM_NITRIDE_ETCH_SIE_8607 = "Tantalum Nitride Etch SIE-8607"
+
+
+class EtchingSolventSuggestion(StrEnum):
+    ETHANOL = "Ethanol"
+    ACETONE = "Acetone"
+    ISOPROPYL_ALCOHOL_IPA = "Isopropyl alcohol (IPA)"
+    N_METHYL_2_PYRROLIDONE_NMP_REMOVER1165 = ("N-Methyl-2-pyrrolidone (NMP) = "
+                                              "Remover1165")
+    REMOVER_PG = "Remover PG"
+    ETHYL_LACTATE_AR_600_09 = "Ethyl lactate (AR 600-09...)"
+    METHYL_ISOBUTYL_KETONE_MIBK = "Methyl isobutyl ketone (MIBK)"
+    QSR_5_D2 = "QSR-5 D2"
+    SU8_DEVELOPER = "SU8 developer"
+    SU8_2000_THINNER = "SU8 2000 Thinner"
+    AR_300_70 = "AR 300-70"
+    MR_REM_660 = "mr-Rem 660"
+    CYCLOHEXANE = "Cyclohexane"
+
+
 class XrayType(StrEnum):
     SMART_LAB = 'smart_lab'
     ESRF = 'esrf'
-
-
-# class EtchingDevelopers(StrEnum):
-#     pass
-#     # TODO Bases from
-#      https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
 
 
 class StoichioOf(StrEnum):

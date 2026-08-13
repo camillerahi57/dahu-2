@@ -135,8 +135,6 @@ class IsBasePatchField(Field):
         return True, ''
 
 
-# TODO Forbid negative pixels everywhere.
-
 class IsCorrectFigureField(Field):
     type = Ft.MANDATORY
 

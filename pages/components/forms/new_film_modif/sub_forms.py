@@ -107,6 +107,8 @@ class RootForm(Form):
         if not film_modif.modif_type:
             raise PausePageRun
 
+        st.divider()
+
         match film_modif.modif_type:
             case FilmModifType.ANNEALING:
                 if default_film_modif:

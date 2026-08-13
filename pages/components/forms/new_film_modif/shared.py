@@ -6,8 +6,7 @@ from components.forms.new_film_modif.fields import ConstituentCountField, \
     PlasmaFormulaField, PlasmaProportionField, \
     HasPatternField
 from logic.lab_modelization.db_models import EtchingPattern, IonBeamEtching, \
-    PlasmaConstituent, WetEtching, \
-    AcidConstituent, FilmModification, Etching, EtchingRecipe
+    PlasmaConstituent, FilmModification, Etching, EtchingRecipe
 from logic.lab_modelization.other_classes import MixtureConstituent
 
 
@@ -217,18 +216,6 @@ class ConstituentListForm(Form):
                 formula,
                 proportion / proportion_sum,
                 ion_beam_etching)
-            for formula, proportion in self.formula_list
-        ]
-
-    def to_acid(self, wet_etching: WetEtching) -> list[AcidConstituent]:
-        if not self.is_valid:
-            raise PausePageRun
-        proportion_sum = sum(prop for _, prop in self.formula_list)
-        return [
-            AcidConstituent.from_stoichio(
-                formula,
-                proportion / proportion_sum,
-                wet_etching, )
             for formula, proportion in self.formula_list
         ]
 

@@ -1,8 +1,9 @@
 import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
-from components.forms.new_film_modif.fields import IonDurationField, FlowField, \
-    AngleField, RotationField, PowerField, PressureField
+from components.forms.new_film_modif.fields import (
+    IonDurationField, FlowField, AngleField, RotationField, PowerField,
+    PressureField)
 from components.forms.new_film_modif.shared import ConstituentListForm, \
     EtchingForm
 from logic.lab_modelization.db_models import IonBeamEtching, \

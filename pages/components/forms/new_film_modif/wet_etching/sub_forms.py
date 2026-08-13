@@ -3,8 +3,9 @@ import streamlit as st
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.fields import HardBakeTempField, \
     AcidEtchingDurationField, UsedUltrasoundField, \
-    UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField
-from components.forms.new_film_modif.shared import ConstituentListForm, \
+    UltrasoundConfigField, EtchingDepthSpeedField, EtchingLateralSpeedField, \
+    BaseField, AcidField, SolventField
+from components.forms.new_film_modif.shared import \
     EtchingForm
 from logic.lab_modelization.db_models import WetEtching, \
     Etching, FilmModification
@@ -23,6 +24,8 @@ class WetEtchingForm(Form):
                 db_default=default_wet_etch.duration
                 if default_wet_etch else None,
             )
+        st.divider()
+        with st.container(horizontal=True):
             used_ultrasound_fld = UsedUltrasoundField(
                 form_default=None,
                 db_default=default_wet_etch.used_ultrasound
@@ -33,6 +36,25 @@ class WetEtchingForm(Form):
                 db_default=default_wet_etch.ultrasound_config
                 if default_wet_etch else None,
             )
+        st.divider()
+        with st.container(horizontal=True):
+            base_fld = BaseField(
+                form_default=None,
+                db_default=default_wet_etch.base
+                    if default_wet_etch else None,
+            )
+            acid_fld = AcidField(
+                form_default=None,
+                db_default=default_wet_etch.acid
+                    if default_wet_etch else None,
+            )
+            solvent_fld = SolventField(
+                form_default=None,
+                db_default=default_wet_etch.solvent
+                    if default_wet_etch else None,
+            )
+        st.divider()
+        with st.container(horizontal=True):
             depth_speed_fld = EtchingDepthSpeedField(
                 form_default=None,
                 db_default=default_wet_etch.acid_etching_depth_speed
@@ -43,16 +65,12 @@ class WetEtchingForm(Form):
                 db_default=default_wet_etch.acid_etching_lateral_speed
                 if default_wet_etch else None,
             )
+        st.divider()
 
         default_etch = default_wet_etch.etching if default_wet_etch else None
         base_info_form = EtchingForm(default_etch)
 
         st.divider()
-        constituent_form = ConstituentListForm(
-            default_constituents=default_wet_etch.to_mixture_constituents()
-                if default_wet_etch else None,
-            title='Acid Constituents',
-        )
 
         self.hard_bake_temp = bake_temp_fld.in_db_unit
         self.duration = etching_duration_fld.in_db_unit
@@ -61,13 +79,16 @@ class WetEtchingForm(Form):
         self.ultrasound_config = ultrasound_config_fld.value
         self.depth_speed = depth_speed_fld.in_db_unit
         self.lateral_speed = lateral_speed_fld.in_db_unit
+        self.base = base_fld.value
+        self.acid = acid_fld.value
+        self.solvent = solvent_fld.value
 
         self.base_info_form = base_info_form
-        self.constituent_form = constituent_form
         super().__init__(
             fields=[bake_temp_fld, etching_duration_fld, used_ultrasound_fld,
-                    ultrasound_config_fld, depth_speed_fld, lateral_speed_fld],
-            sub_forms=[base_info_form, constituent_form]
+                    ultrasound_config_fld, depth_speed_fld, lateral_speed_fld,
+                    base_fld, acid_fld, solvent_fld],
+            sub_forms=[base_info_form]
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
@@ -86,14 +107,14 @@ class WetEtchingForm(Form):
             duration=self.duration,
             used_ultrasound=self.used_ultrasound,
             ultrasound_config=self.ultrasound_config,
+            base=self.base,
+            acid=self.acid,
+            solvent=self.solvent,
             acid_etching_depth_speed=self.depth_speed,
             acid_etching_lateral_speed=self.lateral_speed,
             etching=etching,
         )
 
         etching.wet_etchings = [wet_etching]
-
-        constituents = self.constituent_form.to_acid(wet_etching)
-        wet_etching.constituents = constituents
 
         return etching
