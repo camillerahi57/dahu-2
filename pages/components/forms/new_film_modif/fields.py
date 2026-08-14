@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Iterable
 
 import streamlit as st
 
@@ -9,7 +10,8 @@ from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement, \
     EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion
 from logic.functions import is_valid_email_address
-from logic.lab_modelization.db_models import FilmModification, Patch
+from logic.lab_modelization.db_models import FilmModification, Patch, \
+    Pattern, Recipe
 from logic.units import ur
 
 
@@ -219,14 +221,54 @@ class HasPatternField(Field):
         return True, ''
 
 
-class PatternLabelField(Field):
-    type = Ft.MANDATORY
+class SelectPatternLabelField(Field):
+    type = Ft.OPTIONAL
 
     def _streamlit_input(self, prefill, key: str):
-        return st.text_input("Pattern Label", value=prefill, max_chars=50)
+        patterns: Iterable[Pattern] = Pattern.select()
+        options = [p.label for p in patterns]
+        index = options.index(prefill) if prefill else None
+        return st.selectbox('Pattern', options, index=index)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
+
+
+# class PatternLabelField(Field):
+#     type = Ft.MANDATORY
+#
+#     def _streamlit_input(self, prefill, key: str):
+#         return st.text_input('Pattern label', value=prefill)
+#
+#     def _validate(self, input_) -> tuple[bool, str]:
+#         if input_ and Pattern.label_is_taken(input_):
+#             return False, 'Label is already taken.'
+#         return True, ''
+
+
+class SelectRecipeLabelField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        recipes: Iterable[Recipe] = Recipe.select()
+        options = [r.label for r in recipes]
+        index = options.index(prefill) if prefill else None
+        return st.selectbox('Recipe', options, index=index)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+# class RecipeLabelField(Field):
+#     type = Ft.MANDATORY
+#
+#     def _streamlit_input(self, prefill, key: str):
+#         return st.text_input('Recipe label', value=prefill)
+#
+#     def _validate(self, input_) -> tuple[bool, str]:
+#         if input_ and Recipe.label_is_taken(input_):
+#             return False, 'Label is already taken.'
+#         return True, ''
 
 
 class FurnaceField(Field):

@@ -112,6 +112,10 @@ class _BaseModel(Model):
         objects)."""
         self.delete_parts()
         self.delete_instance(*args, **kwargs)
+        self.delete_related_files()
+
+    def delete_related_files(self):
+        pass
 
 
 class Substrate(_BaseModel):
@@ -641,14 +645,14 @@ class UserUploadedFile(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
-        self.delete_file()
+        pass
+
+    def delete_related_files(self):
+        Path.unlink(self.get_path())
+        sleep(.1)
 
     def get_path(self):
         return USER_UPLOAD_PATH.joinpath(self.file_name)
-
-    def delete_file(self):
-        Path.unlink(self.get_path())
-        sleep(.1)
 
     @property
     def file_bytes(self):
@@ -684,6 +688,12 @@ class UserUploadedFile(_BaseModel):
                 file_name=remove_random_prefix(self.file_name),
                 icon=":material/download:",
             )
+
+    @classmethod
+    def label_is_taken(cls, label: str) -> bool:
+        patterns = cls.select()
+        labels = [p.label for p in patterns]
+        return label in labels
 
 
 class FilmModification(_BaseModel):
@@ -924,22 +934,44 @@ class AnnealingStep(_BaseModel):
             return ur.Quantity(self.temperature, db_units.temperature)
 
 
+class Pattern(UserUploadedFile):
+    etchings: DependentBackref[Etching]
+
+    def __init__(self, *args, label: str = None, file_name: str = None,
+                 upload_date: datetime = None, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+
+class Recipe(UserUploadedFile):
+    etchings: DependentBackref[Etching]
+
+    def __init__(self, *args, label: str = None, file_name: str = None,
+                 upload_date: datetime = None, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+
 class Etching(_BaseModel):
     has_a_pattern = BooleanField()
-    film_modif = ForeignKeyField(
+
+    film_modif: FilmModification = ForeignKeyField(
         FilmModification, on_delete='RESTRICT', backref='etchings',
-        unique=True,
-    )
+        unique=True)
+    pattern: Pattern = ForeignKeyField(
+        Pattern, backref='etchings', on_delete='RESTRICT', null=True)
+    recipe: Recipe = ForeignKeyField(
+        Recipe, backref='etchings', on_delete='RESTRICT', null=True)
 
     ion_etchings: DependentBackref[IonBeamEtching]
     wet_etchings: DependentBackref[WetEtching]
     lift_offs: DependentBackref[LiftOffEtching]
 
-    patterns: DependentBackref[EtchingPattern]
-    recipes: DependentBackref[EtchingRecipe]
-
-    def __init__(self, *args, has_a_pattern: bool = None,
+    def __init__(self, *args,
+                 has_a_pattern: bool = None,
                  film_modif: FilmModification = None,
+                 pattern: Pattern = None,
+                 recipe: Recipe = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -951,24 +983,16 @@ class Etching(_BaseModel):
             we.delete_with_parts()
         for lo in self.lift_offs:
             lo.delete_with_parts()
-        for p in self.patterns:
-            p.delete_with_parts()
-        for r in self.recipes:
-            r.delete_with_parts()
 
-    def store_related_files(self):
-        if self.patterns:
-            if self.patterns[0].file_bytes:
-                self.patterns[0].save_bytes()
-        if self.recipes:
-            if self.recipes[0].file_bytes:
-                self.recipes[0].save_bytes()
 
-    def delete_related_files(self):
-        if self.patterns:
-            self.patterns[0].delete_file()
-        if self.recipes:
-            self.recipes[0].delete_file()
+class GeneralLibraryFile(UserUploadedFile):
+    library = ForeignKeyField(Library, backref='general_files')
+
+    def __init__(self, *args, label: str = None, file_name: str = None,
+                 upload_date: datetime = None, library: Library = None,
+                 **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class IonBeamEtching(_BaseModel):
@@ -1022,16 +1046,6 @@ class IonBeamEtching(_BaseModel):
             ('Power', self.power, PowerField),
             ('Pressure', self.pressure, PressureField),
         ]
-
-
-class EtchingPattern(UserUploadedFile):
-    etching = ForeignKeyField(Etching, backref='patterns', unique=True)
-
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None,
-                 etching: Etching = None, **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class PlasmaConstituent(_BaseModel):
@@ -1145,26 +1159,6 @@ class WetEtching(_BaseModel):
             ('Etching lateral speed', self.acid_etching_lateral_speed,
              EtchingLateralSpeedField),
         ]
-
-
-class EtchingRecipe(UserUploadedFile):
-    etching = ForeignKeyField(Etching, backref='recipes', unique=True)
-
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None,
-                 etching: Etching = None, **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
-
-
-class GeneralLibraryFile(UserUploadedFile):
-    library = ForeignKeyField(Library, backref='general_files')
-
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None, library: Library = None,
-                 **kwargs):
-        model_kwargs = self.get_model_kwargs(locals())
-        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class DeteriorationState(_BaseModel):

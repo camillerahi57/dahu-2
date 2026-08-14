@@ -1,32 +1,32 @@
 import streamlit as st
 
 from components.forms.base_classes import Form, \
-    PausePageRun, FileUploadForm
+    PausePageRun
 from components.forms.new_film_modif.fields import ConstituentCountField, \
     PlasmaFormulaField, PlasmaProportionField, \
-    HasPatternField
-from logic.lab_modelization.db_models import EtchingPattern, IonBeamEtching, \
-    PlasmaConstituent, FilmModification, Etching, EtchingRecipe
+    HasPatternField, SelectPatternLabelField, SelectRecipeLabelField
+from logic.lab_modelization.db_models import Pattern, IonBeamEtching, \
+    PlasmaConstituent, FilmModification, Etching, Recipe
 from logic.lab_modelization.other_classes import MixtureConstituent
 
 
 class EtchingForm(Form):
     def __init__(self, default_etch: Etching|None):
+
         st.subheader("Recipe")
-        if default_etch and default_etch.recipes:
-            default_recipe = default_etch.recipes[0]
-        else:
-            default_recipe = None
-        recipe_form = FileUploadForm(default_recipe, key='recipe_form')
+        recipe_label_fld = SelectRecipeLabelField(
+            form_default=None,
+            db_default=default_etch.recipe if default_etch else None,
+        )
 
         st.subheader("Pattern")
+        pattern_form = PatternForm(default_etch)
 
-        pattern_form = EtchingPatternForm(default_etch)
+        self.recipe_label = recipe_label_fld.value
+        self.has_pattern = pattern_form.has_pattern
+        self.pattern_label = pattern_form.pattern_label
 
-        self.recipe_form = recipe_form
-        self.pattern_form = pattern_form
-
-        super().__init__(fields=[], sub_forms=[recipe_form, pattern_form])
+        super().__init__(fields=[recipe_label_fld], sub_forms=[pattern_form])
 
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
@@ -35,47 +35,28 @@ class EtchingForm(Form):
         if not self.is_valid:
             raise PausePageRun
 
+        pattern, recipe = None, None
+
+        if self.pattern_label:
+            pattern = (Pattern.select()
+                       .where(Pattern.label == self.pattern_label)
+                       .get())
+
+        if self.recipe_label:
+            recipe = (Recipe.select()
+                      .where(Recipe.label == self.recipe_label)
+                      .get())
+
         etching = Etching(
-            has_a_pattern=self.pattern_form.has_pattern,
+            has_a_pattern=self.has_pattern,
             film_modif=film_modif,
+            pattern=pattern,
+            recipe=recipe,
         )
-
-        if self.recipe_form.file_provided:
-            recipe_upload = self.recipe_form.to_user_upload()
-            recipe = EtchingRecipe(
-                label=recipe_upload.label,
-                file_name=recipe_upload.file_name,
-                upload_date=recipe_upload.upload_date,
-                etching=etching,
-            )
-            recipe.file_bytes = recipe_upload.file_bytes
-        else:
-            recipe = None
-
-        pattern_form = self.pattern_form
-        if (pattern_form.diagram_form
-            and pattern_form.diagram_form.file_provided):
-
-            pattern_upload = self.pattern_form.diagram_form.to_user_upload()
-            pattern = EtchingPattern(
-                label=pattern_upload.label,
-                file_name=pattern_upload.file_name,
-                upload_date=pattern_upload.upload_date,
-                etching=etching,
-            )
-            pattern.file_bytes = pattern_upload.file_bytes
-        else:
-            pattern = None
-
-        if pattern:
-            etching.patterns = [pattern]
-        if recipe:
-            etching.recipes = [recipe]
-
         return etching
 
 
-class EtchingPatternForm(Form):
+class PatternForm(Form):
     def __init__(self, default_etch: Etching|None):
         has_pattern_fld = HasPatternField(
             form_default=None,
@@ -87,18 +68,20 @@ class EtchingPatternForm(Form):
 
         has_pattern = has_pattern_fld.value == HasPatternField.Option.YES
         if has_pattern:
-            if default_etch and default_etch.patterns:
-                default_pattern = default_etch.patterns[0]
-            else:
-                default_pattern = None
-            diagram_form = FileUploadForm(default_pattern, key='pattern_form')
+            has_default_pattern = default_etch and default_etch.pattern
+            db_default_label = default_etch.pattern.label \
+                if has_default_pattern else None
+            pattern_fld = SelectPatternLabelField(
+                form_default=None,
+                db_default=db_default_label,
+            )
         else:
-            diagram_form = None
+            pattern_fld = None
 
         self.has_pattern = has_pattern
-        self.diagram_form = diagram_form
+        self.pattern_label = pattern_fld.value if pattern_fld else None
 
-        super().__init__(fields=[has_pattern_fld], sub_forms=[diagram_form])
+        super().__init__(fields=[has_pattern_fld, pattern_fld], sub_forms=[])
 
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''

@@ -47,16 +47,16 @@ def etching_base_info(etching: Etching):
     with st.container(horizontal=True, vertical_alignment='center'):
         has_pattern_str = 'Yes' if etching.has_a_pattern else 'No'
         st.write(f"**Has a pattern**: {has_pattern_str}.")
-        if etching.patterns:
-            etching.patterns[0].download_bttn()
+        if etching.pattern:
+            st.image(etching.pattern.file_bytes)
         else:
             if etching.has_a_pattern:
                 st.write('No pattern found.')
 
     with st.container(horizontal=True, vertical_alignment='center'):
         st.write(f"**Recipe:**")
-        if etching.recipes:
-            etching.recipes[0].download_bttn()
+        if etching.recipe:
+            etching.recipe.download_bttn()
         else:
             st.write('No recipe found.')
 

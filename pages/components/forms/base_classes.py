@@ -175,7 +175,8 @@ class FileUploadField(Field):
 
 class FileUploadForm(Form):
     def __init__(self, default_file: UserUploadedFile|None,
-                 key: str = 'default_key'):
+                 key: str = 'default_key',
+                 accepted_formats: list[str] | None = None):
         upload_fld = None
 
         if Sk.USE_DEFAULT_FILE+key not in sess:
@@ -192,7 +193,7 @@ class FileUploadForm(Form):
                 with st.container(border=True, width='content',
                                   horizontal=True):
                     st.write(sess[Sk.FILE_NAME+key])
-                    if st.button('❌ Delete file', key=key):
+                    if st.button('🗑️ Cancel', key=key):
                         del sess[Sk.UPLOADED_FILE+key]
                         sess[Sk.USE_DEFAULT_FILE+key] = False
                         st.rerun()
@@ -214,6 +215,7 @@ class FileUploadForm(Form):
             else:
                 label_fld = None
 
+        self.accepted_formats = accepted_formats
         self.file_name = sess.get(Sk.FILE_NAME+key)
         self.file_provided = bool(self.file_name)
         self.label = label_fld.value if label_fld else ''
@@ -222,6 +224,12 @@ class FileUploadForm(Form):
         super().__init__(fields=[upload_fld, label_fld], sub_forms=[])
 
     def _is_coherent(self) -> tuple[bool, str]:
+        if self.accepted_formats is not None and self.file_name:
+            extension = self.file_name.split('.')[-1].lower()
+            accepted_formats = [f.lower() for f in self.accepted_formats]
+            if extension not in accepted_formats:
+                return False, (f'File extension {extension} not supported. '
+                               f'Supported formats: {accepted_formats}.')
         return True, ''
 
     def to_user_upload(self) -> UserUploadedFile:

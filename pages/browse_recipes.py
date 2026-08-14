@@ -1,0 +1,24 @@
+from typing import Iterable
+
+import streamlit as st
+
+from browse_patterns import file_row
+from components.streamlit_tools import init_page
+from logic.components import browser_side_bar
+from logic.functions import show_html_link
+from logic.lab_modelization.db_models import Recipe
+from logic.page_list import pages
+
+init_page(pages.browse_recipes, show_home_btn=False)
+browser_side_bar(None, pages.browse_recipes)
+
+def body():
+    st.set_page_config(layout="wide")
+    show_html_link("Add a new recipe", pages.new_recipe, border=True,
+                   icon="➕")
+    recipes: Iterable[Recipe] = Recipe.select()
+    for r in recipes:
+        file_row(r)
+
+
+body()

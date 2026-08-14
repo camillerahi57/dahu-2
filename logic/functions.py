@@ -4,16 +4,20 @@ import os
 import re
 from datetime import date as dt_date
 from time import sleep
+from urllib import parse
 
 import PIL
 import numpy as np
 from peewee import DateField
 from plotly.graph_objs import Scatter
+from streamlit.navigation.page import StreamlitPage
 from streamlit_cookies_controller import CookieController
 from streamlit_js_eval import streamlit_js_eval
+import streamlit as st
 
 from components.streamlit_tools import sess
-from logic.constants import CookieKeys as Ck, SessionKeys as Sk
+from logic.constants import CookieKeys as Ck, SessionKeys as Sk, DOMAIN
+from logic.page_list import pages
 
 
 def highlight_rows(row) -> list[str]:
@@ -159,6 +163,41 @@ def get_file_extension(file_name: str):
 
 def link_html(label: str, url: str):
     return f"<a href=\"{url}\" target=\"_self\">{label}</a>"
+
+
+def q_param_str(q_params: dict[str, str|int], include_question_mark=False):
+    q_params = q_params or {}
+    for k, v in q_params.items():
+        # If there are numbers, converts them to strings:
+        q_params[k] = str(v)
+    string = parse.urlencode(q_params)
+    if include_question_mark:
+        string = '?' + string
+    return string
+
+
+def st_page_link_html(label: str, page: StreamlitPage,
+                      q_params: dict[str, str|int] = None):
+    q_param_string = q_param_str(q_params, include_question_mark=True) \
+        if q_params else ''
+    if page == pages.browse_libs:  # Home page.
+        url_path = ''
+    else:
+        url_path = page.url_path
+    url = f'http://{DOMAIN}/{url_path}{q_param_string}'
+    return link_html(label, url)
+
+
+def show_html_link(label: str, page: StreamlitPage, border: bool = False,
+                   icon: str = None, q_params: dict[str, str|int] = None):
+    html = st_page_link_html(label, page, q_params=q_params)
+    if icon:
+        html = f'{icon} {html}'
+    if not border:
+        st.write(html, unsafe_allow_html=True)
+    else:
+        with st.container(border=True, width='content'):
+            st.write(html, unsafe_allow_html=True)
 
 
 def email_html(email: str, label: str=None):

@@ -17,9 +17,11 @@ sess = st.session_state  # Shorthand.
 def init_page(page: StreamlitPage, show_home_btn = True):
     from logic.functions import reset_session, add_cookie_data_to_session
     if show_home_btn:
-        switch_page_bttn(pages.browse_libs, label='🏠 Home', force_same_tab=True)
-    page_paged = sess.get(Sk.CURRENT_PATH) != page.url_path
-    if page_paged:
+        switch_page_bttn(pages.browse_libs, label='🏠 Home',
+                         force_same_tab=True)
+    page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
+    if page_changed:
+        print(f'Called reset session on page {page.url_path}')
         reset_session()
         sess[Sk.CURRENT_PATH] = page.url_path
     add_cookie_data_to_session()

@@ -22,10 +22,6 @@ ROOM_TEMPERATURE_CELSIUS = 20
 USER_UPLOAD_PATH = Path('user_uploads')
 
 
-class EtchingPattern(StrEnum):
-    pattern_2025_02_19 = 'pattern_2025_02_19.png'
-
-
 class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable
     for an update, we'll still access the value from old version with the

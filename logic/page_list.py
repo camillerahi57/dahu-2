@@ -15,6 +15,12 @@ class _Pages:
     browse_substrates: StreamlitPage = Page(
         '../pages/browse_substrates.py', url_path='browse_substrates',
         title='Browse Substrates', icon="🐐")
+    browse_patterns: StreamlitPage = Page(
+        '../pages/browse_patterns.py', url_path='browse_patterns',
+        title="Browse Patterns", icon="🐐")
+    browse_recipes: StreamlitPage = Page(
+        '../pages/browse_recipes.py', url_path='browse_recipes',
+        title="Browse Recipes", icon="🐐")
 
     new_lib: StreamlitPage = Page(
         '../pages/new_lib.py', url_path='new_library',
@@ -34,6 +40,12 @@ class _Pages:
     new_lib_file_upload: StreamlitPage = Page(
         '../pages/new_lib_file_upload.py', url_path='new_lib_file_upload',
         title='Add a New File to Library', icon="🐐")
+    new_pattern: StreamlitPage = Page(
+        '../pages/new_pattern.py', url_path='new_pattern',
+        title='New Pattern', icon="🐐")
+    new_recipe: StreamlitPage = Page(
+        '../pages/new_recipe.py', url_path='new_recipe',
+        title='New Recipe', icon="🐐")
 
     inspect_lib: StreamlitPage = Page(
         '../pages/inspect_library.py', url_path='inspect_lib',
