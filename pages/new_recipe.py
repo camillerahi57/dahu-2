@@ -7,7 +7,6 @@ from components.streamlit_tools import init_page, switch_to_submit_successful
 from logic.lab_modelization.db_models import db, Recipe
 from logic.page_list import pages
 
-
 init_page(pages.new_recipe)
 
 
@@ -22,13 +21,14 @@ st.header(f'New Recipe')
 form = RecipeUploadForm(default_file=None)
 
 if st.button('Confirm', disabled=not form.is_valid):
-    uploaded = form.to_user_upload()
     recipe = Recipe(
-        label=uploaded.label,
-        file_name=uploaded.file_name,
-        upload_date=uploaded.upload_date,
+        label=form.label,
+        internal_file_name=Recipe.new_internal_file_name(
+            form.label, form.original_file_name),
+        original_file_name=form.original_file_name,
+        upload_date=form.upload_date,
     )
-    recipe.file_bytes = uploaded.file_bytes
+    recipe.file_bytes = form.file_bytes
     with db.atomic():
         recipe.save()
         recipe.save_bytes()

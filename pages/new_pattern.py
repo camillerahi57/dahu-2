@@ -22,13 +22,14 @@ form = PatternUploadForm(default_file=None,
                          accepted_formats=['png', 'jpg', 'jpeg'])
 
 if st.button('Confirm', disabled=not form.is_valid):
-    uploaded = form.to_user_upload()
     pattern = Pattern(
-        label=uploaded.label,
-        file_name=uploaded.file_name,
-        upload_date=uploaded.upload_date,
+        label=form.label,
+        internal_file_name=Pattern.new_internal_file_name(
+            form.label, form.original_file_name),
+        original_file_name=form.original_file_name,
+        upload_date=form.upload_date,
     )
-    pattern.file_bytes = uploaded.file_bytes
+    pattern.file_bytes = form.file_bytes
     with db.atomic():
         pattern.save()
         pattern.save_bytes()

@@ -29,7 +29,7 @@ from logic.functions import letter_count
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
-from logic.python_tools import remove_digits, remove_random_prefix
+from logic.python_tools import remove_digits, rand_str
 from logic.units import ur, db_units
 
 # FIELD TYPES:
@@ -633,26 +633,39 @@ class TriodeSputtering(_BaseModel):
 
 class UserUploadedFile(_BaseModel):
     label: str = CharField(null=True)
-    file_name: str = CharField(unique=True)
+    internal_file_name: str = CharField(unique=True)
+    original_file_name: str = CharField(unique=True)
     upload_date = DateField()
 
     _file_bytes: bytes | None = None  # Not in DB.
 
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None,
+    def __init__(self, *args, label: str = None, internal_file_name: str = None,
+                 original_file_name: str = None, upload_date: datetime = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
+
+    @property
+    def download_file_name(self):
+        class_name = self.__class__.__name__
+        return f'{class_name}_{self.label}_{self.original_file_name}'
+
+    @classmethod
+    def new_internal_file_name(cls, label: str, original_file_name: str):
+        return f'{cls.__name__}_{label}_{rand_str()}_{original_file_name}'
 
     def delete_parts(self):
         pass
 
     def delete_related_files(self):
-        Path.unlink(self.get_path())
-        sleep(.1)
+        try:
+            Path.unlink(self.get_path())
+            sleep(.1)
+        except FileNotFoundError:
+            pass
 
     def get_path(self):
-        return USER_UPLOAD_PATH.joinpath(self.file_name)
+        return USER_UPLOAD_PATH.joinpath(self.internal_file_name)
 
     @property
     def file_bytes(self):
@@ -685,7 +698,7 @@ class UserUploadedFile(_BaseModel):
             st.download_button(
                 label=self.label,
                 data=self.file_bytes,
-                file_name=remove_random_prefix(self.file_name),
+                file_name=self.download_file_name,
                 icon=":material/download:",
             )
 
@@ -937,8 +950,9 @@ class AnnealingStep(_BaseModel):
 class Pattern(UserUploadedFile):
     etchings: DependentBackref[Etching]
 
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None, **kwargs):
+    def __init__(self, *args, label: str = None, internal_file_name: str = None,
+                 original_file_name: str = None, upload_date: datetime = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -946,8 +960,9 @@ class Pattern(UserUploadedFile):
 class Recipe(UserUploadedFile):
     etchings: DependentBackref[Etching]
 
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None, **kwargs):
+    def __init__(self, *args, label: str = None, internal_file_name: str = None,
+                 original_file_name: str = None, upload_date: datetime = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -988,8 +1003,9 @@ class Etching(_BaseModel):
 class GeneralLibraryFile(UserUploadedFile):
     library = ForeignKeyField(Library, backref='general_files')
 
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None, library: Library = None,
+    def __init__(self, *args, label: str = None, internal_file_name: str = None,
+                 original_file_name: str = None, upload_date: datetime = None,
+                 library: Library = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1229,8 +1245,8 @@ class TargetPhoto(UserUploadedFile):
     target_state: DeteriorationState = ForeignKeyField(
         DeteriorationState, backref='photos', on_delete='RESTRICT', unique=True)
 
-    def __init__(self, *args, label: str = None, file_name: str = None,
-                 upload_date: datetime = None,
+    def __init__(self, *args, label: str = None, internal_file_name: str = None,
+                 original_file_name: str = None, upload_date: datetime = None,
                  target_state: DeteriorationState = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)

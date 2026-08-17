@@ -17,14 +17,15 @@ lib: Library = Library.get_by_id(lib_id)
 st.header(f'New File for {lib.label}')
 form = FileUploadForm(default_file=None)
 if st.button('Confirm', disabled=not form.is_valid):
-    uploaded = form.to_user_upload()
     lib_file = GeneralLibraryFile(
-        label=uploaded.label,
-        file_name=uploaded.file_name,
-        upload_date=uploaded.upload_date,
+        label=form.label,
+        internal_file_name=GeneralLibraryFile.new_internal_file_name(
+            form.label, form.original_file_name),
+        original_file_name=form.original_file_name,
+        upload_date=form.upload_date,
         library=lib,
     )
-    lib_file.file_bytes = uploaded.file_bytes
+    lib_file.file_bytes = form.file_bytes
     with db.atomic():
         lib_file.save()
         lib_file.save_bytes()

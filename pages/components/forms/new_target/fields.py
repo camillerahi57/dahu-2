@@ -8,7 +8,6 @@ from logic.constants import CookieKeys as Ck, NEW_TARGET
 from logic.db_enums import ShapeType
 from logic.functions import is_valid_email_address
 from logic.lab_modelization.db_models import Target, Patch
-from logic.python_tools import add_random_prefix
 from logic.units import ur
 
 
@@ -249,16 +248,15 @@ class PhotoUploadField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key):
-        return st.file_uploader("Select target photo",
+        fld = st.file_uploader("Select target photo",
                                 type=["jpg", "png"])
+        self.file_name = fld.name if fld else None
+        return fld
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None:
             return False, 'Please upload an image file.'
         return True, ''
-
-    def new_file_name(self):
-        return add_random_prefix(self._input.name)
 
 
 class PixelEquivalenceField(Field):
@@ -282,7 +280,7 @@ class MillimeterEquivalenceField(UnitField):
     ui_unit = ur.cm
 
     def _streamlit_input(self, prefill, key):
-        return st.number_input(f"Distance in {self.ui_unit}:",
+        return st.number_input(f"Distance in **{self.ui_unit}**:",
                                min_value=0., step=1., value=prefill)
 
     def _validate(self, input_) -> tuple[bool, str]:

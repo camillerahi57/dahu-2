@@ -21,7 +21,6 @@ def init_page(page: StreamlitPage, show_home_btn = True):
                          force_same_tab=True)
     page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
     if page_changed:
-        print(f'Called reset session on page {page.url_path}')
         reset_session()
         sess[Sk.CURRENT_PATH] = page.url_path
     add_cookie_data_to_session()

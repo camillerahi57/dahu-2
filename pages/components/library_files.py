@@ -4,7 +4,6 @@ from components.streamlit_tools import switch_page_bttn
 from logic.constants import IdType
 from logic.lab_modelization.db_models import GeneralLibraryFile, Library
 from logic.page_list import pages
-from logic.python_tools import remove_random_prefix
 
 
 def file_list_item(uploaded: GeneralLibraryFile, key: int):
@@ -13,7 +12,7 @@ def file_list_item(uploaded: GeneralLibraryFile, key: int):
         st.download_button(
             label='Download',
             data=uploaded.file_bytes,
-            file_name=remove_random_prefix(uploaded.file_name),
+            file_name=uploaded.download_file_name,
             icon=':material/download:',
             key=f'download_bttn_{key}',
         )

@@ -1,19 +1,16 @@
-import base64
-import io
 import os
 import re
 from datetime import date as dt_date
 from time import sleep
 from urllib import parse
 
-import PIL
 import numpy as np
+import streamlit as st
 from peewee import DateField
 from plotly.graph_objs import Scatter
 from streamlit.navigation.page import StreamlitPage
 from streamlit_cookies_controller import CookieController
 from streamlit_js_eval import streamlit_js_eval
-import streamlit as st
 
 from components.streamlit_tools import sess
 from logic.constants import CookieKeys as Ck, SessionKeys as Sk, DOMAIN
@@ -115,32 +112,32 @@ def get_email_user_name(email_address: str) -> str:
     return re.match(r'[^@]+', email_address)[0]
 
 
-def add_target_photo_to_fig(fig, uploaded_photo):
-    img = PIL.Image.open(uploaded_photo)  # noqa
-    w, h = img.size
-
-    # Convert to base64 for Plotly
-    buf = io.BytesIO()
-    img.save(buf, format='PNG')
-    b64 = base64.b64encode(buf.getvalue()).decode()
-
-    fig.add_layout_image(
-        source=f"data:image/png;base64,{b64}",
-        x=0,
-        y=0,
-        xref="x",
-        yref="y",
-        sizex=w,
-        sizey=h,
-        sizing="stretch",
-        opacity=0.5,
-        layer="above",  # On top of all scatters
-    )
-
-    fig.update_layout(
-        xaxis=dict(range=[0, w]),
-        yaxis=dict(range=[h, 0]),
-    )
+# def add_target_photo_to_fig(fig, uploaded_photo):
+#     img = PIL.Image.open(uploaded_photo)  # noqa
+#     w, h = img.size
+#
+#     # Convert to base64 for Plotly
+#     buf = io.BytesIO()
+#     img.save(buf, format='PNG')  # ################# WHY NOT JPEG?
+#     b64 = base64.b64encode(buf.getvalue()).decode()
+#
+#     fig.add_layout_image(
+#         source=f"data:image/png;base64,{b64}",
+#         x=0,
+#         y=0,
+#         xref="x",
+#         yref="y",
+#         sizex=w,
+#         sizey=h,
+#         sizing="stretch",
+#         opacity=0.5,
+#         layer="above",  # On top of all scatters
+#     )
+#
+#     fig.update_layout(
+#         xaxis=dict(range=[0, w]),
+#         yaxis=dict(range=[h, 0]),
+#     )
 
 
 def is_valid_email_address(email_address: str) -> bool:
@@ -184,7 +181,8 @@ def st_page_link_html(label: str, page: StreamlitPage,
         url_path = ''
     else:
         url_path = page.url_path
-    url = f'http://{DOMAIN}/{url_path}{q_param_string}'
+    url = f'http://{DOMAIN}/{url_path}{q_param_string}'  # noqa
+    # TODO HTTPS?
     return link_html(label, url)
 
 

@@ -9,7 +9,6 @@ from pint.registry import Unit
 from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.lab_modelization.db_models import UserUploadedFile
-from logic.python_tools import add_random_prefix
 from logic.units import to_db_unit, from_db_unit, ur
 
 
@@ -185,7 +184,7 @@ class FileUploadForm(Form):
         if default_file and sess[Sk.USE_DEFAULT_FILE+key]:
             file_bytes = default_file.file_bytes
             sess[Sk.UPLOADED_FILE+key] = file_bytes
-            sess[Sk.FILE_NAME+key] = default_file.file_name
+            sess[Sk.FILE_NAME+key] = default_file.original_file_name
             sess[Sk.UPLOADED_AT+key] = default_file.upload_date
 
         with st.container(horizontal=True):
@@ -216,34 +215,21 @@ class FileUploadForm(Form):
                 label_fld = None
 
         self.accepted_formats = accepted_formats
-        self.file_name = sess.get(Sk.FILE_NAME+key)
-        self.file_provided = bool(self.file_name)
+        self.original_file_name = sess.get(Sk.FILE_NAME + key)
+        self.file_provided = bool(self.original_file_name)
         self.label = label_fld.value if label_fld else ''
         self.file_bytes = sess.get(Sk.UPLOADED_FILE+key)
         self.upload_date = sess.get(Sk.UPLOADED_AT+key)
         super().__init__(fields=[upload_fld, label_fld], sub_forms=[])
 
     def _is_coherent(self) -> tuple[bool, str]:
-        if self.accepted_formats is not None and self.file_name:
-            extension = self.file_name.split('.')[-1].lower()
+        if self.accepted_formats is not None and self.original_file_name:
+            extension = self.original_file_name.split('.')[-1].lower()
             accepted_formats = [f.lower() for f in self.accepted_formats]
             if extension not in accepted_formats:
                 return False, (f'File extension {extension} not supported. '
                                f'Supported formats: {accepted_formats}.')
         return True, ''
-
-    def to_user_upload(self) -> UserUploadedFile:
-        if not self.is_valid:
-            raise PausePageRun
-        assert self.label and self.upload_date, "No file provided."
-
-        upload = UserUploadedFile(
-            label=self.label,
-            file_name=add_random_prefix(self.file_name),
-            upload_date=self.upload_date,
-        )
-        upload.file_bytes = self.file_bytes
-        return upload
 
 
 class FileLabelField(Field):

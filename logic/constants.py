@@ -19,7 +19,7 @@ RESOURCE_TYPE = 'object_type'
 OBJ_ID = 'object_id'
 DB_UNIT_SYSTEM = 'SI'
 ROOM_TEMPERATURE_CELSIUS = 20
-USER_UPLOAD_PATH = Path('user_uploads')
+USER_UPLOAD_PATH = Path('user_files')
 
 
 class CookieKeys(StrEnum):
@@ -44,7 +44,7 @@ class SessionKeys(StrEnum):
     CURRENT_PATH = 'current_path_key'
     CROPPED_TARGET_IMG = 'cropped_target_key'
     UPLOADED_TARGET_IMG = 'uploaded_target_key'
-    TARGET_IMG_NAME = 'target_img_name_key'
+    IMG_FILE_NAME = 'target_img_name_key'
     CROPPED_PIC = 'cropped_pic_key'
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
     USE_DEFAULT_PATTERN = 'use_default_pattern_key'

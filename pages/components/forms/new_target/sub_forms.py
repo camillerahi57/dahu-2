@@ -148,72 +148,98 @@ class PixelEquivalenceForm(Form):
 
 
 class UploadAndCropForm(Form):
-    def __init__(self, default_state: DeteriorationState | None):
-
-        if default_state is not None:
-            if Sk.USE_DEFAULT_TARGET_PIC not in sess:
-                sess[Sk.USE_DEFAULT_TARGET_PIC] = True
-            if sess[Sk.USE_DEFAULT_TARGET_PIC]:
-                photo_upload = default_state.photos[0]
-                path = photo_upload.get_path()
-                img = Image.open(path)
-                sess[Sk.CROPPED_TARGET_IMG] = img
-                sess[Sk.UPLOADED_TARGET_IMG] = img.tobytes()
-                sess[Sk.TARGET_IMG_NAME] = Path(img.filename).name
+    def __init__(self, default_state: DeteriorationState | None):  # noqa
+        self._seed_default_photo_if_needed(default_state)
 
         if Sk.CROPPED_TARGET_IMG in sess:
-            container = st.container(
-                border=True, horizontal=True, vertical_alignment='center',
-                width='content')
-            with container:
-                cropped_img = sess[Sk.CROPPED_TARGET_IMG]
-                aspect_ratio = cropped_img.height / cropped_img.width
-                thumbnail_w = 300
-                thumbnail_h = round(thumbnail_w * aspect_ratio)
-                thumbnail = cropped_img.resize((thumbnail_w, thumbnail_h))
-                st.image(thumbnail)
-                with st.container():
-                    st.write("**Target cropped ✅**")
-                    if st.button("Delete"):
-                        del sess[Sk.CROPPED_TARGET_IMG]
-                        del sess[Sk.UPLOADED_TARGET_IMG]
-                        sess[Sk.USE_DEFAULT_TARGET_PIC] = False
-                        st.rerun()
+            self._init_from_cropped_image()  # super().__init__ called here.
+            return
 
-            has_correct_orientation_fld = HasCorrectOrientationField(
-                key='correct_orientation', form_default=False)
-            self.cropped_target_img: ImageFile = sess[Sk.CROPPED_TARGET_IMG]
-            self.file_name = sess[Sk.TARGET_IMG_NAME]
-            super().__init__([has_correct_orientation_fld], [])
-
-        elif Sk.UPLOADED_TARGET_IMG in sess:
-            photo = sess[Sk.UPLOADED_TARGET_IMG]
-            st.warning("**Keep only what you think is relevant in the image.**")
-            cropped_pic = st_cropperjs(
-                pic=photo, btn_text="Select target", key=Sk.CROPPED_PIC)
-            if cropped_pic:
-                target_img = Image.open(io.BytesIO(cropped_pic))
-                sess[Sk.CROPPED_TARGET_IMG] = target_img
-                st.rerun()
-            if st.button("Delete"):
-                del sess[Sk.UPLOADED_TARGET_IMG]
-                st.rerun()
+        if Sk.UPLOADED_TARGET_IMG in sess:
+            self._show_cropper()
             raise PausePageRun
 
-        else:
-            photo_upload_fld = PhotoUploadField(form_default=None)
-            if photo_upload_fld.value:
-                sess[Sk.UPLOADED_TARGET_IMG] = photo_upload_fld.value.read()
-                if default_state is None:
-                    sess[Sk.TARGET_IMG_NAME] = photo_upload_fld.new_file_name()
-                st.rerun()
-            raise PausePageRun
+        self._show_upload_field()
+        raise PausePageRun
+
+    @staticmethod
+    def _seed_default_photo_if_needed(default_state):
+        """If we have a default state and haven't opted out, try to preload
+        its photo into session state so the user doesn't have to upload."""
+        if default_state is None:
+            return
+        if Sk.USE_DEFAULT_TARGET_PIC not in sess:
+            sess[Sk.USE_DEFAULT_TARGET_PIC] = True
+        if not sess[Sk.USE_DEFAULT_TARGET_PIC]:
+            return
+
+        path = default_state.photos[0].get_path()
+        try:
+            img = Image.open(path)
+        except FileNotFoundError:
+            sess[Sk.USE_DEFAULT_TARGET_PIC] = False
+            return
+
+        sess[Sk.CROPPED_TARGET_IMG] = img
+        sess[Sk.UPLOADED_TARGET_IMG] = img.tobytes()
+        sess[Sk.IMG_FILE_NAME] = default_state.photos[0].original_file_name
+
+    def _init_from_cropped_image(self):
+        """A cropped image exists: show its preview and build the form
+        fields."""
+        cropped_img = sess[Sk.CROPPED_TARGET_IMG]
+
+        container = st.container(
+            border=True, horizontal=True, vertical_alignment='center',
+            width='content')
+        with container:
+            aspect_ratio = cropped_img.height / cropped_img.width
+            thumbnail_w = 300
+            thumbnail_h = round(thumbnail_w * aspect_ratio)
+            st.image(cropped_img.resize((thumbnail_w, thumbnail_h)))
+            with st.container():
+                st.write("**Target cropped ✅**")
+                if st.button("❌ Delete photo"):
+                    del sess[Sk.CROPPED_TARGET_IMG]
+                    del sess[Sk.UPLOADED_TARGET_IMG]
+                    sess[Sk.USE_DEFAULT_TARGET_PIC] = False
+                    st.rerun()
+
+        has_correct_orientation_fld = HasCorrectOrientationField(
+            key='correct_orientation', form_default=False)
+
+        self.cropped_target_img: ImageFile = cropped_img
+        self.file_name = sess[Sk.IMG_FILE_NAME]
+        super().__init__([has_correct_orientation_fld], [])
+
+    @staticmethod
+    def _show_cropper():
+        """An image was uploaded but not cropped yet: run the cropper UI."""
+        photo = sess[Sk.UPLOADED_TARGET_IMG]
+        st.warning("**Keep only what you think is relevant in the image.**")
+        cropped_pic = st_cropperjs(
+            pic=photo, btn_text="Select target", key=Sk.CROPPED_PIC)
+        if cropped_pic:
+            sess[Sk.CROPPED_TARGET_IMG] = Image.open(io.BytesIO(cropped_pic))
+            st.rerun()
+        if st.button("Delete"):
+            del sess[Sk.UPLOADED_TARGET_IMG]
+            st.rerun()
+
+    @staticmethod
+    def _show_upload_field():
+        """Nothing uploaded yet: show the file uploader."""
+        photo_upload_fld = PhotoUploadField(form_default=None)
+        if photo_upload_fld.value:
+            sess[Sk.UPLOADED_TARGET_IMG] = photo_upload_fld.value.read()
+            sess[Sk.IMG_FILE_NAME] = photo_upload_fld.file_name
+            st.rerun()
 
     def _is_coherent(self) -> tuple[bool, str]:
         return True, ''
 
 
-class StateInfoForm(Form):
+class StateForm(Form):
     def __init__(self, target_date: datetime,
                  default_state: DeteriorationState | None):
         db_has_comment = None
@@ -302,11 +328,12 @@ class StateInfoForm(Form):
             target=target,
             made_by_email=made_by_email,
         )
-        photo_label = (f'target_state_{target.label}_'
-                       f'{self.state_date:%Y-%m-%d_%H-%M-%S}')
+        photo_label = f'{target.label}_{self.state_date:%Y-%m-%d_%H-%M-%S}'
         photo_upload = TargetPhoto(
             label=photo_label,
-            file_name=f'{photo_label}.{self.img_format}',
+            internal_file_name=TargetPhoto.new_internal_file_name(
+                photo_label, self.photo_file_name),
+            original_file_name=self.photo_file_name,
             upload_date=datetime.now(),
             target_state=state,
         )
@@ -576,8 +603,8 @@ class PatchListForm(Form):
 class DeteriorationStateForm(Form):
     def __init__(self, target: Target, email: str = None,
                  default_state: DeteriorationState = None):
-        state_info_form = StateInfoForm(target.made_on,
-                                        default_state=default_state)
+        state_info_form = StateForm(target.made_on,
+                                    default_state=default_state)
         st.divider()
         state = state_info_form.to_deterioration_state(target, email)
         target.states = [state]

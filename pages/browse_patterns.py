@@ -72,7 +72,7 @@ def file_row(file: UserUploadedFile):
     with st.container(
             border=True, horizontal=True, vertical_alignment='center',
             width='content'):
-        st.download_button('', file.file_bytes, file.file_name,
+        st.download_button('', file.file_bytes, file.download_file_name,
                            icon=':material/download:',
                            key=f'download_{file.id}')
         if isinstance(file, Pattern):
