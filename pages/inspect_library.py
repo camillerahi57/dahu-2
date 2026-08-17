@@ -184,8 +184,7 @@ def page_body():
 
     switch_page_bttn(
         pages.edit_lib,
-        label='✏️ Edit name or comment',
-        q_params={IdType.LIB: lib.id},
+        label='Edit name or comment', icon='✏️', q_params={IdType.LIB: lib.id}
     )
 
     with (st.container(horizontal=True, vertical_alignment='center',
@@ -207,8 +206,9 @@ def page_body():
         st.container(width=300)
         switch_page_bttn(
             pages.new_film_modif,
-            label='➕**Add**',
+            label='**Add**',
             type_='tertiary',
+            icon='➕',
             q_params={IdType.FILM: film.id}
         )
 
@@ -221,7 +221,8 @@ def page_body():
         with st.container(border=True):
             with st.container(horizontal_alignment='right'):
                 switch_page_bttn(pages.edit_film,
-                                 label="✏️ Edit film information",
+                                 label="Edit film information",
+                                 icon='✏️',
                                  q_params={IdType.FILM: film.id})
             date_str = film.made_on.strftime("%B %d, %Y")
             st.write(f"Made on **{date_str}** by "
@@ -234,8 +235,8 @@ def page_body():
             st.write(f"**Targets:** {', '.join(target_link_htmls)}",
                      unsafe_allow_html=True)
             with st.container(horizontal_alignment='right'):
-                switch_page_bttn(pages.edit_film_layers, label="✏️ Edit layers",
-                                 q_params={IdType.FILM: film.id})
+                switch_page_bttn(pages.edit_film_layers, label="Edit layers",
+                                 q_params={IdType.FILM: film.id}, icon='✏️')
 
             st.write(f"**Layers**:")
 

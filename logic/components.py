@@ -24,30 +24,6 @@ def browser_side_bar(dynamic_filters: DynamicFilters|None,
                     st.write(f'**{title}**')
             else:
                 show_html_link(title, page, border=True)
-        # if st.button("Browse Libraries",
-        #              disabled=current_page==pages.browse_libs,
-        #              key='side_bar_libs'):
-        #     st.switch_page(pages.browse_libs)
-        #
-        # if st.button("Browse Targets",
-        #              disabled=current_page==pages.browse_targets,
-        #              key='side_bar_targets'):
-        #     st.switch_page(pages.browse_targets)
-        #
-        # if st.button("Browse Substrates",
-        #              disabled=current_page==pages.browse_substrates,
-        #              key='side_bar_subs'):
-        #     st.switch_page(pages.browse_substrates)
-        #
-        # if st.button("Browse Patterns",
-        #              disabled=current_page==pages.browse_patterns,
-        #              key='side_bar_patts'):
-        #     st.switch_page(pages.browse_patterns)
-        #
-        # if st.button("Browse Recipes",
-        #              disabled=current_page==pages.browse_recipes,
-        #              key='side_bar_recips'):
-        #     st.switch_page(pages.browse_recipes)
 
         if dynamic_filters is not None:
             st.title("Filters:")

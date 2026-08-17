@@ -634,7 +634,7 @@ class TriodeSputtering(_BaseModel):
 class UserUploadedFile(_BaseModel):
     label: str = CharField(null=True)
     internal_file_name: str = CharField(unique=True)
-    original_file_name: str = CharField(unique=True)
+    original_file_name: str = CharField()
     upload_date = DateField()
 
     _file_bytes: bytes | None = None  # Not in DB.

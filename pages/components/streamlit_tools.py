@@ -17,8 +17,7 @@ sess = st.session_state  # Shorthand.
 def init_page(page: StreamlitPage, show_home_btn = True):
     from logic.functions import reset_session, add_cookie_data_to_session
     if show_home_btn:
-        switch_page_bttn(pages.browse_libs, label='🏠 Home',
-                         force_same_tab=True)
+        switch_page_bttn(pages.browse_libs, label='Home', icon='🏠')
     page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
     if page_changed:
         reset_session()
@@ -49,38 +48,42 @@ def switch_page_bttn(
         page: StreamlitPage | str, *, label: str,
         q_params: dict[str, str|int] = None, key: str = None,
         type_: Literal["primary", "secondary", "tertiary"] = 'secondary',
-        force_same_tab: bool = False):
+        icon: str = None):
     """Don't use st.switch_page to go from current page P1 to another page P2 if
     P1 has query parameters in its URL. The browser's back button
     will not restore these parameters if the user wants to go back. This will
     break navigation.
 
-    In this case, use st.page_link, which will open the page
-    in a new tab. That way, if the user wants to go back, they will simply close
-    the newly opened tab. Not ideal but there is no satisfying alternative."""
+    To solve his, use an HTML link instead. This alternative is chosen
+    automatically if you use the present function."""
 
     if isinstance(page, str):
         page = pages.from_url_path(page)
 
     q_params = q_params or {}
-    for k, v in q_params.items():
-        # If there are numbers, converts them to strings:
-        q_params[k] = str(v)
+    convert_values_to_str(q_params)
 
-    if key is None:
-        key = label.encode(  # To bytes.
-            'ascii', 'xmlcharrefreplace'
-        ).decode('ascii')  # Back to string.
-
-    url = page.url_path + '?' + parse.urlencode(q_params)
+    if not key:
+        key = to_ascii(label)  # Create a key from label.
 
     # If there currently are q_parameters:
-    if len(current_params()) > 0 and not force_same_tab:
-        st.link_button(label, url, key=key, type=type_)  # Open in new tab.
+    if len(current_params()) > 0:
+        from logic.functions import show_html_link
+        show_html_link(label, page, border=True, icon=icon, q_params=q_params)
     else:
-        if st.button(label, key=key, type=type_):
-            # Open in same tab:
+        if st.button(f'{icon} {label}', key=key, type=type_):
             st.switch_page(page, query_params=q_params)
+
+
+def convert_values_to_str(dict_: dict):
+    for k, v in dict_.items():
+        dict_[k] = str(v)
+
+
+def to_ascii(str_: str):
+    return str_.encode(  # To bytes.
+        'ascii', 'xmlcharrefreplace'
+    ).decode('ascii')  # Back to string.
 
 
 def close_button(label: str = "Close"):

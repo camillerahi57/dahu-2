@@ -18,7 +18,7 @@ init_page(pages.browse_libs, show_home_btn=False)
 st.set_page_config(layout="wide")
 
 with st.container(horizontal=True, vertical_alignment='center'):
-    switch_page_bttn(pages.new_lib, label="➕ Add a new library")
+    switch_page_bttn(pages.new_lib, label="Add a new library", icon='➕')
     show_archived = st.checkbox('Show archived 📦')
 
 query = Library.select(

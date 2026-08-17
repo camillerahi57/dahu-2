@@ -26,7 +26,8 @@ else:
 st.title('Submission Successful ✔')
 
 if redirect_path:
-    switch_page_bttn(redirect_path, label='Continue', q_params=redirect_q_params,
-                     force_same_tab=True)
+    switch_page_bttn(
+        redirect_path, label='Continue', q_params=redirect_q_params
+    )
 else:
-    close_button()
+    switch_page_bttn(pages.browse_libs, label='Home', icon='🏠')

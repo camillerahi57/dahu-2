@@ -36,13 +36,13 @@ def main_page():
                 st.rerun()
 
     show_target_info(target)
-    switch_page_bttn(pages.edit_target, label="✏️ Edit base info",
+    switch_page_bttn(pages.edit_target, label="Edit base info", icon='✏️',
                      q_params={IdType.TARGET: str(target.id)})
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.subheader('Most Recent Deterioration State', width='content')
         switch_page_bttn(pages.new_state,
-                         label='➕ Add New State',
+                         label='Add New State', icon='➕',
                          q_params={IdType.TARGET: target_id})
 
     states = target.old_to_recent_states()
@@ -101,7 +101,7 @@ def show_state(state: DeteriorationState, state_count: int):
             show_state_info(state)
             with st.container(horizontal=True, vertical_alignment="center"):
                 switch_page_bttn(pages.edit_state,
-                                 label="✏️ Edit State",
+                                 label="Edit State", icon='✏️',
                                  q_params={IdType.STATE: f'{state.id}'},
                                  key=f'state_edit_{state.id}')
                 if state_count > 1:
@@ -154,12 +154,6 @@ def get_on_delete_callback(target: Target):
             dependent_lib_error(target)
 
     return on_delete
-
-
-def get_target_edit_callback(target: Target):
-    params = {IdType.TARGET: str(target.id)}
-    edit_page = pages.edit_target
-    return lambda: st.switch_page(edit_page, query_params=params)
 
 
 @st.dialog(title="Confirm")
