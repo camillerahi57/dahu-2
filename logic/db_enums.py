@@ -5,15 +5,19 @@ from typing import Self
 
 
 
-###################################################################
-############################# WARNING #############################
-###################################################################
+# ##################################################################
+# ############################ WARNING #############################
+# ##################################################################
 # Modifying or deleting string values can cause DB mismatch. For example,
-# if you rename 'polygon' to 'Polygon', all [shape_in_db ==
-# ShapeType.POLYGON] comparisons will fail because it's comparing 'polygon'
-# to 'Polygon'. That's why, if you rename an enum value (key/variable name
-# change is ok), you must rename it everywhere in the DB (with a Python
-# script). However, you can add new values without any problem.
+# if you rename 'polygon' to 'Polygon', all (shape_in_db ==
+# ShapeType.POLYGON) comparisons will fail because it's comparing 'polygon'
+# to 'Polygon'. That's why, if you rename an enum value, you must rename it
+# everywhere in the DB (with a Python script). However, you can add new
+# values without any problem. You can also change the name of variables/keys,
+# like renaming POLYGON to POLY, because this is not stored in the DB.
+
+# To keep it simple:
+    # Don't modify or delete values. Only add new ones.
 
 
 class ShapeType(StrEnum):
