@@ -63,7 +63,7 @@ def show_target_info(target: Target):
         with st.container(horizontal=True, vertical_alignment="center"):
             st.write(f"Made on **{date_str}** by **{email}**.",
                      unsafe_allow_html=True)
-            if target.previous_version is not None:
+            if target.previous_version:
                 previous: Target = target.previous_version
                 st.write("Based on previous target:")
                 switch_page_bttn(pages.inspect_target,

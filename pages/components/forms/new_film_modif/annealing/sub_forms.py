@@ -209,7 +209,7 @@ class PhaseListForm(Form):
             default_step_type = None
             default_stoichio = ''
 
-            if default_annealing is not None:
+            if default_annealing:
                 db_steps = default_annealing.steps
                 try:
                     db_phase_start = db_steps[phase_idx]

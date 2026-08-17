@@ -36,7 +36,7 @@ class ModifBaseInfoForm(Form):
 
         made_after_db_default = None
         previous_modif = None
-        if default_modif is not None:
+        if default_modif:
             if default_modif.modif_number == 0:
                 made_after_db_default = (-1, FILM_INIT_STATE)
             else:
@@ -76,7 +76,7 @@ class ModifBaseInfoForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
-        if self.previous_modif is not None:
+        if self.previous_modif:
             if self.previous_modif.made_on > self.made_on:
                 return False, ("The date of this modification cannot be "
                                "anterior to what has been selected as the "

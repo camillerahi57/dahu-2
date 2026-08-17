@@ -146,7 +146,7 @@ class FilmInfoForm(Form):
 class LayerIntroForm(Form):
     def __init__(self, default_layer: FilmLayer|None, key: str):
         no_db_default = default_layer is None
-        if default_layer is not None:
+        if default_layer:
             db_default_target_labels = [use.target.label
                                        for use in default_layer.target_uses]
             if len(db_default_target_labels) > 2:
@@ -460,14 +460,14 @@ class LayerForm(Form):
             layer_intro_form = LayerIntroForm(default_layer, key)
             sputter_system = layer_intro_form.sputtering_system
             if sputter_system == SputteringSystem.TRIODE:
-                if default_layer is not None:
+                if default_layer:
                     triode_sput = default_layer.triode_sputterings[0]
                 else:
                     triode_sput = None
                 sputter_form = TriodeForm(triode_sput, key=key)
 
             elif sputter_system == SputteringSystem.MAGNETRON:
-                if default_layer is not None:
+                if default_layer:
                     magnetron_sput = (default_layer.magnetron_sputterings[0])
                 else:
                     magnetron_sput = None
@@ -596,7 +596,7 @@ class TargetListForm(Form):
 
 class RootForm(Form):
     def __init__(self, default_lib: Library|None = None):
-        default_film = default_lib.films[0] if default_lib is not None else None
+        default_film = default_lib.films[0] if default_lib else None
 
         base_info_form = BaseInfoForm(default_lib)
         film_info_form = FilmInfoForm(default_film)

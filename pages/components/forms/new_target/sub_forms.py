@@ -104,7 +104,7 @@ class BasicInfoForm(Form):
 class PixelEquivalenceForm(Form):
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
-        if default_state is not None:
+        if default_state:
             default_db_length = to_db_unit(100 * ur.mm)  # Only ratio is
             # stored in DB, so we arbitrarily chose a length to show it's
             # equivalent in pixels.
@@ -243,7 +243,7 @@ class StateForm(Form):
     def __init__(self, target_date: datetime,
                  default_state: DeteriorationState | None):
         db_has_comment = None
-        if default_state is not None:
+        if default_state:
             if default_state.comment != '':
                 db_has_comment = HasCommentField.Option.YES
             else:
@@ -344,7 +344,7 @@ class StateForm(Form):
 
 class XYCoordinatesForm(Form):
     def __init__(self, key: str | int, default_vertex: Vertex | None):
-        if default_vertex is not None:
+        if default_vertex:
             x = round(default_vertex.pixel_x)
             y = round(default_vertex.pixel_y)
             couple = str((x, y)).removeprefix('(').removesuffix(')')
@@ -372,7 +372,7 @@ class DiscPatchForm(Form):
             vertex2 = None
             vertex3 = None
 
-        if default_patch is not None:
+        if default_patch:
             vertices = default_patch.vertices
             vertex_count = len(vertices)
             Default.vertex1 = vertices[0]
