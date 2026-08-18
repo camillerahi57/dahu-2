@@ -7,6 +7,9 @@ from logic.constants import DB_UNIT_SYSTEM
 
 ur = UnitRegistry(system=DB_UNIT_SYSTEM)
 ur.default_format = 'P'  # Or '~P' for short version.
+db_units_explanation = """All units in DB are SI. All quantities are converted 
+to SI using Pint's `to_base_units` method, with 
+`ur = UnitRegistry(system='SI')`."""
 
 
 def to_db_unit(quantity: Quantity = None, unit: Unit = None) -> Unit|float:

@@ -12,7 +12,7 @@ import streamlit as st
 from pandas import DataFrame
 from peewee import PostgresqlDatabase, CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
-    BooleanField, DateField
+    BooleanField, DateField, TextField, Check, DoesNotExist
 from pint.registry import Quantity
 from playhouse.shortcuts import model_to_dict  # noqa
 from playhouse.signals import Model
@@ -30,7 +30,7 @@ from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
 from logic.python_tools import remove_digits, rand_str
-from logic.units import ur, db_units
+from logic.units import ur, db_units, db_units_explanation
 
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
@@ -1469,12 +1469,37 @@ class StoichioElement(_BaseModel):
         return ''.join([str(e) for e in sorted_elements])
 
 
+class AppMetadata(_BaseModel):
+    """Table with only one row (class with only one instance), also called
+    'a singleton'."""
+    is_the_only_row = BooleanField(
+        unique=True, constraints=[Check('is_the_only_row = TRUE')],
+    )
+    db_units_description = TextField()
+    last_backup = DateTimeField(null=True)
+
+    def __init__(self, *args,
+                 is_the_only_row: bool = True,
+                 db_units_description: str = db_units_explanation,
+                 last_backup: datetime = None,
+                 **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+    @classmethod
+    def get_or_new(cls):
+        try:
+            return cls.get()
+        except DoesNotExist:
+            return cls()
+
+
 def all_models():
     def is_a_model(cls):
         return (
-                inspect.isclass(cls)
-                and issubclass(cls, _BaseModel)
-                and not cls.__name__.startswith('_')
+            inspect.isclass(cls)
+            and issubclass(cls, _BaseModel)
+            and not cls.__name__.startswith('_')
         )
 
     name_models = inspect.getmembers(sys.modules[__name__], is_a_model)
