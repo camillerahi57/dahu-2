@@ -10,9 +10,9 @@ import chemparse
 import plotly.graph_objects as go
 import streamlit as st
 from pandas import DataFrame
-from peewee import PostgresqlDatabase, CharField, DateTimeField, \
+from peewee import CharField, DateTimeField, \
     ForeignKeyField, FloatField, IntegerField, \
-    BooleanField, DateField, TextField, Check, DoesNotExist
+    BooleanField, DateField, TextField, Check, DoesNotExist, SqliteDatabase
 from pint.registry import Quantity
 from playhouse.shortcuts import model_to_dict  # noqa
 from playhouse.signals import Model
@@ -20,25 +20,21 @@ from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
-from logic.constants import (DOMAIN, ROOM_TEMPERATURE_CELSIUS, IdType,
-                             USER_UPLOAD_PATH)
+from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
+                             USER_DATA_PATH)
+from dahu_2_config import DOMAIN
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, FilmModifType, Furnace, \
     MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
-from logic.functions import letter_count
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
-from logic.python_tools import remove_digits, rand_str
 from logic.units import ur, db_units, db_units_explanation
 
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
 
-db = PostgresqlDatabase(
-    'dahu2', user='postgres', password='postgres', host='localhost', port=5432
-)
-
+db = SqliteDatabase('user_data/dahu_2.db')
 
 type DependentBackref[T] = list[T]
 type Backref[T] = list[T]
@@ -467,6 +463,7 @@ class FilmLayer(_BaseModel):
 
     @property
     def element_str(self) -> str:
+        from logic.utils import remove_digits
         return remove_digits(self.nominal_stoichio_str)
 
     @property
@@ -652,6 +649,7 @@ class UserUploadedFile(_BaseModel):
 
     @classmethod
     def new_internal_file_name(cls, label: str, original_file_name: str):
+        from logic.utils import rand_str
         return f'{cls.__name__}_{label}_{rand_str()}_{original_file_name}'
 
     def delete_parts(self):
@@ -665,7 +663,7 @@ class UserUploadedFile(_BaseModel):
             pass
 
     def get_path(self):
-        return USER_UPLOAD_PATH.joinpath(self.internal_file_name)
+        return USER_DATA_PATH.joinpath(self.internal_file_name)
 
     @property
     def file_bytes(self):
@@ -1296,6 +1294,7 @@ class Patch(_BaseModel):
 
     @staticmethod
     def is_valid_formula(stoichio_str: str) -> tuple[bool, str]:
+        from logic.utils import letter_count
         for char in stoichio_str:
             if char not in alphanums + '.':
                 return False, f"Character '{char}' not allowed."
@@ -1473,15 +1472,14 @@ class AppMetadata(_BaseModel):
     """Table with only one row (class with only one instance), also called
     'a singleton'."""
     is_the_only_row = BooleanField(
-        unique=True, constraints=[Check('is_the_only_row = TRUE')],
-    )
+        unique=True, constraints=[Check('is_the_only_row = TRUE')])
     db_units_description = TextField()
-    last_backup = DateTimeField(null=True)
+    next_backup_at = DateTimeField()
 
     def __init__(self, *args,
                  is_the_only_row: bool = True,
                  db_units_description: str = db_units_explanation,
-                 last_backup: datetime = None,
+                 next_backup_at: datetime = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1491,7 +1489,7 @@ class AppMetadata(_BaseModel):
         try:
             return cls.get()
         except DoesNotExist:
-            return cls()
+            return cls(next_backup_at=datetime.now())
 
 
 def all_models():

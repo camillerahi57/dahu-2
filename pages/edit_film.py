@@ -2,10 +2,10 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.new_library.sub_forms import FilmInfoForm
-from components.streamlit_tools import init_page, \
+from components.general import init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import IdType
-from logic.functions import save_cookies
+from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db, Film
 from logic.page_list import pages
 

@@ -4,7 +4,7 @@ import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft
 from logic.constants import CookieKeys as Ck
-from logic.functions import is_valid_email_address
+from logic.utils import is_valid_email_address
 
 
 class UpdaterEmailField(Field):

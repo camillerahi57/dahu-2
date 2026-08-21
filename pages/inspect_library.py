@@ -1,18 +1,16 @@
 import streamlit as st
 from pandas import DataFrame
 
-from components.browse import INSPECT_BUTTON_KEY
+from components.browsing import INSPECT_BUTTON_KEY
 from components.forms.new_library.fields import DepositTempField
-from components.inspect_film_layer import show_film_layer
 from components.library_files import file_list_container
-from components.streamlit_tools import (
+from components.general import (
     sess, init_page, current_params, switch_page_bttn,
-    switch_to_submit_successful,
+    switch_to_submit_successful, link_html, email_html,
 )
-from logic.components import inspect_page_header
+from components.inspection import inspect_page_header, show_film_layer
 from logic.constants import SessionKeys as Sk, IdType
 from logic.db_enums import FilmModifType
-from logic.functions import link_html, email_html
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
     IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching)

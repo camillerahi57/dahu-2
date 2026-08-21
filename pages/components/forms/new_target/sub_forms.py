@@ -17,10 +17,10 @@ from components.forms.new_target.fields import MadeAtField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
 from components.pixel_helper import pixel_helper_button
-from components.streamlit_tools import sess
+from components.general import sess
 from logic.constants import SessionKeys as Sk, NEW_TARGET
 from logic.db_enums import PixelCoordinateSystem, ShapeType
-from logic.functions import get_file_extension
+from logic.utils import get_file_extension
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex, TargetPhoto
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear

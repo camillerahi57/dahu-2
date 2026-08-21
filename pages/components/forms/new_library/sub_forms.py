@@ -37,7 +37,7 @@ from components.forms.new_library.fields import (LibLabelField, CommentField, \
                                                  TargetChoiceField,
                                                  ConfirmOrderField,
                                                  IsCoSputteringField)
-from components.streamlit_tools import sess
+from components.general import sess
 from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \

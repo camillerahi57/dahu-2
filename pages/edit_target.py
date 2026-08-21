@@ -2,11 +2,11 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.new_target.sub_forms import BasicInfoForm
-from components.streamlit_tools import init_page, sess, \
+from components.general import init_page, sess, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \
     IdType
-from logic.functions import save_cookies
+from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db, Target
 from logic.page_list import pages
 

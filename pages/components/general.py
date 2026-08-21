@@ -1,21 +1,32 @@
+from datetime import date as dt_date, datetime
+from threading import Thread
 from typing import Literal
-from urllib import parse
 
 import keyboard
 import streamlit as st
+from peewee import DateField
 from streamlit.navigation.page import StreamlitPage
 
 from logic.constants import (
     SessionKeys as Sk, REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID,
     IdType
 )
+from dahu_2_config import DOMAIN, BACKUP_INTERVAL
+from logic.lab_modelization.db_models import AppMetadata
 from logic.page_list import pages
 
 sess = st.session_state  # Shorthand.
+print("App metadata loaded.")
+app_metadata = AppMetadata.get_or_new()
 
 
 def init_page(page: StreamlitPage, show_home_btn = True):
-    from logic.functions import reset_session, add_cookie_data_to_session
+    from logic.utils import reset_session, add_cookie_data_to_session
+
+    if datetime.now() > app_metadata.next_backup_at:
+        from logic.app_restoration import Snapshot
+        Thread(target=Snapshot.backup).start()
+
     if show_home_btn:
         switch_page_bttn(pages.browse_libs, label='Home', icon='🏠')
     page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
@@ -56,6 +67,7 @@ def switch_page_bttn(
 
     To solve his, use an HTML link instead. This alternative is chosen
     automatically if you use the present function."""
+    from logic.utils import to_ascii
 
     if isinstance(page, str):
         page = pages.from_url_path(page)
@@ -68,7 +80,6 @@ def switch_page_bttn(
 
     # If there currently are q_parameters:
     if len(current_params()) > 0:
-        from logic.functions import show_html_link
         show_html_link(label, page, border=True, icon=icon, q_params=q_params)
     else:
         if st.button(f'{icon} {label}', key=key, type=type_):
@@ -80,12 +91,47 @@ def convert_values_to_str(dict_: dict):
         dict_[k] = str(v)
 
 
-def to_ascii(str_: str):
-    return str_.encode(  # To bytes.
-        'ascii', 'xmlcharrefreplace'
-    ).decode('ascii')  # Back to string.
-
-
 def close_button(label: str = "Close"):
     if st.button(label):
         keyboard.press_and_release('ctrl+w')
+
+
+def link_html(label: str, url: str):
+    return f"<a href=\"{url}\" target=\"_self\">{label}</a>"
+
+
+def st_page_link_html(label: str, page: StreamlitPage,
+                      q_params: dict[str, str|int] = None):
+    from logic.utils import q_param_str
+
+    q_param_string = q_param_str(q_params, include_question_mark=True) \
+        if q_params else ''
+    if page == pages.browse_libs:  # Home page.
+        url_path = ''
+    else:
+        url_path = page.url_path
+    url = f'http://{DOMAIN}/{url_path}{q_param_string}'  # noqa
+    # TODO HTTPS?
+    return link_html(label, url)
+
+
+def show_html_link(label: str, page: StreamlitPage, border: bool = False,
+                   icon: str = None, q_params: dict[str, str|int] = None):
+    html = st_page_link_html(label, page, q_params=q_params)
+    if icon:
+        html = f'{icon} {html}'
+    if not border:
+        st.write(html, unsafe_allow_html=True)
+    else:
+        with st.container(border=True, width='content'):
+            st.write(html, unsafe_allow_html=True)
+
+
+def email_html(email: str, label: str=None):
+    if label is None:
+        label = email
+    return f'<a href="mailto:{email}">{label}</a>'
+
+
+def extensive_date_str(date: DateField):
+    return dt_date(date.year, date.month, date.day).strftime("%B %d, %Y")

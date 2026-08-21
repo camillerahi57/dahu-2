@@ -3,7 +3,7 @@ from time import sleep
 import streamlit as st
 
 from components.forms.base_classes import FileUploadForm
-from components.streamlit_tools import init_page, current_params, \
+from components.general import init_page, current_params, \
     switch_to_submit_successful
 from logic.constants import IdType
 from logic.lab_modelization.db_models import db, Library, GeneralLibraryFile

@@ -4,12 +4,12 @@ from typing import Iterable
 import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
-from components.streamlit_tools import sess
+from components.general import sess
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
     FILM_INIT_STATE
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement, \
     EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion
-from logic.functions import is_valid_email_address
+from logic.utils import is_valid_email_address
 from logic.lab_modelization.db_models import FilmModification, Patch, \
     Pattern, Recipe
 from logic.units import ur

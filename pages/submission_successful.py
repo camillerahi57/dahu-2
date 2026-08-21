@@ -1,6 +1,6 @@
 import streamlit as st
 
-from components.streamlit_tools import (
+from components.general import (
     init_page, current_params, close_button, \
     switch_page_bttn)
 from logic.constants import REDIRECT_PATH, RESOURCE_TYPE, \

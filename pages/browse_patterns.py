@@ -3,11 +3,10 @@ from typing import Iterable
 
 import streamlit as st
 
-from components.streamlit_tools import init_page
-from logic.components import browser_side_bar
+from components.general import init_page, show_html_link
+from components.browsing import browser_side_bar
 from logic.constants import IdType
-from logic.functions import show_html_link
-from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe, \
+from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe,\
     Etching
 from logic.page_list import pages
 

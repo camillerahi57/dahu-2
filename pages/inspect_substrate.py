@@ -2,9 +2,9 @@ import streamlit as st
 from pandas import DataFrame
 
 from components.forms.new_substrate.fields import ThicknessField
-from components.streamlit_tools import init_page, switch_to_submit_successful, \
+from components.general import init_page, switch_to_submit_successful, \
     current_params, switch_page_bttn
-from logic.components import inspect_page_header
+from components.inspection import inspect_page_header
 from logic.constants import IdType
 from logic.lab_modelization.db_models import Substrate, StoichioElement
 from logic.page_list import pages

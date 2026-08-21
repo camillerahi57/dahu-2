@@ -1,11 +1,29 @@
+from typing import Callable
+
 import streamlit as st
 
-from components.browse import INSPECT_BUTTON_KEY
-from components.streamlit_tools import sess, switch_page_bttn
+from components.browsing import INSPECT_BUTTON_KEY
+from components.general import sess, switch_page_bttn
 from logic.constants import IdType
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse
 from logic.page_list import pages
+
+
+def inspect_page_header(object_type: str, instance_name: str,
+                        on_delete: Callable, on_edit: Callable = None):
+    col1, col2 = st.columns(2)
+    with col1:
+        with st.container(horizontal=True, vertical_alignment="center"):
+            st.write(f'**{object_type.upper()}**')
+            st.subheader(instance_name)
+    with col2:
+        with st.container(horizontal=True, horizontal_alignment='right'):
+            if on_edit is not None:
+                if st.button('Edit ✏️'):
+                    on_edit()
+            if st.button(f'Delete {object_type} ❌'):
+                on_delete()
 
 
 @st.dialog(title="Layer info")

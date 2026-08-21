@@ -2,12 +2,12 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from components.browse import on_inspect_click, INSPECT_BUTTON_KEY
-from components.streamlit_tools import init_page, sess, switch_page_bttn
-from logic.components import browser_side_bar
+from components.general import init_page, sess, switch_page_bttn
+from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
+    on_inspect_click
 from logic.constants import CookieKeys as Ck, \
     SessionKeys as Sk, IdType
-from logic.functions import save_cookies, \
+from logic.utils import save_cookies, \
     get_email_user_name
 from logic.lab_modelization.db_models import Library, Film
 from logic.page_list import pages

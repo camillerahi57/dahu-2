@@ -1,6 +1,6 @@
 import streamlit as st
 
-from components.streamlit_tools import switch_page_bttn
+from components.general import switch_page_bttn
 from logic.constants import IdType
 from logic.lab_modelization.db_models import GeneralLibraryFile, Library
 from logic.page_list import pages

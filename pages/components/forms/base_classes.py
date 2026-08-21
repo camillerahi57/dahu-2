@@ -6,7 +6,6 @@ from typing import Any
 import streamlit as st
 from pint.registry import Unit
 
-from components.streamlit_tools import sess
 from logic.constants import SessionKeys as Sk
 from logic.lab_modelization.db_models import UserUploadedFile
 from logic.units import to_db_unit, from_db_unit, ur
@@ -176,6 +175,7 @@ class FileUploadForm(Form):
     def __init__(self, default_file: UserUploadedFile|None,
                  key: str = 'default_key',
                  accepted_formats: list[str] | None = None):
+        from components.general import sess
         upload_fld = None
 
         if Sk.USE_DEFAULT_FILE+key not in sess:

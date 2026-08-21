@@ -2,10 +2,10 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.new_library.sub_forms import RootForm
-from components.streamlit_tools import init_page, sess, \
+from components.general import init_page, sess, \
     switch_to_submit_successful
 from logic.constants import CookieKeys as Ck, IdType
-from logic.functions import save_cookies
+from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db
 from logic.page_list import pages
 

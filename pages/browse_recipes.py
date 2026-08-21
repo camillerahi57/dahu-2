@@ -3,9 +3,8 @@ from typing import Iterable
 import streamlit as st
 
 from browse_patterns import file_row
-from components.streamlit_tools import init_page
-from logic.components import browser_side_bar
-from logic.functions import show_html_link
+from components.general import init_page, show_html_link
+from components.browsing import browser_side_bar
 from logic.lab_modelization.db_models import Recipe
 from logic.page_list import pages
 

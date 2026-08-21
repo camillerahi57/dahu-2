@@ -4,7 +4,7 @@ from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from logic.constants import CookieKeys as Ck, SessionKeys as Sk
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, MagnetronMachineModel
-from logic.functions import is_valid_email_address
+from logic.utils import is_valid_email_address
 from logic.lab_modelization.db_models import (Library, Film, Target, Patch,
                                               Substrate)
 from logic.units import ur

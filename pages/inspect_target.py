@@ -1,11 +1,10 @@
 import streamlit as st
 from PIL import Image
 
-from components.streamlit_tools import init_page, switch_page_bttn, \
-    switch_to_submit_successful
-from logic.components import inspect_page_header
+from components.general import init_page, switch_page_bttn, \
+    switch_to_submit_successful, email_html, extensive_date_str
+from components.inspection import inspect_page_header
 from logic.constants import IdType
-from logic.functions import email_html, extensive_date_str
 from logic.lab_modelization.db_models import Target, DeteriorationState
 from logic.math_tools import get_constrained_size
 from logic.page_list import pages
@@ -14,7 +13,7 @@ init_page(pages.inspect_target)
 
 
 def main_page():
-    from components.streamlit_tools import current_params
+    from components.general import current_params
     target_id = current_params()[IdType.TARGET]
     target: Target = Target.get_by_id(target_id)
 

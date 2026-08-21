@@ -2,11 +2,11 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.new_film_modif.sub_forms import RootForm
-from components.streamlit_tools import sess, init_page, \
+from components.general import sess, init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import CookieKeys as Ck, \
     SessionKeys as Sk, IdType
-from logic.functions import save_cookies
+from logic.utils import save_cookies
 from logic.lab_modelization.db_models import (
     db, Film)
 from logic.page_list import pages

@@ -10,7 +10,6 @@ class IdType(StrEnum):
     STATE = 'state_id'
 
 
-DOMAIN = 'localhost:8501'
 FILM_INIT_STATE = 'As deposited'
 NEW_TARGET = 'NOT BASED ON AN EXISTING TARGET'
 PIXEL_COORDS = 'pixel_selection'
@@ -19,14 +18,13 @@ RESOURCE_TYPE = 'object_type'
 OBJ_ID = 'object_id'
 DB_UNIT_SYSTEM = 'SI'
 ROOM_TEMPERATURE_CELSIUS = 20
-USER_UPLOAD_PATH = Path('user_files')
+USER_DATA_PATH = Path('user_data')
 
 
 class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable
     for an update, we'll still access the value from old version with the
     same key in the cookie."""
-
     LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
     LIB_FILTERS = 'f4ze86sd4ce1v68rrf46sdw1cqz568fc4'
     TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq43q1dz'
@@ -35,6 +33,7 @@ class CookieKeys(StrEnum):
 
 class SessionKeys(StrEnum):
     PATCH_FORMS = 'patch_forms_key'
+    SNAP_TO_RESTORE = 'snap_to_restore_key'
     SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
     SUBSTRATE_LAYER_FORMS = 'substrate_layer_forms_key'
     FILM_LAYERS = 'film_layers_key'
@@ -56,4 +55,3 @@ class SessionKeys(StrEnum):
     FILE_NAME = 'pattern_label_key'
     UPLOADED_AT = 'uploaded_at_key'
     USE_DEFAULT_FILE = 'use_default_file_key'
-

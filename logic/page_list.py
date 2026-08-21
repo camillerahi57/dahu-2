@@ -80,6 +80,10 @@ class _Pages:
         '../pages/edit_substrate.py', url_path='edit_substrate',
         title='Edit Substrate', icon='🐐')
 
+    restore_app_state: StreamlitPage = Page(
+        '../pages/restore_app_state.py', url_path='restore_app_state',
+        title='Restore App State', icon='🐐')
+
     test: StreamlitPage = Page(
         '../pages/test.py', url_path='test',
         title='Test Page', icon="🐐")

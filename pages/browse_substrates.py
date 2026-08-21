@@ -2,11 +2,11 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from components.browse import INSPECT_BUTTON_KEY, on_inspect_click
-from components.streamlit_tools import init_page, switch_page_bttn, sess
-from logic.components import browser_side_bar
+from components.general import init_page, switch_page_bttn, sess
+from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
+    on_inspect_click
 from logic.constants import CookieKeys as Ck, IdType, SessionKeys as Sk
-from logic.functions import save_cookies
+from logic.utils import save_cookies
 from logic.lab_modelization.db_models import Substrate
 from logic.page_list import pages
 from logic.table_columns import SubstrateBrowserColumnName as ColName
