@@ -18,4 +18,4 @@ class BackupsToKeep(IntEnum):
     LAST_N_MONTHS = 5
     LAST_N_YEARS = 1
 
-BACKUP_INTERVAL: timedelta = timedelta(hours=1)
+BACKUP_INTERVAL = timedelta(hours=1)

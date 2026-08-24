@@ -11,7 +11,7 @@ from logic.constants import (
     SessionKeys as Sk, REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID,
     IdType
 )
-from dahu_2_config import DOMAIN, BACKUP_INTERVAL
+from dahu_2_config import DOMAIN
 from logic.lab_modelization.db_models import AppMetadata
 from logic.page_list import pages
 

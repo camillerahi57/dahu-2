@@ -1,6 +1,5 @@
 import io
 from datetime import datetime
-from pathlib import Path
 from types import SimpleNamespace
 
 import streamlit as st
@@ -16,15 +15,15 @@ from components.forms.new_target.fields import MadeAtField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from components.pixel_helper import pixel_helper_button
 from components.general import sess
+from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET
 from logic.db_enums import PixelCoordinateSystem, ShapeType
-from logic.utils import get_file_extension
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex, TargetPhoto
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
 from logic.units import ur, to_db_unit
+from logic.utils import get_file_extension
 
 
 class BasicInfoForm(Form):
@@ -464,7 +463,7 @@ class PolygonPatchForm(Form):
 class PatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None,
-                 is_first_patch: bool):
+                 is_first_patch: bool, stack_idx: int):
         if default_patch is None:
             default_shape = None
         elif len(default_patch.vertices) > 100:
@@ -506,6 +505,7 @@ class PatchForm(Form):
             self.form = form
             self.shape = shape
             self.stoichio = stoichio_fld.value
+            self.stack_idx = stack_idx
             self.updated_patch = default_patch
             self.is_base_patch = is_base_patch_fld.value
 
@@ -521,7 +521,8 @@ class PatchForm(Form):
 
         return self.to_patch(state)
 
-    def to_patch(self, state: DeteriorationState):
+    def to_patch(self, state: DeteriorationState)\
+            -> Patch | None:
         if not self.is_valid:
             raise PausePageRun
         if self.shape == ShapeType.DISC:
@@ -534,7 +535,7 @@ class PatchForm(Form):
             return Patch.from_polygon(
                 stoichio_str=self.stoichio,
                 vertices=disc.to_vertices(),
-                stack_idx=42,
+                stack_idx=self.stack_idx,
                 deterioration_state=state,
             )
         elif self.shape == ShapeType.POLYGON:
@@ -542,7 +543,7 @@ class PatchForm(Form):
             return Patch.from_polygon(
                 stoichio_str=self.stoichio,
                 vertices=form.vertices,
-                stack_idx=42,
+                stack_idx=self.stack_idx,
                 deterioration_state=state,
             )
         else:
@@ -576,7 +577,8 @@ class PatchListForm(Form):
             default_state: Patch | None
             patch_form = PatchForm(f'{i}', target_img,
                                    default_patch=default_state,
-                                   is_first_patch=(i==0))
+                                   is_first_patch=(i==0),
+                                   stack_idx=i)
             patch_forms.append(patch_form)
 
         self.patch_forms = patch_forms

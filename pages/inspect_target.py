@@ -34,7 +34,7 @@ def main_page():
                 target.save()
                 st.rerun()
 
-    show_target_info(target)
+    show_base_info(target)
     switch_page_bttn(pages.edit_target, label="Edit base info", icon='✏️',
                      q_params={IdType.TARGET: str(target.id)})
 
@@ -55,7 +55,7 @@ def main_page():
             show_state(state, len(states))
 
 
-def show_target_info(target: Target):
+def show_base_info(target: Target):
     with st.container(border=True):
         email = email_html(target.made_by_email)
         date_str = extensive_date_str(target.made_on)
@@ -76,6 +76,14 @@ def show_target_info(target: Target):
                 st.write(f"- **[{date}]** {comment}")
         else:
             st.write(f"**Comments:** _empty_")
+        with st.container(horizontal=True, vertical_alignment="center"):
+            if target.next_versions:
+                st.write(f"**Targets base on the current one:**")
+            for t in target.next_versions:
+                switch_page_bttn(
+                    pages.inspect_target, label=t.label,
+                    q_params={IdType.TARGET: t.id}, key=str(t.id)
+                )
 
 
 def display_target_state(state: DeteriorationState):
@@ -129,7 +137,7 @@ def show_state_info(state: DeteriorationState):
 def dependent_lib_error(target_: Target):
     libs = target_.libraries()
     markdown = (f"The target cannot be deleted because {len(libs)} "
-                f"libraries depend on it:")
+                f"librarie(s) depend on it:")
     for lib_ in libs:
         markdown += f"\n- [{lib_.label}]({lib_.url})"
     st.error(markdown)
@@ -137,12 +145,29 @@ def dependent_lib_error(target_: Target):
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(target_: Target):
-    st.error(f"Are you sure you want to **permanently** delete the "
-             f"target **\"{target_.label}\"**?")
-    with st.container(horizontal=True, vertical_alignment="center"):
-        if st.button('Yes', key=f"target_confirm_{target_.id}"):
-            target_.delete_with_parts()
-            switch_to_submit_successful(pages.browse_targets)
+    if target_.next_versions:
+        next_versions = target_.next_versions
+        st.error(
+            f"**{len(next_versions)}** other target(s) are built based on "
+            f"this one.\n\n"
+            f"Targets based one the deleted one will not be "
+            f"deleted, but the information that they were based on a "
+            f"previous target will be lost."
+        )
+        st.write(f"**Concerned targets:**")
+        with st.container(horizontal=True, vertical_alignment="center"):
+            for target in next_versions:
+                switch_page_bttn(
+                    pages.inspect_target, label=target.label,
+                    q_params={IdType.TARGET: target.id}, key=str(target.id)
+                )
+    else:
+        st.error(f"Are you sure you want to **permanently** delete the target "
+               f"**\"{target_.label}\"**?")
+    st.divider()
+    if st.button('Confirm', key=f"target_confirm_{target_.id}"):
+        target_.delete_with_parts()
+        switch_to_submit_successful(pages.browse_targets)
 
 
 def get_on_delete_callback(target: Target):

@@ -3,8 +3,8 @@ import streamlit as st
 from components.forms.base_classes import PausePageRun
 from components.forms.new_substrate.sub_forms import RootForm
 from components.general import init_page, switch_to_submit_successful, \
-    current_params
-from logic.constants import IdType
+    current_params, sess
+from logic.constants import IdType, CookieKeys as Ck
 from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db, Substrate
 from logic.page_list import pages

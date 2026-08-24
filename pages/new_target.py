@@ -17,12 +17,12 @@ st.set_page_config(layout='centered')
 try:
     root_form = RootForm()
     target = root_form.target
-    state = target.states[0]
 
     if st.button("Submit", disabled=not root_form.is_valid, type="primary"):
         sess[Ck.LAST_EMAIL_USED] = target.made_by_email
 
         with db.atomic():
+
             target.save_with_dependent()
             target.states[0].photos[0].save_bytes()
         save_cookies()

@@ -35,7 +35,7 @@ st.set_page_config(layout="wide", page_title=lib.label)
 def dependent_lib_error(lib_: Library):
     libs = lib_.dependent_libraries()
     markdown = (f"The library cannot be deleted because {len(libs)} "
-                f"other libraries refer to some of its characterizations:")
+                f"other librarie(s) refer to some of its characterizations:")
     for lib_ in libs:
         markdown += f"\n- [{lib_.label}]({lib_.url()})"
     st.error(markdown)

@@ -1,10 +1,7 @@
 import streamlit as st
 
-from components.general import (
-    init_page, current_params, close_button, \
-    switch_page_bttn)
-from logic.constants import REDIRECT_PATH, RESOURCE_TYPE, \
-    OBJ_ID
+from components.general import init_page, current_params, switch_page_bttn
+from logic.constants import REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID
 from logic.page_list import pages
 
 init_page(pages.submission_successful)

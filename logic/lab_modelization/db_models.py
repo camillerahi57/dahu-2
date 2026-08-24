@@ -34,7 +34,8 @@ from logic.units import ur, db_units, db_units_explanation
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
 
-db = SqliteDatabase('user_data/dahu_2.db')
+db = SqliteDatabase('user_data/dahu_2.db', pragmas={'foreign_keys': 1})
+# The 'foreign_keys': 1 is required to enforce foreign key constraints.
 
 type DependentBackref[T] = list[T]
 type Backref[T] = list[T]
@@ -206,11 +207,12 @@ class Target(_BaseModel):
     made_by_email = CharField()
     label: str | ForeignKeyField = CharField(unique=True)
     previous_version: Target = ForeignKeyField(
-        'self', null=True, on_delete='SET NULL', backref='next_version')
+        'self', null=True, on_delete='SET NULL', backref='next_versions')
     is_archived = BooleanField()
 
     states: DependentBackref[DeteriorationState]
     uses: DependentBackref[TargetUse]
+    next_versions: DependentBackref[Target]
 
     def __init__(self, *args, made_on: datetime = None,
                  made_by_email: str = None, is_archived: bool = None,
@@ -1280,7 +1282,8 @@ class Patch(_BaseModel):
                      stack_idx: int,
                      deterioration_state: DeteriorationState) \
             -> Patch:
-        patch = cls(stack_idx, deterioration_state)
+        patch = cls(stack_idx=stack_idx,
+                    deterioration_state=deterioration_state)
         patch.stoichio = StoichioElement.from_str(
             formula=stoichio_str,
             fk_field=StoichioElement.patch,
