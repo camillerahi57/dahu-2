@@ -2,8 +2,8 @@ import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 from streamlit_dynamic_filters import DynamicFilters
 
-from logic.constants import SessionKeys as Sk
 from components.general import show_html_link
+from logic.constants import SessionKeys as Sk
 from logic.page_list import pages
 
 

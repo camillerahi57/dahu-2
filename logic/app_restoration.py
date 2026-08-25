@@ -64,7 +64,6 @@ class Snapshot:
     def backup(cls, prune_excessive_snaps: bool = True):
         available = cls._backup_lock.acquire(blocking=False)
         if not available:
-            print("Backup already in progress, skipping.")
             return  # Another thread is already backing up.
 
         try:
@@ -141,13 +140,11 @@ def delete_excessive_snapshots():
         '--prune',
         '--repo', RESTIC_REPO_PATH,
     ]
-    print("Starting forget-prune...")
     start = datetime.now()
     result = subprocess.run(
         command, capture_output=True, text=True,
         env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},
     )
-    print(f"Finished forget-prune ({datetime.now() - start})")
     if result.returncode != 0:
         raise RuntimeError(f"Database dump error: {result.stderr}")
 

@@ -2,10 +2,9 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.edit_deterioration_state.sub_forms import RootForm
-from components.general import sess, init_page, \
+from components.general import init_page, \
     switch_to_submit_successful, current_params
-from logic.constants import CookieKeys as Ck, IdType
-from logic.utils import save_cookies
+from logic.constants import IdType
 from logic.lab_modelization.db_models import db, Target, DeteriorationState
 from logic.page_list import pages
 
@@ -22,14 +21,11 @@ try:
     new_state = root_form.state
 
     if st.button("Submit", disabled=not root_form.is_valid, type="primary"):
-        sess[Ck.LAST_EMAIL_USED] = new_state.made_by_email
-
         with db.atomic():
             old_state.delete_with_parts()
             new_state.save_with_dependent()
             new_state.photos[0].save_bytes()
 
-        save_cookies()
         switch_to_submit_successful(
             redirect_to=pages.inspect_target,
             id_type=IdType.TARGET,

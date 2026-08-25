@@ -1,13 +1,13 @@
 import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
-from logic.constants import CookieKeys as Ck, SessionKeys as Sk
+from logic.constants import SessionKeys as Sk
 from logic.db_enums import SputteringSystem, FilmLayerFunction, \
     MagnetronSputteringGenerator, MagnetronMachineModel
-from logic.utils import is_valid_email_address
 from logic.lab_modelization.db_models import (Library, Film, Target, Patch,
                                               Substrate)
 from logic.units import ur
+from logic.utils import is_valid_email_address
 
 
 class LibLabelField(Field):
@@ -115,8 +115,6 @@ class MadeByField(Field):
     type = Ft.MANDATORY
     
     def _streamlit_input(self, prefill, key):
-        if prefill == '':
-            prefill = st.session_state.get(Ck.LAST_EMAIL_USED, '')
         return st.text_input("Made by (email address)", value=prefill,
                              width=300)
 
@@ -148,7 +146,7 @@ class TargetCountField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill: int, key):
-        return st.number_input("Number of different target used:", min_value=0,
+        return st.number_input("Number of different targets used:", min_value=0,
                                value=prefill, step=1, width=200)
 
     def _validate(self, input_) -> tuple[bool, str]:

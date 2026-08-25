@@ -36,6 +36,22 @@ class FilmLayerFunction(StrEnum):
     CAPPING = 'capping'
 
 
+class LogSeverity(StrEnum):
+    INFO = 'info'
+    WARNING = 'warning'
+    CRITICAL = 'critical'
+
+
+class EventType(StrEnum):
+    MULTIPLICITY_ERR = 'multiplicity_error'
+    NO_RECENT_BACKUP = 'no_recent_backup'
+    UNKNOWN_ENUM = 'unknown_enum'
+    DB_INCOHERENCE = 'database_incoherence'
+    FILE_MISSING = 'file_missing'
+    SAVED_ITEM = 'saved_item'
+    DELETED_ITEM = 'deleted_item'
+
+
 class MagnetronSputteringGenerator(StrEnum):
     RF_1 = 'RF-1'
     RF_2 = 'RF-2'

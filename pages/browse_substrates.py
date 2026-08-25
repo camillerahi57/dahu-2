@@ -2,11 +2,10 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from components.general import init_page, switch_page_bttn, sess
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
-from logic.constants import CookieKeys as Ck, IdType, SessionKeys as Sk
-from logic.utils import save_cookies
+from components.general import init_page, switch_page_bttn, sess, cookies
+from logic.constants import CookieKeys, IdType, SessionKeys as Sk
 from logic.lab_modelization.db_models import Substrate
 from logic.page_list import pages
 from logic.table_columns import SubstrateBrowserColumnName as ColName
@@ -48,11 +47,15 @@ col_order = column_config.keys()  # Same order as in the column config
 
 df = pd.DataFrame(rows, columns=list(col_order))
 
+filters_in_cookies = cookies.get(CookieKeys.SUBSTRATE_FILTERS)
+if filters_in_cookies:
+    sess[Sk.SUBSTRATE_FILTERS] = filters_in_cookies
+
 possible_filters = [ColName.label]
 dynamic_filters = DynamicFilters(df, filters=possible_filters,
-                                 filters_name=Ck.SUBSTRATE_FILTERS)
+                                 filters_name=Sk.SUBSTRATE_FILTERS)
 browser_side_bar(dynamic_filters, pages.browse_substrates)
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-save_cookies()
+cookies.set(CookieKeys.SUBSTRATE_FILTERS, sess[Sk.SUBSTRATE_FILTERS])

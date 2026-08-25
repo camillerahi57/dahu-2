@@ -5,7 +5,6 @@ from components.forms.new_library.sub_forms import FilmInfoForm
 from components.general import init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import IdType
-from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db, Film
 from logic.page_list import pages
 
@@ -26,7 +25,6 @@ try:
         with db.atomic():
             new_film.save()
 
-        save_cookies()
         switch_to_submit_successful(
             redirect_to=pages.inspect_lib,
             id_type=IdType.LIB,

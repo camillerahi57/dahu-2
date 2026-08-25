@@ -1,11 +1,15 @@
+from datetime import datetime
 from time import sleep
 
 import streamlit as st
 
-from components.general import init_page, sess, app_metadata
+from components.general import init_page, sess, app_metadata, \
+    compact_datetime_str, datetime_sentence
 from logic.app_restoration import Snapshot
 from logic.constants import SessionKeys as Sk
+from logic.lab_modelization.db_models import AppLog
 from logic.page_list import pages
+from logic.utils import database_to_excel_file_bytes
 
 init_page(pages.restore_app_state)
 st.set_page_config(layout='centered')
@@ -13,7 +17,7 @@ st.set_page_config(layout='centered')
 
 @st.dialog('ARE YOU SURE YOU WANT TO RESET ALL DATA TO THIS POINT?')
 def restore_warning_dialog(snap: Snapshot):
-    time_str = snap.time.strftime("%A, %B %d, %Y at %H:%M:%S")
+    time_str = datetime_sentence(snap.time)
     msg = f"""The state of Dahu 2 will be reset to:\n\n**{time_str}**."""
     st.error(msg)
     if st.button('⚠️ **Confirm** ⚠️'):
@@ -36,7 +40,7 @@ def snapshot_row(snap: Snapshot):
                       horizontal_alignment='distribute',
                       vertical_alignment='center',
                       width=500):
-        st.write(f'**{snap.time.strftime("%A, %B %d, %Y at %H:%M:%S")}**')
+        st.write(f'**{datetime_sentence(snap.time)}**')
         if st.button('Restore', key='restore'+snap.id):
             restore_warning_dialog(snap)
 
@@ -46,7 +50,24 @@ def body():
         snap = sess[Sk.SNAP_TO_RESTORE]
         restore_process_dialog(snap)
 
-    st.header("Restore App State")
+    st.header("Internal Logs")
+    file_name = f'dahu_2_logs_{compact_datetime_str(datetime.now())}.csv'
+    st.download_button('Download as CSV', data=AppLog.all_rows_to_csv(),
+                       file_name=file_name)
+
+    st.divider()
+
+    st.header("Explore Database")
+
+    st.download_button(
+        'Download as XLSX',
+        data=database_to_excel_file_bytes(),
+        file_name=f'dahu_2_db_{compact_datetime_str(datetime.now())}.xlsx'
+    )
+
+    st.divider()
+
+    st.header("App State Restoration")
 
     warning_msg = """
     If you restore the app state back to a restoration point, all modifications 
@@ -79,7 +100,7 @@ def body():
     except RuntimeError as e:
         st.error(f"**Unable to list available restore points. "
                  f"Error message:**\n\n{e}")
-    next_ = app_metadata.next_backup_at.strftime('%A, %B %d, %Y at %H:%M:%S')
-    st.subheader(f"Next backup: {next_}.")
+    next_time = app_metadata.next_backup_at
+    st.subheader(f"Next backup: {datetime_sentence(next_time)}.")
 
 body()

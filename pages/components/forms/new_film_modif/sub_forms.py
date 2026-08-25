@@ -8,7 +8,8 @@ from components.forms.new_film_modif.ion_beam_etching.sub_forms import \
     IonEtchingForm
 from components.forms.new_film_modif.lift_off.sub_forms import LiftOffForm
 from components.forms.new_film_modif.wet_etching.sub_forms import WetEtchingForm
-from logic.constants import FILM_INIT_STATE
+from components.general import cookies
+from logic.constants import FILM_INIT_STATE, CookieKeys as Ck
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
     FilmModification, Film, AnnealingStep)
@@ -30,7 +31,8 @@ class ModifBaseInfoForm(Form):
 
             made_by_fld = MadeByField(
                 form_default='',
-                db_default=None if default_modif is None
+                db_default=cookies.get(Ck.LAST_EMAIL_USED)
+                    if default_modif is None
                     else default_modif.made_by_email,
             )
 

@@ -3,42 +3,21 @@ from datetime import datetime
 import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
-from components.forms.new_library.fields import (LibLabelField, CommentField, \
-                                                 FilmLabelField, MadeOnField,
-                                                 MadeByField, SubstrateField, \
-                                                 DepositTempField,
-                                                 NominalThicknessField,
-                                                 ShadowMaskField, \
-                                                 NominalStoichioField,
-                                                 FilmLayerFunctionField,
-                                                 SputteringSystemField, \
-                                                 DepositDistanceField,
-                                                 DepositAngleField,
-                                                 DepositPowerField, \
-                                                 DepositDurationField,
-                                                 MagnetronModelField,
-                                                 MagnetronGeneratorField, \
-                                                 HasActiveCoolingField,
-                                                 RotationSpeedField,
-                                                 FilamentCurrentStartField, \
-                                                 FilamentCurrentEndField,
-                                                 AnodeCurrentField,
-                                                 AnodeVoltageField, \
-                                                 CathodeCurrentField,
-                                                 CathodeVoltageField,
-                                                 DepositRateField,
-                                                 ArgonFlowField, \
-                                                 NitrogenFlowField,
-                                                 PressureField,
-                                                 PresputteringThicknessField, \
-                                                 LayerCountField,
-                                                 TargetCountField,
-                                                 TargetField,
-                                                 TargetChoiceField,
-                                                 ConfirmOrderField,
-                                                 IsCoSputteringField)
-from components.general import sess
-from logic.constants import SessionKeys as Sk
+from components.forms.new_library.fields import (
+    LibLabelField, CommentField, FilmLabelField, MadeOnField,
+    MadeByField, SubstrateField, DepositTempField, NominalThicknessField,
+    ShadowMaskField, NominalStoichioField, FilmLayerFunctionField,
+    SputteringSystemField, DepositDistanceField, DepositAngleField,
+    DepositPowerField, DepositDurationField, MagnetronModelField,
+    MagnetronGeneratorField, HasActiveCoolingField, RotationSpeedField,
+    FilamentCurrentStartField, FilamentCurrentEndField, AnodeCurrentField,
+    AnodeVoltageField, CathodeCurrentField, CathodeVoltageField,
+    DepositRateField, ArgonFlowField, NitrogenFlowField, PressureField,
+    PresputteringThicknessField, LayerCountField, TargetCountField, TargetField,
+    TargetChoiceField, ConfirmOrderField, IsCoSputteringField,
+)
+from components.general import sess, cookies
+from logic.constants import SessionKeys as Sk, CookieKeys as Ck
 from logic.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
     MagnetronSputtering, TriodeSputtering, Substrate, Target, TargetUse, \
@@ -46,19 +25,19 @@ from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
 
 
 class BaseInfoForm(Form):
-    def __init__(self, default_lib: Library|None):
+    def __init__(self, default_lib: Library | None):
         no_db_default = default_lib is None
         st.title('New Library')
         st.divider()
         lib_label_fld = LibLabelField(
             form_default='',
-            db_default = None if no_db_default
-                else default_lib.label
+            db_default=None if no_db_default
+            else default_lib.label
         )
         comment_fld = CommentField(
             form_default='',
-            db_default = None if no_db_default
-                else default_lib.comment
+            db_default=None if no_db_default
+            else default_lib.comment
         )
 
         self.label = lib_label_fld.value
@@ -86,28 +65,29 @@ class BaseInfoForm(Form):
 
 
 class FilmInfoForm(Form):
-    def __init__(self, default_film: Film|None):
+    def __init__(self, default_film: Film | None):
         no_db_default = default_film is None
         with st.container(horizontal=True, vertical_alignment='center'):
             label_fld = FilmLabelField(
                 form_default='',
                 db_default=None if no_db_default
-                    else default_film.label
+                else default_film.label
             )
             made_on_fld = MadeOnField(
                 form_default=None,
                 db_default=None if no_db_default
-                    else default_film.made_on
+                else default_film.made_on
             )
+            cookie_email = cookies.get(Ck.LAST_EMAIL_USED)
             email_fld = MadeByField(
                 form_default='',
-                db_default=None if no_db_default
-                    else default_film.made_by_email
+                db_default=cookie_email if no_db_default
+                else default_film.made_by_email
             )
             substrate_fld = SubstrateField(
                 form_default=None,
                 db_default=None if no_db_default
-                    else default_film.substrate.label
+                else default_film.substrate.label
             )
 
         self.label = label_fld.value
@@ -144,11 +124,11 @@ class FilmInfoForm(Form):
 
 
 class LayerIntroForm(Form):
-    def __init__(self, default_layer: FilmLayer|None, key: str):
+    def __init__(self, default_layer: FilmLayer | None, key: str):
         no_db_default = default_layer is None
         if default_layer:
             db_default_target_labels = [use.target.label
-                                       for use in default_layer.target_uses]
+                                        for use in default_layer.target_uses]
             if len(db_default_target_labels) > 2:
                 raise NotImplementedError(
                     "It is possible to have more than two targets in "
@@ -160,43 +140,43 @@ class LayerIntroForm(Form):
             deposit_temp_fld = DepositTempField(
                 key=f'deposit_temp_{key}',
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.deposit_temp
+                db_default=None if no_db_default
+                else default_layer.deposit_temp
             )
             nominal_thickness_fld = NominalThicknessField(
                 key=f'thickness_{key}',
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.nominal_thickness
+                db_default=None if no_db_default
+                else default_layer.nominal_thickness
             )
             shadow_mask_fld = ShadowMaskField(
                 key=f'shadow_mask_{key}',
                 form_default='',
-                db_default = None if no_db_default
-                    else default_layer.shadow_mask_description
+                db_default=None if no_db_default
+                else default_layer.shadow_mask_description
             )
             nominal_stoichio_fld = NominalStoichioField(
                 key=f'stoichio_{key}',
                 form_default='',
-                db_default = None if no_db_default
-                    else default_layer.nominal_stoichio_str
+                db_default=None if no_db_default
+                else default_layer.nominal_stoichio_str
             )
             layer_function_fld = FilmLayerFunctionField(
                 key=f'function_{key}',
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.function
+                db_default=None if no_db_default
+                else default_layer.function
             )
             is_cosputter_fld = IsCoSputteringField(
                 key=key,
                 form_default=False,
-                db_default = len(db_default_target_labels) == 2
+                db_default=len(db_default_target_labels) == 2
             )
             target_label_fld = TargetChoiceField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else db_default_target_labels[0]
+                db_default=None if no_db_default
+                else db_default_target_labels[0]
             )
             if is_cosputter_fld.value:
                 if no_db_default or len(db_default_target_labels) < 2:
@@ -206,7 +186,7 @@ class LayerIntroForm(Form):
                 target_2_label_fld = TargetChoiceField(
                     key=f'co_sputter_target_{key}',
                     form_default=None,
-                    db_default = db_co_sputter_target
+                    db_default=db_co_sputter_target
                 )
                 target_2_label = target_2_label_fld.value
             else:
@@ -215,8 +195,8 @@ class LayerIntroForm(Form):
             sputtering_system_fld = SputteringSystemField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.sputtering_system
+                db_default=None if no_db_default
+                else default_layer.sputtering_system
             )
 
         self.deposit_temp = deposit_temp_fld.in_db_unit
@@ -240,44 +220,44 @@ class LayerIntroForm(Form):
 
 
 class MagnetronForm(Form):
-    def __init__(self, default_layer: MagnetronSputtering|None, key: str):
+    def __init__(self, default_layer: MagnetronSputtering | None, key: str):
         no_db_default = default_layer is None
         with st.container(horizontal=True):
             deposit_distance_fld = DepositDistanceField(
                 key=key,
                 form_default=100.,
-                db_default = None if no_db_default
-                    else default_layer.deposit_distance
+                db_default=None if no_db_default
+                else default_layer.deposit_distance
             )
             deposit_angle_fld = DepositAngleField(
                 key=key,
                 form_default=0.,
-                db_default = None if no_db_default
-                    else default_layer.deposit_angle
+                db_default=None if no_db_default
+                else default_layer.deposit_angle
             )
             deposit_power_fld = DepositPowerField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.deposit_power
+                db_default=None if no_db_default
+                else default_layer.deposit_power
             )
             deposit_duration_fld = DepositDurationField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.deposit_duration
+                db_default=None if no_db_default
+                else default_layer.deposit_duration
             )
             machine_model_fld = MagnetronModelField(
                 key=key,
                 form_default='',
-                db_default = None if no_db_default
-                    else default_layer.machine_model
+                db_default=None if no_db_default
+                else default_layer.machine_model
             )
             generator_fld = MagnetronGeneratorField(
                 key=key,
                 form_default='',
-                db_default = None if no_db_default
-                    else default_layer.generator
+                db_default=None if no_db_default
+                else default_layer.generator
             )
 
         self.deposit_distance = deposit_distance_fld.in_db_unit
@@ -312,93 +292,93 @@ class MagnetronForm(Form):
 
 
 class TriodeForm(Form):
-    def __init__(self, default_layer: TriodeSputtering|None, key: str):
+    def __init__(self, default_layer: TriodeSputtering | None, key: str):
         no_db_default = default_layer is None
         with st.container(horizontal=True, vertical_alignment='center'):
             active_cooling_fld = HasActiveCoolingField(
                 key=key,
                 form_default=True,
-                db_default = None if no_db_default
-                    else default_layer.has_active_cooling
+                db_default=None if no_db_default
+                else default_layer.has_active_cooling
             )
             rot_speed_fld = RotationSpeedField(
                 key=key,
                 form_default=0.,
-                db_default = None if no_db_default
-                    else default_layer.rotation_speed
+                db_default=None if no_db_default
+                else default_layer.rotation_speed
             )
             filament_current_start_fld = FilamentCurrentStartField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.filament_current_start
+                db_default=None if no_db_default
+                else default_layer.filament_current_start
             )
             filament_current_end_fld = FilamentCurrentEndField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.filament_current_end
-                
+                db_default=None if no_db_default
+                else default_layer.filament_current_end
+
             )
             anode_current_fld = AnodeCurrentField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.anode_current
+                db_default=None if no_db_default
+                else default_layer.anode_current
             )
             anode_voltage_fld = AnodeVoltageField(
                 key=key,
                 form_default=80.,
-                db_default = None if no_db_default
-                    else default_layer.anode_voltage
+                db_default=None if no_db_default
+                else default_layer.anode_voltage
             )
             cathode_current_fld = CathodeCurrentField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.cathode_current
+                db_default=None if no_db_default
+                else default_layer.cathode_current
             )
             cathode_voltage_fld = CathodeVoltageField(
                 key=key,
                 form_default=900.,
-                db_default = None if no_db_default
-                    else default_layer.cathode_voltage
+                db_default=None if no_db_default
+                else default_layer.cathode_voltage
             )
             deposit_rate_fld = DepositRateField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.deposit_rate
+                db_default=None if no_db_default
+                else default_layer.deposit_rate
             )
             argon_flow_fld = ArgonFlowField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.argon_flow
+                db_default=None if no_db_default
+                else default_layer.argon_flow
             )
             nitrogen_flow_fld = NitrogenFlowField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.nitrogen_flow
+                db_default=None if no_db_default
+                else default_layer.nitrogen_flow
             )
             pressure_fld = PressureField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.pressure
+                db_default=None if no_db_default
+                else default_layer.pressure
             )
             deposit_duration_fld = DepositDurationField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.deposit_duration
+                db_default=None if no_db_default
+                else default_layer.deposit_duration
             )
             presputtering_thickness_fld = PresputteringThicknessField(
                 key=key,
                 form_default=None,
-                db_default = None if no_db_default
-                    else default_layer.presputtering_thickness
+                db_default=None if no_db_default
+                else default_layer.presputtering_thickness
             )
 
         self.active_cooling = active_cooling_fld.value
@@ -417,7 +397,7 @@ class TriodeForm(Form):
         self.presputter_thickness = presputtering_thickness_fld.in_db_unit
 
         super().__init__(
-            fields = [
+            fields=[
                 active_cooling_fld, rot_speed_fld, filament_current_start_fld,
                 filament_current_end_fld, anode_current_fld, anode_voltage_fld,
                 cathode_current_fld, cathode_voltage_fld, deposit_rate_fld,
@@ -454,9 +434,9 @@ class TriodeForm(Form):
 
 
 class LayerForm(Form):
-    def __init__(self, default_layer: FilmLayer|None, key: str):
+    def __init__(self, default_layer: FilmLayer | None, key: str):
         with st.container(border=True):
-            st.header(f"• Layer  {int(key)+1}")
+            st.header(f"• Layer  {int(key) + 1}")
             layer_intro_form = LayerIntroForm(default_layer, key)
             sputter_system = layer_intro_form.sputtering_system
             if sputter_system == SputteringSystem.TRIODE:
@@ -520,12 +500,12 @@ class LayerForm(Form):
 
 
 class LayerListForm(Form):
-    def __init__(self, default_film: Film|None):
+    def __init__(self, default_film: Film | None):
         no_db_default = default_film is None
         layer_count_fld = LayerCountField(
             form_default=0,
-            db_default = None if no_db_default
-                else len(default_film.layers)
+            db_default=None if no_db_default
+            else len(default_film.layers)
         )
         if not layer_count_fld.is_valid:
             raise PausePageRun
@@ -557,7 +537,7 @@ class LayerListForm(Form):
 
 
 class TargetListForm(Form):
-    def __init__(self, default_film: Film|None):
+    def __init__(self, default_film: Film | None):
         if default_film is None:
             db_default_target_labels = []
         else:
@@ -568,7 +548,7 @@ class TargetListForm(Form):
                 target_count_fld = TargetCountField(
                     form_default=0,
                     db_default=None if default_film is None
-                        else len(db_default_target_labels)
+                    else len(db_default_target_labels)
                 )
                 if not target_count_fld.is_valid:
                     raise PausePageRun
@@ -587,7 +567,7 @@ class TargetListForm(Form):
 
         sess[Sk.SELECTED_TARGETS] = [f.value for f in self.target_flds]
 
-        super().__init__(fields=[target_count_fld]+target_flds,
+        super().__init__(fields=[target_count_fld] + target_flds,
                          sub_forms=[])
 
     def _is_coherent(self) -> tuple[bool, str]:
@@ -595,7 +575,7 @@ class TargetListForm(Form):
 
 
 class RootForm(Form):
-    def __init__(self, default_lib: Library|None = None):
+    def __init__(self, default_lib: Library | None = None):
         default_film = default_lib.films[0] if default_lib else None
 
         base_info_form = BaseInfoForm(default_lib)

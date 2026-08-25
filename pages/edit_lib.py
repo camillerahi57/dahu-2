@@ -5,7 +5,6 @@ from components.forms.new_library.sub_forms import BaseInfoForm
 from components.general import init_page, \
     switch_to_submit_successful, current_params
 from logic.constants import IdType
-from logic.utils import save_cookies
 from logic.lab_modelization.db_models import db, Library
 from logic.page_list import pages
 
@@ -26,7 +25,6 @@ try:
         with db.atomic():
             new_lib.save()
 
-        save_cookies()
         switch_to_submit_successful()
 
 except PausePageRun:

@@ -4,11 +4,12 @@ from enum import StrEnum
 import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
+from components.general import cookies
 from logic.constants import CookieKeys as Ck, NEW_TARGET
 from logic.db_enums import ShapeType
-from logic.utils import is_valid_email_address
 from logic.lab_modelization.db_models import Target, Patch
 from logic.units import ur
+from logic.utils import is_valid_email_address
 
 
 class MadeAtField(Field):
@@ -26,7 +27,7 @@ class ExperimenterEmailField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill: str, key):
-        cookie_email = st.session_state.get(Ck.LAST_EMAIL_USED, '')
+        cookie_email = cookies.get(Ck.LAST_EMAIL_USED)
         prefill = cookie_email if prefill == '' else prefill
         return st.text_input(
             "First made by (email address)",
@@ -35,7 +36,6 @@ class ExperimenterEmailField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         if not is_valid_email_address(input_):
             return False, 'Please enter a valid email address.'
-        st.session_state[Ck.LAST_EMAIL_USED] = input_
         return True, ''
 
 

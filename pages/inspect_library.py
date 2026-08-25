@@ -3,12 +3,12 @@ from pandas import DataFrame
 
 from components.browsing import INSPECT_BUTTON_KEY
 from components.forms.new_library.fields import DepositTempField
-from components.library_files import file_list_container
 from components.general import (
     sess, init_page, current_params, switch_page_bttn,
     switch_to_submit_successful, link_html, email_html,
 )
 from components.inspection import inspect_page_header, show_film_layer
+from components.library_files import file_list_container
 from logic.constants import SessionKeys as Sk, IdType
 from logic.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (

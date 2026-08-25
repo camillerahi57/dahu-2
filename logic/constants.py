@@ -25,10 +25,10 @@ class CookieKeys(StrEnum):
     """Keys are hard coded random strings, so that if we rename the variable
     for an update, we'll still access the value from old version with the
     same key in the cookie."""
-    LAST_EMAIL_USED = '4f89qv6sdw531xcs6qqf4c5q6d8zs4cD'
-    LIB_FILTERS = 'f4ze86sd4ce1v68rrf46sdw1cqz568fc4'
-    TARGET_FILTERS = 'd48qz6f4cdsv1r3e54g68e6rq43q1dz'
-    SUBSTRATE_FILTERS = 'e46vsq98f4z5618af9ez4sxdq4658f4s'
+    LAST_EMAIL_USED = 'PNCeTLw1LV9bRKmRW2WYb'
+    LIB_FILTERS = '1Yp0qXhjE1RdYHi5M79Kq'
+    TARGET_FILTERS = 'khHkAiOqfz63PyLktwnOR'
+    SUBSTRATE_FILTERS = '4YRQlQPzzFSDyEud0YjSj'
 
 
 class SessionKeys(StrEnum):
@@ -55,3 +55,7 @@ class SessionKeys(StrEnum):
     FILE_NAME = 'pattern_label_key'
     UPLOADED_AT = 'uploaded_at_key'
     USE_DEFAULT_FILE = 'use_default_file_key'
+
+    LIB_FILTERS = 'lib_filters_key'
+    TARGET_FILTERS = 'target_filters_key'
+    SUBSTRATE_FILTERS = 'substrate_filters_key'

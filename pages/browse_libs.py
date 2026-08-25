@@ -2,16 +2,14 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from components.general import init_page, sess, switch_page_bttn
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
-from logic.constants import CookieKeys as Ck, \
-    SessionKeys as Sk, IdType
-from logic.utils import save_cookies, \
-    get_email_user_name
+from components.general import init_page, sess, switch_page_bttn, cookies
+from logic.constants import SessionKeys as Sk, IdType, CookieKeys
 from logic.lab_modelization.db_models import Library, Film
 from logic.page_list import pages
 from logic.table_columns import LibraryBrowserColumnName as ColName
+from logic.utils import get_email_user_name
 
 init_page(pages.browse_libs, show_home_btn=False)
 
@@ -65,11 +63,15 @@ col_order = list(
 
 df = pd.DataFrame(rows, columns=col_order)
 
+filters_in_cookies = cookies.get(CookieKeys.LIB_FILTERS)
+if filters_in_cookies:
+    sess[Sk.LIB_FILTERS] = filters_in_cookies
+
 possible_filters = [ColName.experimenter]  # TODO ColName.characs
 dynamic_filters = DynamicFilters(df, filters=possible_filters,
-                                 filters_name=Ck.LIB_FILTERS)
+                                 filters_name=Sk.LIB_FILTERS)
 browser_side_bar(dynamic_filters, pages.browse_libs)
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-save_cookies()
+cookies.set(CookieKeys.LIB_FILTERS, sess[Sk.LIB_FILTERS])

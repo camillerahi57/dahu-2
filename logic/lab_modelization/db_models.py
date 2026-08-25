@@ -1,4 +1,6 @@
+import csv
 import inspect
+import io
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -20,12 +22,16 @@ from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
-from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
-                             USER_DATA_PATH)
 from dahu_2_config import DOMAIN
-from logic.db_enums import SputteringSystem, FilmLayerFunction, \
-    MagnetronSputteringGenerator, FilmModifType, Furnace, \
-    MagnetronMachineModel, PixelCoordinateSystem, ChemicalElement
+from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
+                             USER_DATA_PATH, CookieKeys as Ck)
+from logic.db_enums import (SputteringSystem, FilmLayerFunction, \
+                            MagnetronSputteringGenerator, FilmModifType,
+                            Furnace, \
+                            MagnetronMachineModel, PixelCoordinateSystem,
+                            ChemicalElement,
+                            LogSeverity, \
+                            EventType)
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
@@ -46,10 +52,15 @@ class _BaseModel(Model):
 
     # A list of attributes with title, corresponding attribute and input field.
     title_db_value_input_fields: list[tuple[str, Any, type]] = None
+    # Write a new log at save/deletion if set to True in subclass:
+    log_db_write: bool = False
 
     class Meta:
         database = db
         legacy_table_names = False
+
+    def __str__(self):
+        return str(model_to_dict(self))
 
     @final
     def save_with_dependent(self, *args, **kwargs):
@@ -114,12 +125,60 @@ class _BaseModel(Model):
     def delete_related_files(self):
         pass
 
+    def delete_instance(self, recursive: bool = False,
+                        delete_nullable: bool = False,
+                        *args, **kwargs):
+        if self.log_db_write:
+            from components.general import cookies
+            description = f"Saved {self.__class__.__name__}. Value: {self}."
+            AppLog.save_new(
+                ip_address=st.context.ip_address,
+                email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
+                notify=False,
+                severity=LogSeverity.INFO,
+                event_type=EventType.DELETED_ITEM,
+                event_description=description,
+            )
+        super().delete_instance(recursive, delete_nullable, *args, **kwargs)
+
+    def save(self, force_insert: bool = False, only: list = None,
+             *args, **kwargs):
+        if self.log_db_write:
+            from components.general import cookies
+            description = f"Saved {self.__class__.__name__}. Value: {self}."
+            AppLog.save_new(
+                ip_address=st.context.ip_address,
+                email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
+                notify=False,
+                severity=LogSeverity.INFO,
+                event_type=EventType.SAVED_ITEM,
+                event_description=description,
+            )
+        super().save(force_insert, only, *args, **kwargs)
+
+    @classmethod
+    def all_rows_to_csv(cls, delimiter: str = ',') -> str:
+        row_dicts = cls.select().dicts()
+        if not row_dicts:
+            return ''
+
+        output = io.StringIO()
+        field_names = list(row_dicts[0].keys())
+        writer = csv.DictWriter(
+            output, fieldnames=field_names, quoting=csv.QUOTE_NONNUMERIC,  # noqa
+            delimiter=delimiter)
+        writer.writeheader()
+        writer.writerows(row_dicts)
+        return output.getvalue()
+
 
 class Substrate(_BaseModel):
     label = CharField(unique=True)
     comment = CharField(null=True)
 
     layers: DependentBackref[SubstrateLayer]
+
+    log_db_write = True
 
     def __init__(self, *args, label: str = None, comment: str = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
@@ -171,11 +230,14 @@ class SubstrateLayer(_BaseModel):
 
     stoichio: DependentBackref[StoichioElement]
 
-    def __init__(self, *args, thickness: float | None = None,
+    def __init__(self, *args,
+                 thickness: float | None = None,
                  h: int | None = None,
                  k: int | None = None,
-                 l: int | None = None, substrate: Substrate | None = None,
-                 position_from_back: int | None = None, **kwargs):
+                 l: int | None = None,
+                 substrate: Substrate | None = None,
+                 position_from_back: int | None = None,
+                 **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -213,6 +275,8 @@ class Target(_BaseModel):
     states: DependentBackref[DeteriorationState]
     uses: DependentBackref[TargetUse]
     next_versions: DependentBackref[Target]
+
+    log_db_write = True
 
     def __init__(self, *args, made_on: datetime = None,
                  made_by_email: str = None, is_archived: bool = None,
@@ -271,6 +335,8 @@ class MokeCoilFactor(_BaseModel):
     factor = FloatField()
     comment = CharField(null=True)
 
+    log_db_write = True
+
     def __init__(self, *args, validity_start: datetime = None,
                  validity_end: datetime = None,
                  factor: float = None, comment: str = None, **kwargs):
@@ -292,6 +358,8 @@ class EsrfPoni(_BaseModel):
     rot3 = FloatField()
     wavelength = FloatField()
     comment = CharField(null=True)
+
+    log_db_write = True
 
     def __init__(self, *args, validity_start: datetime = None,
                  validity_end: datetime = None,
@@ -316,7 +384,7 @@ class Library(_BaseModel):
     films: DependentBackref[Film]  # Should be a list of exactly 1 element.
     general_files: DependentBackref[GeneralLibraryFile]
 
-    # Will add charac refs in the future.
+    log_db_write = True
 
     def __init__(self, *args, label: str = None,
                  last_inspected_at: datetime = None,
@@ -721,7 +789,7 @@ class FilmModification(_BaseModel):
     annealings: DependentBackref[Annealing]
     etchings: DependentBackref[Etching]
 
-    # Will add characs in the future.
+    log_db_write = True
 
     def __init__(self, *args, made_on: datetime = None,
                  modif_number: int = None,
@@ -749,7 +817,8 @@ class FilmModification(_BaseModel):
         super().save()
 
     def delete_instance(self, recursive: bool = False,
-                        delete_nullable: bool = False):
+                        delete_nullable: bool = False,
+                        *args, **kwargs):
         """Saves a film modification with its modif_number, and adds 1 to all
         modif_number attributes of subsequent film modifications."""
         for modif in FilmModification.select():
@@ -757,10 +826,7 @@ class FilmModification(_BaseModel):
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
 
-        # if self.etchings:
-        #     self.etchings[0].delete_related_files()
-
-        super().delete_instance(recursive, delete_nullable)
+        super().delete_instance(recursive, delete_nullable, *args, **kwargs)
 
     def modification_process(self) \
             -> (Annealing | WetEtching | LiftOffEtching | IonBeamEtching):
@@ -950,6 +1016,8 @@ class AnnealingStep(_BaseModel):
 class Pattern(UserUploadedFile):
     etchings: DependentBackref[Etching]
 
+    log_db_write = True
+
     def __init__(self, *args, label: str = None, internal_file_name: str = None,
                  original_file_name: str = None, upload_date: datetime = None,
                  **kwargs):
@@ -959,6 +1027,8 @@ class Pattern(UserUploadedFile):
 
 class Recipe(UserUploadedFile):
     etchings: DependentBackref[Etching]
+
+    log_db_write = True
 
     def __init__(self, *args, label: str = None, internal_file_name: str = None,
                  original_file_name: str = None, upload_date: datetime = None,
@@ -1002,6 +1072,8 @@ class Etching(_BaseModel):
 
 class GeneralLibraryFile(UserUploadedFile):
     library = ForeignKeyField(Library, backref='general_files')
+
+    log_db_write = True
 
     def __init__(self, *args, label: str = None, internal_file_name: str = None,
                  original_file_name: str = None, upload_date: datetime = None,
@@ -1192,6 +1264,8 @@ class DeteriorationState(_BaseModel):
     patches: DependentBackref[Patch]
     photos: DependentBackref[TargetPhoto]
 
+    log_db_write = True
+
     def __init__(self, *args,
                  date: datetime,
                  length_per_px: float | None = None,
@@ -1244,6 +1318,8 @@ class DeteriorationState(_BaseModel):
 class TargetPhoto(UserUploadedFile):
     target_state: DeteriorationState = ForeignKeyField(
         DeteriorationState, backref='photos', on_delete='RESTRICT', unique=True)
+
+    log_db_write = True
 
     def __init__(self, *args, label: str = None, internal_file_name: str = None,
                  original_file_name: str = None, upload_date: datetime = None,
@@ -1495,7 +1571,56 @@ class AppMetadata(_BaseModel):
             return cls(next_backup_at=datetime.now())
 
 
-def all_models():
+class AppLog(_BaseModel):
+    """Table with logs about various app event."""
+    timestamp: datetime = DateTimeField()
+    ip_address = TextField(null=True)
+    email_in_cookies = TextField(null=True)
+    notify: bool = BooleanField()
+    is_read: bool = BooleanField()
+    marked_as_solved: bool = BooleanField()
+    severity: LogSeverity = TextField()
+    event_type: EventType = TextField()
+    event_description = TextField()
+
+    def __init__(self, *args, timestamp: datetime = None,
+                 ip_address: str = None, email_in_cookies: str = None,
+                 notify: bool = None, is_read: bool = None,
+                 marked_as_solved: bool = None,
+                 severity: LogSeverity = None, event_type: str = None,
+                 event_description: str = None, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+    @classmethod
+    def save_new(cls, ip_address: str|None, email_in_cookies: str|None,
+                 notify: bool, severity: LogSeverity, event_type: EventType,
+                 event_description: str, is_read: bool = False,
+                 marked_as_solved: bool = False,
+                 timestamp: datetime = None):
+        if timestamp is None:
+            timestamp = datetime.now()
+        new_log = cls(
+            timestamp=timestamp,
+            ip_address=ip_address,
+            email_in_cookies=email_in_cookies,
+            notify=notify,
+            is_read=is_read,
+            marked_as_solved=marked_as_solved,
+            severity=severity,
+            event_type=event_type,
+            event_description=event_description,
+        )
+        new_log.save()
+
+    def mark_all_day_solved(self, day: datetime, type_: EventType):
+        pass  # TODO
+
+    def mark_all_day_read(self, day: datetime, type_: EventType):
+        pass  # TODO
+
+
+def all_models() -> list[type[_BaseModel]]:
     def is_a_model(cls):
         return (
             inspect.isclass(cls)

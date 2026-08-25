@@ -1,13 +1,16 @@
+import io
 import os
 import re
 import secrets
 from time import sleep
+from typing import Any
 from urllib import parse
 
+import pandas as pd
 from streamlit_cookies_controller import CookieController
 
-from components.general import sess
-from logic.constants import CookieKeys as Ck, SessionKeys as Sk
+from logic.constants import SessionKeys as Sk, CookieKeys
+from logic.lab_modelization.db_models import all_models
 
 
 def letter_count(text: str) -> int:
@@ -15,6 +18,7 @@ def letter_count(text: str) -> int:
     return len(''.join(i for i in text if i.upper() in upper))
 
 def new_controller() -> CookieController:
+    from components.general import sess
     if 'cookie_controller' in sess:
         return sess['cookie_controller']
 
@@ -30,39 +34,12 @@ def new_controller() -> CookieController:
     sess['cookie_controller'] = controller
     return controller
 
-# def new_controller() -> CookieController:
-#     controller = CookieController()  # It takes time to get it loaded.
-#     waited = 0
-#     while not controller.get('cookie_ready'):
-#         # In case it's the first time and the key has never been set:
-#         controller.set('cookie_ready', True)
-#         # In case the key has been set, but we have to wait:
-#         sleep(0.1)
-#         waited += 0.1
-#         if waited > 5:
-#             raise RuntimeError('Not able to load cookie')
-#     return controller
-
-
-def add_cookie_data_to_session():
-    controller = new_controller()
-    for key in Ck:
-        stored_value = controller.get(key)
-        if stored_value is not None:
-            sess[key] = stored_value
-
 
 def reset_session():
+    from components.general import sess
     for key in sess:
         if key in Sk:
             del sess[key]
-
-
-def save_cookies():
-    controller = new_controller()
-    for key in Ck:
-        if key in sess:
-            controller.set(key, sess[key])
 
 
 def get_email_user_name(email_address: str) -> str:
@@ -73,7 +50,12 @@ def is_valid_email_address(email_address: str) -> bool:
     # From https://stackoverflow.com/a/201378:
     email_regex = r"(?:[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+(?:\.[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9\x2d]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"  # noqa Long line.
     match = re.fullmatch(email_regex, email_address)
-    return match is not None
+    if match is not None:
+        from components.general import cookies
+        cookies.set(CookieKeys.LAST_EMAIL_USED, email_address)
+        return True
+    else:
+        return False
 
 
 def get_file_extension(file_name: str):
@@ -96,6 +78,16 @@ def to_ascii(str_: str):
         'ascii', 'xmlcharrefreplace'
     ).decode('ascii')  # Back to string.
 
+# 50min d'avance
+# On en est là :
+"""On vient de finir l'export des logs et de la DB.
+Tester avec pas mal de data dans la DB et commit.
+
+Donner une estimation du temps de restoration par GB (en précisant la taille 
+totale de la DB).
+
+Faire DB integrity.
+"""
 
 def remove_digits(s: str) -> str:
     return ''.join([c for c in s if not c.isdigit()])
@@ -106,3 +98,31 @@ def rand_str(length=21) -> str:
     import string
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def dict_of_tables_to_xlsx_bytes(data: dict[str, list[dict[str, Any]]])\
+        -> bytes:
+    """
+    Convert a dict[str, list[dict[str, Any]]] into an Excel file (as bytes).
+
+    Each key in `data` becomes a sheet name, and each list of dicts becomes
+    the rows of that sheet (all inner dicts are assumed to share the same keys).
+    """
+    buffer = io.BytesIO()
+
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        for sheet_name, rows in data.items():
+            df = pd.DataFrame(rows)  # empty list -> empty DataFrame
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def database_to_excel_file_bytes() -> bytes:
+    data_type = dict[str, list[dict[str, Any]]]
+    data: data_type = {
+        model.__name__: list(model.select().dicts())
+        for model in all_models()
+    }
+    return dict_of_tables_to_xlsx_bytes(data)

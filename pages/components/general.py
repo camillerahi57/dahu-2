@@ -7,21 +7,22 @@ import streamlit as st
 from peewee import DateField
 from streamlit.navigation.page import StreamlitPage
 
+from dahu_2_config import DOMAIN
 from logic.constants import (
     SessionKeys as Sk, REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID,
     IdType
 )
-from dahu_2_config import DOMAIN
 from logic.lab_modelization.db_models import AppMetadata
 from logic.page_list import pages
+from logic.utils import new_controller
 
 sess = st.session_state  # Shorthand.
-print("App metadata loaded.")
+cookies = new_controller()
 app_metadata = AppMetadata.get_or_new()
 
 
 def init_page(page: StreamlitPage, show_home_btn = True):
-    from logic.utils import reset_session, add_cookie_data_to_session
+    from logic.utils import reset_session
 
     if datetime.now() > app_metadata.next_backup_at:
         from logic.app_restoration import Snapshot
@@ -31,9 +32,10 @@ def init_page(page: StreamlitPage, show_home_btn = True):
         switch_page_bttn(pages.browse_libs, label='Home', icon='🏠')
     page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
     if page_changed:
+        print(f"Page changed from '{sess.get(Sk.CURRENT_PATH)}' to "
+              f"'{page.url_path}'")
         reset_session()
         sess[Sk.CURRENT_PATH] = page.url_path
-    add_cookie_data_to_session()
 
 
 def current_params() -> dict[str, str]:
@@ -135,3 +137,10 @@ def email_html(email: str, label: str=None):
 
 def extensive_date_str(date: DateField):
     return dt_date(date.year, date.month, date.day).strftime("%B %d, %Y")
+
+
+def compact_datetime_str(dt: datetime):
+    return dt.strftime("%Y-%m-%d_%H-%M-%S")
+
+def datetime_sentence(dt: datetime):
+    return dt.strftime("%A, %B %d, %Y at %H:%M:%S")

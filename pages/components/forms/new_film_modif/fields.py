@@ -5,31 +5,25 @@ import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from components.general import sess
-from logic.constants import SessionKeys as Sk, CookieKeys as Ck, \
-    FILM_INIT_STATE
+from logic.constants import SessionKeys as Sk, FILM_INIT_STATE
 from logic.db_enums import FilmModifType, Furnace, ChemicalElement, \
     EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion
-from logic.utils import is_valid_email_address
 from logic.lab_modelization.db_models import FilmModification, Patch, \
     Pattern, Recipe
 from logic.units import ur
+from logic.utils import is_valid_email_address
 
 
 class MadeByField(Field):
     type = Ft.MANDATORY
 
-    def _streamlit_input(self, prefill, key: str):  # noqa
-        if Ck.LAST_EMAIL_USED in st.session_state:
-            value = st.session_state[Ck.LAST_EMAIL_USED]
-        else:
-            value = ''
+    def _streamlit_input(self, prefill, key: str):
         return st.text_input("Made by (email address)",
-                             value=value, width=300)
+                             value='', width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if not is_valid_email_address(input_):
             return False, 'Please enter a valid email address.'
-        st.session_state[Ck.LAST_EMAIL_USED] = input_
         return True, ''
 
 

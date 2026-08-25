@@ -82,7 +82,7 @@ class _Pages:
 
     restore_app_state: StreamlitPage = Page(
         '../pages/restore_app_state.py', url_path='restore_app_state',
-        title='Restore App State', icon='🐐')
+        title='App State Restoration', icon='🐐')
 
     test: StreamlitPage = Page(
         '../pages/test.py', url_path='test',

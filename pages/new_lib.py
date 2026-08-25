@@ -2,10 +2,8 @@ import streamlit as st
 
 from components.forms.base_classes import PausePageRun
 from components.forms.new_library.sub_forms import RootForm
-from components.general import init_page, sess, \
-    switch_to_submit_successful
-from logic.constants import CookieKeys as Ck, IdType
-from logic.utils import save_cookies
+from components.general import init_page, switch_to_submit_successful
+from logic.constants import IdType
 from logic.lab_modelization.db_models import db
 from logic.page_list import pages
 
@@ -20,12 +18,9 @@ try:
     library = root_form.library
 
     if st.button("Submit", disabled=not root_form.is_valid, type="primary"):
-        sess[Ck.LAST_EMAIL_USED] = library.films[0].made_by_email
-
         with db.atomic():
             library.save_with_dependent()
 
-        save_cookies()
         switch_to_submit_successful(
             redirect_to=pages.inspect_lib,
             id_type=IdType.LIB,
