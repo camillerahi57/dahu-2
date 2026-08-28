@@ -13,7 +13,7 @@ from logic.constants import SessionKeys as Sk, CookieKeys
 from logic.lab_modelization.base_classes import Event
 from logic.lab_modelization.db_enums import EventType, LogSeverity
 from logic.lab_modelization.db_models import dahu_2_models, AppLog, \
-    DeteriorationState, FilmModification, Library, Film, Target
+    DeteriorationState, FilmModification, Film, Target
 
 
 def letter_count(text: str) -> int:

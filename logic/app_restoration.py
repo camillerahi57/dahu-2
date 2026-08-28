@@ -61,8 +61,10 @@ class Snapshot:
 
     @classmethod
     def backup(cls, prune_excessive_snaps: bool = True):
+        print("Starting backup...")
         available = cls._backup_lock.acquire(blocking=False)
         if not available:
+            print("Backup not available.")
             return  # Another thread is already backing up.
 
         try:
@@ -91,6 +93,7 @@ class Snapshot:
 
         finally:
             Snapshot._backup_lock.release()
+            print("Finished.")
 
     def delete_subsequent(self):
         subsequent_snaps = [s for s in Snapshot.list_available()

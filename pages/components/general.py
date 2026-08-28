@@ -1,5 +1,4 @@
 from datetime import date as dt_date, datetime
-from random import random
 from threading import Thread
 from typing import Literal
 
@@ -14,8 +13,6 @@ from logic.constants import (
     IdType
 )
 from logic.db_integrity import get_problems
-from logic.lab_modelization.base_classes import Event
-from logic.lab_modelization.db_enums import EventType, LogSeverity
 from logic.lab_modelization.db_models import AppMetadata, AppLog
 from logic.page_list import pages
 from logic.utils import new_controller

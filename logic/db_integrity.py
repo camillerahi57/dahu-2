@@ -12,6 +12,7 @@ from logic.lab_modelization.db_models import dahu_2_models
 
 def get_problems() -> Iterable[Event]:
     """Run all checks."""
+    print("Looking for problems...")
 
     # Checking in model tables:
 
@@ -27,4 +28,4 @@ def get_problems() -> Iterable[Event]:
     if last_backup_timedelta > NO_RECENT_BACKUP_WARNING_TIMEDELTA:
         yield Event.from_no_recent_backup()
 
-
+    print("Finished.")

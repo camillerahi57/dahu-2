@@ -1500,6 +1500,7 @@ class AppLog(_BaseModel):
             event_type=event.type,
             event_description=event.description,
         )
+        print(new_log.event_description)
         new_log.save()
 
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import streamlit as st
 from pandas import DataFrame
 
@@ -14,7 +16,7 @@ from logic.lab_modelization.base_classes import db
 from logic.lab_modelization.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching, AppLog)
+    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -165,6 +167,10 @@ def archive_dialog():
 def page_body():
     if lib.is_archived:
         st.warning("📦 Archived", width=10_000)
+
+    if datetime.now() - lib.last_inspected_at > timedelta(minutes=5):
+        lib.last_inspected_at = datetime.now()
+        lib.save()
 
     inspect_page_header('Library', lib.label, on_delete, None)
     if not lib.is_archived:

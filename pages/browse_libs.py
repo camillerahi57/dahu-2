@@ -31,7 +31,7 @@ def body():
         Film.made_on.alias(ColName.made_on),
         Film.made_by_email.alias(ColName.experimenter),
         Library.is_archived.alias(ColName.is_archived),
-    ).join(Film).dicts()
+    ).join(Film).order_by(Library.last_inspected_at.desc()).dicts()
 
 
     for row in query:
