@@ -1,8 +1,6 @@
 from enum import StrEnum
 from typing import Self
-
-
-
+from unittest import case
 
 
 # ##################################################################
@@ -41,15 +39,28 @@ class LogSeverity(StrEnum):
     WARNING = 'warning'
     CRITICAL = 'critical'
 
+    @property
+    def icon(self):
+        match self:
+            case LogSeverity.INFO:
+                return '🟢'
+            case LogSeverity.WARNING:
+                return '⚠️'
+            case LogSeverity.CRITICAL:
+                return '🚩'
+
 
 class EventType(StrEnum):
-    MULTIPLICITY_ERR = 'multiplicity_error'
-    NO_RECENT_BACKUP = 'no_recent_backup'
-    UNKNOWN_ENUM = 'unknown_enum'
-    DB_INCOHERENCE = 'database_incoherence'
-    FILE_MISSING = 'file_missing'
     SAVED_ITEM = 'saved_item'
     DELETED_ITEM = 'deleted_item'
+    MULTIPLICITY_ERROR = 'multiplicity_error'
+    RESTIC_ERROR = 'dump_error'
+    UI_ERROR = 'ui_error'
+    BACKUP_PERFORMED = 'backup_completed'
+
+    UNKNOWN_ENUM = 'unknown_enum'
+    NO_RECENT_BACKUP = 'no_recent_backup'
+    FILE_MISSING = 'file_missing'
 
 
 class MagnetronSputteringGenerator(StrEnum):

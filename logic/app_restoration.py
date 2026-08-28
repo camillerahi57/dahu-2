@@ -7,10 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Self
 
+import streamlit as st
+
 from dahu_2_config import (RESTIC_PASSWORD, RESTIC_REPO_PATH,
                            DAHU_2_CODE_BASE_PATH, BackupsToKeep,
                            BACKUP_INTERVAL)
 from logic.constants import USER_DATA_PATH
+from logic.lab_modelization.base_classes import Event
+from logic.lab_modelization.db_enums import EventType, LogSeverity
+from logic.lab_modelization.db_models import AppLog
 
 user_files_abs_path = Path(DAHU_2_CODE_BASE_PATH) / USER_DATA_PATH
 
@@ -32,7 +37,8 @@ class Snapshot:
             env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ}
         )
         if result.returncode != 0:
-            raise RuntimeError(f"Database dump error: {result.stderr}")
+            event = Event.from_restic_error(result.returncode)
+            AppLog.save_new(event)
         snap_dicts = json.loads(result.stdout)
         snap_list = [
             cls(
@@ -47,13 +53,6 @@ class Snapshot:
     def get_latest(cls) -> Self:
         all_ = cls.list_available()
         return sorted(all_, key=lambda x: x.time)[-1]
-
-    @classmethod
-    def from_id(cls, id_: str) -> Self:
-        for snap in Snapshot.list_available():
-            if snap.id == id_:
-                return snap
-        raise RuntimeError(f"Snapshot not found: {id_}")
 
     @classmethod
     def delete_all_snaps(cls):
@@ -75,7 +74,8 @@ class Snapshot:
                 env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ}
             )
             if result.returncode != 0:
-                raise RuntimeError(f"Database dump error: {result.stderr}")
+                event = Event.from_restic_error(result.returncode)
+                AppLog.save_new(event)
 
             if prune_excessive_snaps:
                 delete_excessive_snapshots()
@@ -83,6 +83,12 @@ class Snapshot:
             from components.general import app_metadata
             app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
             app_metadata.save()
+
+            msg = f"Backup performed at {datetime.now()}."
+            event = Event(EventType.BACKUP_PERFORMED, notify=False,
+                          severity=LogSeverity.INFO, description=msg)
+            AppLog.save_new(event)
+
         finally:
             Snapshot._backup_lock.release()
 
@@ -100,26 +106,39 @@ class Snapshot:
             env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},
         )
         if result.returncode != 0:
-            raise RuntimeError(f"Database dump error: {result.stderr}")
+            event = Event.from_restic_error(result.returncode)
+            AppLog.save_new(event)
 
     def restore(self):
-        subtree_to_restore = user_files_abs_path  # We don't restore the full
-        # directory tree from Windows file system root (e.g. C:).
-        # Make it Linux like:
+        subtree_to_restore = user_files_abs_path
         subtree_to_restore = subtree_to_restore.as_posix().replace(':', '')
         command = ['restic',
                    'restore',
-                   self.id+':'+subtree_to_restore,
+                   self.id + ':' + subtree_to_restore,
                    '--target', user_files_abs_path,
                    '--repo', RESTIC_REPO_PATH,
-                   '--delete']  # --delete removes files that are not in
-        # snapshot.
-        result = subprocess.run(
-            command, capture_output=True, text=True,
+                   '--delete',
+                   '--json']
+
+        process = subprocess.Popen(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, bufsize=1,
             env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},
         )
-        if result.returncode != 0:
-            raise RuntimeError(f"Database dump error: {result.stderr}")
+
+        progress_bar = st.progress(0, text="Restoring…")
+        for line in process.stdout:
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            pct = data.get("percent_done", 0)
+            progress_bar.progress(pct, text=f"Restoring… {pct * 100:.0f}%")
+
+        process.wait()
+        if process.returncode != 0:
+            event = Event.from_restic_error(process.returncode)
+            AppLog.save_new(event)
 
         self.delete_subsequent()
 
@@ -146,17 +165,19 @@ def delete_excessive_snapshots():
         env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},
     )
     if result.returncode != 0:
-        raise RuntimeError(f"Database dump error: {result.stderr}")
+        event = Event.from_restic_error(result.returncode)
+        AppLog.save_new(event)
 
 def test():
+    pass
     # Snapshot.delete_all_snaps()
     # Snapshot.create(delete_old_snaps=False)
     # id_ = 'b095ebd1efa36e99169fa12536b9722ab9483467763d77fb00efa3fa61f2b15c'
     # snap = Snapshot.from_id(id_)
     # snap.restore(delete_subsequent_snaps=True)
 
-    for s in Snapshot.list_available():
-        print(s)
+    # for s in Snapshot.list_available():
+    #     print(s)
 
 
 test()

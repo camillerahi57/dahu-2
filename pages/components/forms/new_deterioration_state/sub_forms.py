@@ -1,9 +1,11 @@
 import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
-from components.forms.new_deterioration_state.fields import UpdaterEmailField, \
+from components.forms.new_deterioration_state.fields import MadeByField, \
     IsItReallyDeteriorationField as Iirdf
 from components.forms.new_target.sub_forms import DeteriorationStateForm
+from components.general import cookies
+from logic.constants import CookieKeys as Ck
 from logic.lab_modelization.db_models import Target, DeteriorationState
 
 
@@ -29,11 +31,10 @@ class RootForm(Form):
             raise PausePageRun
         else:
             pass
-        email_fld = UpdaterEmailField(
-            form_default='',
-            db_default=None
-                if default_state is None
-                else default_state.made_by_email,
+        email_fld = MadeByField(
+            form_default=cookies.get(Ck.LAST_EMAIL_USED),
+            db_default=default_state.made_by_email
+                if default_state else None,
         )
         state_form = DeteriorationStateForm(target, email_fld.value,
                                             default_state=default_state)

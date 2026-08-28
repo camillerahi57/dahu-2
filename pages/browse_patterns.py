@@ -18,7 +18,7 @@ def body():
     st.set_page_config(layout="wide")
 
     show_html_link("Add a new pattern", pages.new_pattern, border=True,
-                   icon="➕")
+                   icon_="➕")
 
     patterns: Iterable[Pattern] = Pattern.select()
 
@@ -71,9 +71,12 @@ def file_row(file: UserUploadedFile):
     with st.container(
             border=True, horizontal=True, vertical_alignment='center',
             width='content'):
-        st.download_button('', file.file_bytes, file.download_file_name,
-                           icon=':material/download:',
-                           key=f'download_{file.id}')
+        if not file.file_bytes:
+            st.write('File could not be found.')
+        else:
+            st.download_button('', file.file_bytes, file.download_file_name,
+                               icon=':material/download:',
+                               key=f'download_{file.id}')
         if isinstance(file, Pattern):
             if st.button('Show', key=f'show_{file.id}'):
                 show_pattern(file)

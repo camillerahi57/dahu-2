@@ -5,7 +5,7 @@ import streamlit as st
 from components.browsing import INSPECT_BUTTON_KEY
 from components.general import sess, switch_page_bttn
 from logic.constants import IdType
-from logic.db_enums import SputteringSystem
+from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse
 from logic.page_list import pages
 

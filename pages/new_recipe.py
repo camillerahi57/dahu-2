@@ -4,7 +4,8 @@ import streamlit as st
 
 from components.forms.base_classes import FileUploadForm
 from components.general import init_page, switch_to_submit_successful
-from logic.lab_modelization.db_models import db, Recipe
+from logic.lab_modelization.base_classes import db
+from logic.lab_modelization.db_models import Recipe
 from logic.page_list import pages
 
 init_page(pages.new_recipe)

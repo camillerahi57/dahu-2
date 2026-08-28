@@ -14,7 +14,7 @@ browser_side_bar(None, pages.browse_recipes)
 def body():
     st.set_page_config(layout="wide")
     show_html_link("Add a new recipe", pages.new_recipe, border=True,
-                   icon="➕")
+                   icon_="➕")
     recipes: Iterable[Recipe] = Recipe.select()
     for r in recipes:
         file_row(r)

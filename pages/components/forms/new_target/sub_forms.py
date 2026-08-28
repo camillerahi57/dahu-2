@@ -9,16 +9,16 @@ from streamlit_cropperjs import st_cropperjs
 
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_target.fields import MadeAtField, \
-    ExperimenterEmailField, \
+    MadeByField, \
     TargetLabelField, CommentField, PhotoUploadField, StoichiometryField, \
     VertexCountField, MillimeterEquivalenceField, PixelEquivalenceField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from components.general import sess
+from components.general import sess, cookies
 from components.pixel_helper import pixel_helper_button
-from logic.constants import SessionKeys as Sk, NEW_TARGET
-from logic.db_enums import PixelCoordinateSystem, ShapeType
+from logic.constants import SessionKeys as Sk, NEW_TARGET, CookieKeys as Ck
+from logic.lab_modelization.db_enums import PixelCoordinateSystem, ShapeType
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex, TargetPhoto
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
@@ -31,20 +31,20 @@ class BasicInfoForm(Form):
         col1, col2 = st.columns(2)
         with col1:
             made_on_fld = MadeAtField(
-                form_default=None
-                if default_target is None
-                else default_target.made_on
+                form_default=None,
+                db_default=default_target.made_on
+                    if default_target else None,
             )
         with col2:
-            email_fld = ExperimenterEmailField(
-                form_default=''
-                if default_target is None
-                else default_target.made_by_email
+            email_fld = MadeByField(
+                form_default=cookies.get(Ck.LAST_EMAIL_USED),
+                db_default=default_target.made_by_email
+                    if default_target else None,
             )
         target_label_fld = TargetLabelField(
-            form_default=''
-            if default_target is None
-            else default_target.label
+            form_default='',
+            db_default=default_target.label
+                if default_target else None,
         )
 
         if default_target is None:

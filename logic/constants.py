@@ -16,9 +16,11 @@ PIXEL_COORDS = 'pixel_selection'
 REDIRECT_PATH = 'redirect_path'
 RESOURCE_TYPE = 'object_type'
 OBJ_ID = 'object_id'
+DAHU_2_TIMEZONE = 'Europe/Paris'
 DB_UNIT_SYSTEM = 'SI'
 ROOM_TEMPERATURE_CELSIUS = 20
 USER_DATA_PATH = Path('user_data')
+LOG_PAGE_LENGTH = 50
 
 
 class CookieKeys(StrEnum):
@@ -33,7 +35,6 @@ class CookieKeys(StrEnum):
 
 class SessionKeys(StrEnum):
     PATCH_FORMS = 'patch_forms_key'
-    SNAP_TO_RESTORE = 'snap_to_restore_key'
     SUBSTRATE_LAYERS = 'substrate_layer_forms_key'
     SUBSTRATE_LAYER_FORMS = 'substrate_layer_forms_key'
     FILM_LAYERS = 'film_layers_key'
@@ -41,11 +42,13 @@ class SessionKeys(StrEnum):
     LAYER_DATA = 'additional_layer_data_key'
     CURRENT_FILM = 'current_film_key'
     CURRENT_PATH = 'current_path_key'
+
     CROPPED_TARGET_IMG = 'cropped_target_key'
     UPLOADED_TARGET_IMG = 'uploaded_target_key'
     IMG_FILE_NAME = 'target_img_name_key'
     CROPPED_PIC = 'cropped_pic_key'
     USE_DEFAULT_TARGET_PIC = 'use_default_target_pic_key'
+
     USE_DEFAULT_PATTERN = 'use_default_pattern_key'
     PREVIOUS_PIXEL_COORDS = 'previous_pixel_coords_key'
     SELECTED_TARGETS = 'selected_targets_key'
@@ -59,3 +62,6 @@ class SessionKeys(StrEnum):
     LIB_FILTERS = 'lib_filters_key'
     TARGET_FILTERS = 'target_filters_key'
     SUBSTRATE_FILTERS = 'substrate_filters_key'
+
+    LOG_PAGE = 'log_page_key'
+    SNAP_TO_RESTORE = 'snap_to_restore_key'

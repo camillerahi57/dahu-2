@@ -5,7 +5,8 @@ from components.forms.new_target.sub_forms import BasicInfoForm
 from components.general import init_page, switch_to_submit_successful, \
     current_params
 from logic.constants import IdType
-from logic.lab_modelization.db_models import db, Target
+from logic.lab_modelization.base_classes import db
+from logic.lab_modelization.db_models import Target
 from logic.page_list import pages
 
 init_page(pages.edit_target)

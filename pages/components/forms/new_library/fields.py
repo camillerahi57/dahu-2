@@ -2,12 +2,13 @@ import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
 from logic.constants import SessionKeys as Sk
-from logic.db_enums import SputteringSystem, FilmLayerFunction, \
-    MagnetronSputteringGenerator, MagnetronMachineModel
+from logic.lab_modelization.db_enums import (
+    SputteringSystem, FilmLayerFunction,
+    MagnetronSputteringGenerator, MagnetronMachineModel)
 from logic.lab_modelization.db_models import (Library, Film, Target, Patch,
                                               Substrate)
 from logic.units import ur
-from logic.utils import is_valid_email_address
+from logic.utils import is_valid_email_address, all_email_addresses
 
 
 class LibLabelField(Field):
@@ -115,8 +116,11 @@ class MadeByField(Field):
     type = Ft.MANDATORY
     
     def _streamlit_input(self, prefill, key):
-        return st.text_input("Made by (email address)", value=prefill,
-                             width=300)
+        options = all_email_addresses
+        index = options.index(prefill) if prefill in options else None
+        return st.selectbox(
+            "Made by (email address)",
+            options=options, index=index, accept_new_options=True, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if not is_valid_email_address(input_):

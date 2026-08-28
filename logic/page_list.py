@@ -1,4 +1,5 @@
 from dataclasses import dataclass, asdict
+from typing import Iterable
 
 from streamlit import Page
 from streamlit.navigation.page import StreamlitPage
@@ -80,23 +81,28 @@ class _Pages:
         '../pages/edit_substrate.py', url_path='edit_substrate',
         title='Edit Substrate', icon='🐐')
 
-    restore_app_state: StreamlitPage = Page(
-        '../pages/restore_app_state.py', url_path='restore_app_state',
-        title='App State Restoration', icon='🐐')
+    admin: StreamlitPage = Page(
+        '../pages/admin.py', url_path='admin',
+        title='Admin', icon='🐐')
+    view_logs: StreamlitPage = Page(
+        '../pages/view_logs.py', url_path='view_logs',
+        title='Logs', icon='🐐')
 
     test: StreamlitPage = Page(
         '../pages/test.py', url_path='test',
         title='Test Page', icon="🐐")
 
-    def to_list(self) -> list[StreamlitPage]:
-        """Add 'StreamlitPage' type hint to make it appear in the list."""
-        return list(asdict(self).values())
+    def __iter__(self) -> Iterable[StreamlitPage]:
+        """Add 'StreamlitPage' type hint to make it appear in the iteration."""
+        return iter(asdict(self).values())
 
     def from_url_path(self, url_path: str) -> StreamlitPage:
-        for page in self.to_list():
+        for page in self:
             if page.url_path == url_path:
                 return page
         raise RuntimeError(f'Page {url_path} not found.')
 
 
 pages = _Pages()
+
+

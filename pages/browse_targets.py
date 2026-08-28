@@ -16,7 +16,7 @@ init_page(pages.browse_targets, show_home_btn=False)
 st.set_page_config(layout="wide")
 
 with st.container(horizontal=True, vertical_alignment='center'):
-    switch_page_bttn(pages.new_target, label="Add a new target", icon='➕')
+    switch_page_bttn(pages.new_target, label="Add a new target", icon_='➕')
     show_archived = st.checkbox('Show archived 📦')
 
 

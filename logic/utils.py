@@ -3,14 +3,17 @@ import os
 import re
 import secrets
 from time import sleep
-from typing import Any
+from typing import Any, Iterable
 from urllib import parse
 
 import pandas as pd
 from streamlit_cookies_controller import CookieController
 
 from logic.constants import SessionKeys as Sk, CookieKeys
-from logic.lab_modelization.db_models import all_models
+from logic.lab_modelization.base_classes import Event
+from logic.lab_modelization.db_enums import EventType, LogSeverity
+from logic.lab_modelization.db_models import dahu_2_models, AppLog, \
+    DeteriorationState, FilmModification, Library, Film, Target
 
 
 def letter_count(text: str) -> int:
@@ -29,7 +32,14 @@ def new_controller() -> CookieController:
         sleep(0.1)
         waited += 0.1
         if waited > 5:
-            raise RuntimeError('Not able to load cookie')
+            event = Event(
+                type=EventType.UI_ERROR,
+                notify=False,
+                severity=LogSeverity.WARNING,
+                description="Cookie feature in user interface is not working "
+                            "properly. Cookie could not be loaded.",
+            )
+            AppLog.save_new(event)
 
     sess['cookie_controller'] = controller
     return controller
@@ -78,16 +88,6 @@ def to_ascii(str_: str):
         'ascii', 'xmlcharrefreplace'
     ).decode('ascii')  # Back to string.
 
-# 50min d'avance
-# On en est là :
-"""On vient de finir l'export des logs et de la DB.
-Tester avec pas mal de data dans la DB et commit.
-
-Donner une estimation du temps de restoration par GB (en précisant la taille 
-totale de la DB).
-
-Faire DB integrity.
-"""
 
 def remove_digits(s: str) -> str:
     return ''.join([c for c in s if not c.isdigit()])
@@ -123,6 +123,24 @@ def database_to_excel_file_bytes() -> bytes:
     data_type = dict[str, list[dict[str, Any]]]
     data: data_type = {
         model.__name__: list(model.select().dicts())
-        for model in all_models()
+        for model in dahu_2_models
     }
     return dict_of_tables_to_xlsx_bytes(data)
+
+
+def get_all_email_addresses() -> Iterable[str]:
+    for state in DeteriorationState.select():
+        state: DeteriorationState
+        yield state.made_by_email
+    for modif in FilmModification.select():
+        modif: FilmModification
+        yield modif.made_by_email
+    for film in Film.select():
+        film: Film
+        yield film.made_by_email
+    for target in Target.select():
+        target: Target
+        yield target.made_by_email
+
+
+all_email_addresses = list(set(get_all_email_addresses()))

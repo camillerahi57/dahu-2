@@ -5,8 +5,7 @@ from components.forms.new_target.sub_forms import RootForm
 from components.general import init_page, \
     switch_to_submit_successful
 from logic.constants import IdType
-from logic.lab_modelization.db_models import (
-    db)
+from logic.lab_modelization.base_classes import db
 from logic.page_list import pages
 
 init_page(pages.new_target)

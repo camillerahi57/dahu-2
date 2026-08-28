@@ -1,182 +1,51 @@
-import csv
 import inspect
-import io
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from random import Random
 from time import sleep
-from typing import Self, get_type_hints, Iterable, Any, final
+from typing import Self, Iterable, Any
 
 import chemparse
 import plotly.graph_objects as go
 import streamlit as st
 from pandas import DataFrame
-from peewee import CharField, DateTimeField, \
-    ForeignKeyField, FloatField, IntegerField, \
-    BooleanField, DateField, TextField, Check, DoesNotExist, SqliteDatabase
+from peewee import (
+    CharField, DateTimeField, ForeignKeyField, FloatField, IntegerField,
+    BooleanField, DateField, TextField, Check, DoesNotExist, Query, )
 from pint.registry import Quantity
-from playhouse.shortcuts import model_to_dict  # noqa
-from playhouse.signals import Model
 from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
-from dahu_2_config import DOMAIN
+from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL
 from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
                              USER_DATA_PATH, CookieKeys as Ck)
-from logic.db_enums import (SputteringSystem, FilmLayerFunction, \
-                            MagnetronSputteringGenerator, FilmModifType,
-                            Furnace, \
-                            MagnetronMachineModel, PixelCoordinateSystem,
-                            ChemicalElement,
-                            LogSeverity, \
-                            EventType)
+from logic.lab_modelization.base_classes import _BaseModel, \
+    DependentBackref, Event
+from logic.lab_modelization.db_enums import (
+    SputteringSystem, FilmLayerFunction, MagnetronSputteringGenerator,
+    FilmModifType, Furnace, MagnetronMachineModel, PixelCoordinateSystem,
+    ChemicalElement, LogSeverity, EventType,
+)
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
 from logic.units import ur, db_units, db_units_explanation
 
+
 # FIELD TYPES:
 # https://docs.peewee-orm.com/en/latest/peewee/models.html#fields
 
-db = SqliteDatabase('user_data/dahu_2.db', pragmas={'foreign_keys': 1})
 # The 'foreign_keys': 1 is required to enforce foreign key constraints.
-
-type DependentBackref[T] = list[T]
-type Backref[T] = list[T]
-
-
-class _BaseModel(Model):
-    id: int | IntegerField
-
-    # A list of attributes with title, corresponding attribute and input field.
-    title_db_value_input_fields: list[tuple[str, Any, type]] = None
-    # Write a new log at save/deletion if set to True in subclass:
-    log_db_write: bool = False
-
-    class Meta:
-        database = db
-        legacy_table_names = False
-
-    def __str__(self):
-        return str(model_to_dict(self))
-
-    @final
-    def save_with_dependent(self, *args, **kwargs):
-        """Saves the object and all other objects that dependent on it.
-        An object A depends on an object B if A has a foreign key towards B
-        with de parameter [on_delete='RESTRICT'] or [on_delete='CASCADE'].
-        If the parameter is [on_delete='SET NULL'], which means the foreign
-        key can point to nothing, A does not dependent on B."""
-
-        self.save(*args, **kwargs)
-        for obj in self.dependent_objects():
-            obj.save_with_dependent()
-
-    @classmethod
-    def get_model_kwargs(cls, kwargs: dict[str, Any]):
-        """Gets a dictionary of keyword arguments, and returns a filtered
-        version with only the ones that are needed to instantiate the model."""
-        return {k: v for k, v in kwargs.items()
-                if k in cls._meta.sorted_field_names}
-
-    @classmethod
-    def dependent_object_fld_names(cls) -> Iterable[str]:
-        for name, hint in get_type_hints(cls).items():
-            try:
-                if hint.__origin__ == DependentBackref:
-                    yield name
-            except AttributeError:
-                pass
-
-    def dependent_objects(self) -> list[_BaseModel]:
-        objects = []
-        for fld_name in self.dependent_object_fld_names():
-            new_objects = self.__getattribute__(fld_name)
-            objects += list(new_objects)
-        return objects
-
-    def data_string(self, separator='\n\n'):
-        from components.forms.base_classes import UnitField
-        if self.title_db_value_input_fields is None:
-            raise RuntimeError('self.title_db_value_input_fields is not set.')
-        description_items = []
-        for title, db_value, field in self.title_db_value_input_fields:
-            try:
-                field: UnitField
-                quantity_str = field.db_to_ui_str(db_value) \
-                    if db_value is not None else '_None_'
-            except AttributeError:
-                quantity_str = db_value if db_value is not None else '_None_'
-            description_items.append(f"**{title}:** {quantity_str}")
-        return separator.join(description_items)
-    
-    def delete_parts(self):
-        raise NotImplementedError
-    
-    def delete_with_parts(self, *args, **kwargs):
-        """Recursive delete but safe (only deleting parts, not other dependent
-        objects)."""
-        self.delete_parts()
-        self.delete_instance(*args, **kwargs)
-        self.delete_related_files()
-
-    def delete_related_files(self):
-        pass
-
-    def delete_instance(self, recursive: bool = False,
-                        delete_nullable: bool = False,
-                        *args, **kwargs):
-        if self.log_db_write:
-            from components.general import cookies
-            description = f"Saved {self.__class__.__name__}. Value: {self}."
-            AppLog.save_new(
-                ip_address=st.context.ip_address,
-                email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
-                notify=False,
-                severity=LogSeverity.INFO,
-                event_type=EventType.DELETED_ITEM,
-                event_description=description,
-            )
-        super().delete_instance(recursive, delete_nullable, *args, **kwargs)
-
-    def save(self, force_insert: bool = False, only: list = None,
-             *args, **kwargs):
-        if self.log_db_write:
-            from components.general import cookies
-            description = f"Saved {self.__class__.__name__}. Value: {self}."
-            AppLog.save_new(
-                ip_address=st.context.ip_address,
-                email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
-                notify=False,
-                severity=LogSeverity.INFO,
-                event_type=EventType.SAVED_ITEM,
-                event_description=description,
-            )
-        super().save(force_insert, only, *args, **kwargs)
-
-    @classmethod
-    def all_rows_to_csv(cls, delimiter: str = ',') -> str:
-        row_dicts = cls.select().dicts()
-        if not row_dicts:
-            return ''
-
-        output = io.StringIO()
-        field_names = list(row_dicts[0].keys())
-        writer = csv.DictWriter(
-            output, fieldnames=field_names, quoting=csv.QUOTE_NONNUMERIC,  # noqa
-            delimiter=delimiter)
-        writer.writeheader()
-        writer.writerows(row_dicts)
-        return output.getvalue()
-
 
 class Substrate(_BaseModel):
     label = CharField(unique=True)
     comment = CharField(null=True)
 
     layers: DependentBackref[SubstrateLayer]
+    # layers: DependentBackref[SubstrateLayer]
 
     log_db_write = True
 
@@ -500,9 +369,8 @@ class FilmLayer(_BaseModel):
     function: FilmLayerFunction = CharField()
     sputtering_system: SputteringSystem = CharField(null=True)
 
-    film: Film = ForeignKeyField(Film, on_delete='RESTRICT', backref='layers')
-    # target: Target = ForeignKeyField(Target, on_delete='RESTRICT',
-    #                          backref='film_layers')
+    film: Film = ForeignKeyField(Film, on_delete='RESTRICT',
+                                 backref='layers')
 
     nominal_stoichio: DependentBackref[StoichioElement]
     target_uses: DependentBackref[TargetUse]
@@ -547,8 +415,14 @@ class FilmLayer(_BaseModel):
         mag_sputters = self.magnetron_sputterings
         triode_sputters = self.triode_sputterings
         if len(mag_sputters) + len(triode_sputters) != 1:
-            raise RuntimeError("There must be exactly one sputtering per "
-                               "layer.")
+            event = Event(
+                EventType.MULTIPLICITY_ERROR,
+                notify=True,
+                severity=LogSeverity.CRITICAL,
+                description=f"A single film layer has two sputtering systems, "
+                            f"which makes no sense. Concerned layer: \n{self}."
+            )
+            AppLog.save_new(event)
         if len(mag_sputters) == 1:
             return mag_sputters[0]
         else:
@@ -716,6 +590,17 @@ class UserUploadedFile(_BaseModel):
     def download_file_name(self):
         class_name = self.__class__.__name__
         return f'{class_name}_{self.label}_{self.original_file_name}'
+
+    @classmethod
+    def get_problems(cls) -> Iterable[Event]:
+        # Finding files that don't exist any more:
+        for file in cls.select():
+            file: UserUploadedFile
+            if not file.get_path().is_file():
+                yield Event.from_file_missing(file)
+
+        for prob in super().get_problems():
+            yield prob
 
     @classmethod
     def new_internal_file_name(cls, label: str, original_file_name: str):
@@ -1554,11 +1439,13 @@ class AppMetadata(_BaseModel):
         unique=True, constraints=[Check('is_the_only_row = TRUE')])
     db_units_description = TextField()
     next_backup_at = DateTimeField()
+    next_problem_check_at = DateTimeField()
 
     def __init__(self, *args,
                  is_the_only_row: bool = True,
                  db_units_description: str = db_units_explanation,
                  next_backup_at: datetime = None,
+                 next_problem_check_at: datetime = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1568,7 +1455,10 @@ class AppMetadata(_BaseModel):
         try:
             return cls.get()
         except DoesNotExist:
-            return cls(next_backup_at=datetime.now())
+            return cls(
+                next_backup_at=datetime.now(),
+                next_problem_check_at=datetime.now() + PROBLEM_CHECK_INTERVAL,
+            )
 
 
 class AppLog(_BaseModel):
@@ -1577,56 +1467,123 @@ class AppLog(_BaseModel):
     ip_address = TextField(null=True)
     email_in_cookies = TextField(null=True)
     notify: bool = BooleanField()
-    is_read: bool = BooleanField()
-    marked_as_solved: bool = BooleanField()
-    severity: LogSeverity = TextField()
+    marked_read: bool = BooleanField()
+    marked_solved: bool = BooleanField()
+    severity: LogSeverity|TextField = TextField()
     event_type: EventType = TextField()
-    event_description = TextField()
+    event_description: str = TextField(unique=True)  # Don't log an info twice.
 
     def __init__(self, *args, timestamp: datetime = None,
                  ip_address: str = None, email_in_cookies: str = None,
-                 notify: bool = None, is_read: bool = None,
-                 marked_as_solved: bool = None,
+                 notify: bool = None, marked_read: bool = None,
+                 marked_solved: bool = None,
                  severity: LogSeverity = None, event_type: str = None,
                  event_description: str = None, **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @classmethod
-    def save_new(cls, ip_address: str|None, email_in_cookies: str|None,
-                 notify: bool, severity: LogSeverity, event_type: EventType,
-                 event_description: str, is_read: bool = False,
-                 marked_as_solved: bool = False,
+    def save_new(cls,
+                 event: Event,
+                 marked_read: bool = False,
+                 marked_solved: bool = False,
                  timestamp: datetime = None):
-        if timestamp is None:
-            timestamp = datetime.now()
+        from components.general import cookies
         new_log = cls(
-            timestamp=timestamp,
-            ip_address=ip_address,
-            email_in_cookies=email_in_cookies,
-            notify=notify,
-            is_read=is_read,
-            marked_as_solved=marked_as_solved,
-            severity=severity,
-            event_type=event_type,
-            event_description=event_description,
+            timestamp=timestamp or datetime.now(),
+            ip_address=st.context.ip_address,
+            email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
+            notify=event.notify,
+            marked_read=marked_read,
+            marked_solved=marked_solved,
+            severity=event.severity,
+            event_type=event.type,
+            event_description=event.description,
         )
         new_log.save()
 
-    def mark_all_day_solved(self, day: datetime, type_: EventType):
-        pass  # TODO
 
-    def mark_all_day_read(self, day: datetime, type_: EventType):
-        pass  # TODO
+    @classmethod
+    def filtered_query(cls, severities: list[LogSeverity] = None,
+                       show_read = True, show_solved=True) -> Query:
+        if severities is None:
+            severities = list(LogSeverity)
+        query = (AppLog.select()
+                .order_by(AppLog.timestamp.desc())  # noqa Wrong warning.
+                .where(AppLog.severity.in_(severities))  # noqa Weird warning.
+                 )
+        if not show_read:
+            query = query.where(AppLog.marked_read == False)
+        if not show_solved:
+            query = query.where(AppLog.marked_solved == False)
+
+        return query
+
+    def save(self, force_insert: bool = False, only: list = None,
+             *args, **kwargs):
+        """If the current app_log has the same description as an existing
+        app_log, we skip the save process. However, we update some fields
+        of the existing log, especially in order to display it as recent."""
+        # Check for existing:
+        similar_log_query = (
+            AppLog.select()
+            .where(AppLog.event_description == self.event_description)
+            .where(AppLog.id != self.id)
+        )
+        if similar_log_query.exists():
+            same_log: AppLog = similar_log_query.get()
+            same_log.timestamp = self.timestamp
+            same_log.ip_address = self.ip_address
+            same_log.email_in_cookies = self.email_in_cookies
+            same_log.notify = self.notify
+            same_log.severity = self.severity
+            same_log.event_type = self.event_type
+            super(AppLog, same_log).save()
+            return
+        else:
+            super().save(force_insert=force_insert, only=only, *args, **kwargs)
+
+    @classmethod
+    def unread_warning_notif_count(cls) -> int:
+        return (AppLog.select()
+                .where(AppLog.severity == LogSeverity.WARNING)
+                .where(AppLog.marked_read == False)
+                .where(AppLog.notify == True)
+                .count())
+
+    @classmethod
+    def unsolved_critical_notif_count(cls) -> int:
+        return (AppLog.select()
+                .where(AppLog.severity == LogSeverity.CRITICAL)
+                .where(AppLog.marked_solved == False)
+                .where(AppLog.notify == True)
+                .count())
 
 
-def all_models() -> list[type[_BaseModel]]:
-    def is_a_model(cls):
-        return (
-            inspect.isclass(cls)
-            and issubclass(cls, _BaseModel)
-            and not cls.__name__.startswith('_')
+# Don't move to another file because it looks for classes in the same file:
+@dataclass
+class ModelCollection:
+    models: list[type[_BaseModel]]
+    name_to_model: dict[str, type[_BaseModel]]
+
+    @classmethod
+    def from_current_module(cls):
+        def is_a_model(class_):
+            return (
+                inspect.isclass(class_)
+                and issubclass(class_, _BaseModel)
+                and not class_.__name__.startswith('_')
+            )
+
+        name_models = inspect.getmembers(sys.modules[__name__], is_a_model)
+        return cls(
+            models=[model for name, model in name_models],
+            name_to_model={name: model for name, model in name_models},
         )
 
-    name_models = inspect.getmembers(sys.modules[__name__], is_a_model)
-    return [model for name, model in name_models]
+    def __iter__(self):
+        return iter(self.models)
+
+
+# Don't move to another file because it looks for classes in the same file:
+dahu_2_models = ModelCollection.from_current_module()

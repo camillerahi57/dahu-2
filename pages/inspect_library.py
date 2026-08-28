@@ -10,10 +10,11 @@ from components.general import (
 from components.inspection import inspect_page_header, show_film_layer
 from components.library_files import file_list_container
 from logic.constants import SessionKeys as Sk, IdType
-from logic.db_enums import FilmModifType
+from logic.lab_modelization.base_classes import db
+from logic.lab_modelization.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, db, Etching, Annealing, LiftOffEtching)
+    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching, AppLog)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -182,7 +183,7 @@ def page_body():
 
     switch_page_bttn(
         pages.edit_lib,
-        label='Edit name or comment', icon='✏️', q_params={IdType.LIB: lib.id}
+        label='Edit name or comment', icon_='✏️', q_params={IdType.LIB: lib.id}
     )
 
     with (st.container(horizontal=True, vertical_alignment='center',
@@ -206,7 +207,7 @@ def page_body():
             pages.new_film_modif,
             label='**Add**',
             type_='tertiary',
-            icon='➕',
+            icon_='➕',
             q_params={IdType.FILM: film.id}
         )
 
@@ -220,7 +221,7 @@ def page_body():
             with st.container(horizontal_alignment='right'):
                 switch_page_bttn(pages.edit_film,
                                  label="Edit film information",
-                                 icon='✏️',
+                                 icon_='✏️',
                                  q_params={IdType.FILM: film.id})
             date_str = film.made_on.strftime("%B %d, %Y")
             st.write(f"Made on **{date_str}** by "
@@ -234,7 +235,7 @@ def page_body():
                      unsafe_allow_html=True)
             with st.container(horizontal_alignment='right'):
                 switch_page_bttn(pages.edit_film_layers, label="Edit layers",
-                                 q_params={IdType.FILM: film.id}, icon='✏️')
+                                 q_params={IdType.FILM: film.id}, icon_='✏️')
 
             st.write(f"**Layers**:")
 

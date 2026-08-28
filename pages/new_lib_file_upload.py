@@ -6,7 +6,8 @@ from components.forms.base_classes import FileUploadForm
 from components.general import init_page, current_params, \
     switch_to_submit_successful
 from logic.constants import IdType
-from logic.lab_modelization.db_models import db, Library, GeneralLibraryFile
+from logic.lab_modelization.base_classes import db
+from logic.lab_modelization.db_models import Library, GeneralLibraryFile
 from logic.page_list import pages
 
 init_page(pages.new_lib_file_upload)

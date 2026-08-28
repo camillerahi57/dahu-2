@@ -9,21 +9,22 @@ from logic.page_list import pages
 
 def browser_side_bar(dynamic_filters: DynamicFilters|None,
                      current_page: StreamlitPage):
-    title_page_has_border = [
-        ("Browse Libraries", pages.browse_libs, True),
-        ("Browse Targets", pages.browse_targets, True),
-        ("Browse Substrates", pages.browse_substrates, True),
-        ("Browse Patterns", pages.browse_patterns, True),
-        ("Browse Recipes", pages.browse_recipes, True),
-        ("Incident", pages.restore_app_state, False),
+    sidebar_pages = [
+        pages.browse_libs,
+        pages.browse_targets,
+        pages.browse_substrates,
+        pages.browse_patterns,
+        pages.browse_recipes,
+        pages.admin,
     ]
     with st.sidebar:
-        for title, page, has_border in title_page_has_border:
+        for page in sidebar_pages:
             if page == current_page:
                 with st.container(border=True, width='content'):
-                    st.write(f'**{title}**')
+                    st.write(f'**{page.title}**')
             else:
-                show_html_link(title, page, border=has_border)
+                show_html_link(page.title, page,
+                               border=False if page == pages.admin else True)
 
         if dynamic_filters is not None:
             st.title("Filters:")

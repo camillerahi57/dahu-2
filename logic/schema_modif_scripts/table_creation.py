@@ -1,7 +1,8 @@
 import sqlite3
 
 from logic.app_restoration import Snapshot
-from logic.lab_modelization.db_models import all_models, db
+from logic.lab_modelization.base_classes import db
+from logic.lab_modelization.db_models import dahu_2_models
 
 """Don't call create_tables for abstract models (parent models that will 
 never have an instance, like Shape for example). Peewee don't use parent 
@@ -15,4 +16,4 @@ with sqlite3.connect('user_data/dahu_2.db') as connection:
 # Delete backups:
 Snapshot.delete_all_snaps()
 # Create the tables in the DB:
-db.create_tables(all_models())
+db.create_tables(dahu_2_models)

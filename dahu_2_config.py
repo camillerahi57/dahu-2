@@ -19,3 +19,7 @@ class BackupsToKeep(IntEnum):
     LAST_N_YEARS = 1
 
 BACKUP_INTERVAL = timedelta(hours=1)
+NO_RECENT_BACKUP_WARNING_TIMEDELTA = timedelta(days=7)
+
+PROBLEM_CHECK_INTERVAL = timedelta(hours=1, minutes=24)
+SHOW_PROBLEM_BANNER = True

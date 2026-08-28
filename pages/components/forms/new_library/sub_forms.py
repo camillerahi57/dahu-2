@@ -18,7 +18,7 @@ from components.forms.new_library.fields import (
 )
 from components.general import sess, cookies
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
-from logic.db_enums import SputteringSystem
+from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
     MagnetronSputtering, TriodeSputtering, Substrate, Target, TargetUse, \
     StoichioElement
@@ -66,28 +66,26 @@ class BaseInfoForm(Form):
 
 class FilmInfoForm(Form):
     def __init__(self, default_film: Film | None):
-        no_db_default = default_film is None
         with st.container(horizontal=True, vertical_alignment='center'):
             label_fld = FilmLabelField(
                 form_default='',
-                db_default=None if no_db_default
-                else default_film.label
+                db_default=default_film.label
+                    if default_film else None,
             )
             made_on_fld = MadeOnField(
                 form_default=None,
-                db_default=None if no_db_default
-                else default_film.made_on
+                db_default=default_film.made_on
+                    if default_film else None,
             )
-            cookie_email = cookies.get(Ck.LAST_EMAIL_USED)
             email_fld = MadeByField(
-                form_default='',
-                db_default=cookie_email if no_db_default
-                else default_film.made_by_email
+                form_default=cookies.get(Ck.LAST_EMAIL_USED),
+                db_default=default_film.made_by_email
+                    if default_film else None,
             )
             substrate_fld = SubstrateField(
                 form_default=None,
-                db_default=None if no_db_default
-                else default_film.substrate.label
+                db_default=default_film.substrate.label
+                    if default_film else None,
             )
 
         self.label = label_fld.value

@@ -1,7 +1,7 @@
 import streamlit as st
 
 from components.forms.base_classes import Form
-from components.forms.new_deterioration_state.fields import UpdaterEmailField
+from components.forms.new_deterioration_state.fields import MadeByField
 from components.forms.new_target.sub_forms import DeteriorationStateForm
 from components.general import cookies
 from logic.constants import CookieKeys as Ck
@@ -13,12 +13,10 @@ class RootForm(Form):
         st.title(f'Editing state {default_state.date} of '
                  f'{target.label}')
 
-        cookie_email = cookies.get(Ck.LAST_EMAIL_USED)
-        email_fld = UpdaterEmailField(
-            form_default='',
-            db_default=cookie_email
-                if not default_state
-                else default_state.made_by_email,
+        email_fld = MadeByField(
+            form_default=cookies.get(Ck.LAST_EMAIL_USED),
+            db_default=default_state.made_by_email
+                if default_state else None,
         )
         state_form = DeteriorationStateForm(target, email_fld.value,
                                             default_state=default_state)

@@ -35,13 +35,13 @@ def main_page():
                 st.rerun()
 
     show_base_info(target)
-    switch_page_bttn(pages.edit_target, label="Edit base info", icon='✏️',
+    switch_page_bttn(pages.edit_target, label="Edit base info", icon_='✏️',
                      q_params={IdType.TARGET: str(target.id)})
 
     with st.container(horizontal=True, vertical_alignment="center"):
         st.subheader('Most Recent Deterioration State', width='content')
         switch_page_bttn(pages.new_state,
-                         label='Add New State', icon='➕',
+                         label='Add New State', icon_='➕',
                          q_params={IdType.TARGET: target_id})
 
     states = target.old_to_recent_states()
@@ -108,7 +108,7 @@ def show_state(state: DeteriorationState, state_count: int):
             show_state_info(state)
             with st.container(horizontal=True, vertical_alignment="center"):
                 switch_page_bttn(pages.edit_state,
-                                 label="Edit State", icon='✏️',
+                                 label="Edit State", icon_='✏️',
                                  q_params={IdType.STATE: f'{state.id}'},
                                  key=f'state_edit_{state.id}')
                 if state_count > 1:

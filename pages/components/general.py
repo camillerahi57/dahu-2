@@ -1,4 +1,5 @@
 from datetime import date as dt_date, datetime
+from random import random
 from threading import Thread
 from typing import Literal
 
@@ -12,7 +13,10 @@ from logic.constants import (
     SessionKeys as Sk, REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID,
     IdType
 )
-from logic.lab_modelization.db_models import AppMetadata
+from logic.db_integrity import get_problems
+from logic.lab_modelization.base_classes import Event
+from logic.lab_modelization.db_enums import EventType, LogSeverity
+from logic.lab_modelization.db_models import AppMetadata, AppLog
 from logic.page_list import pages
 from logic.utils import new_controller
 
@@ -24,22 +28,47 @@ app_metadata = AppMetadata.get_or_new()
 def init_page(page: StreamlitPage, show_home_btn = True):
     from logic.utils import reset_session
 
-    if datetime.now() > app_metadata.next_backup_at:
-        from logic.app_restoration import Snapshot
-        Thread(target=Snapshot.backup).start()
+    run_routines()
 
     if show_home_btn:
-        switch_page_bttn(pages.browse_libs, label='Home', icon='🏠')
+        switch_page_bttn(pages.browse_libs, label='Home', icon_='🏠')
     page_changed = sess.get(Sk.CURRENT_PATH) != page.url_path
     if page_changed:
-        print(f"Page changed from '{sess.get(Sk.CURRENT_PATH)}' to "
-              f"'{page.url_path}'")
         reset_session()
         sess[Sk.CURRENT_PATH] = page.url_path
 
 
 def current_params() -> dict[str, str]:
     return st.query_params.to_dict()
+
+
+def run_routines():
+    now = datetime.now()
+
+    if now > app_metadata.next_backup_at:
+        from logic.app_restoration import Snapshot
+        Thread(target=Snapshot.backup).start()
+
+    if now > app_metadata.next_problem_check_at:
+        for event in get_problems():
+            AppLog.save_new(event)
+
+        # For testing:
+
+        # if random() > .5:
+        #     event = Event(EventType.UNKNOWN_ENUM, True, LogSeverity.CRITICAL,
+        #                   f'BE CAREFUL {random()}')
+        #     AppLog.save_new(event)
+        #
+        # if random() > .5:
+        #     event = Event(EventType.NO_RECENT_BACKUP, True,
+        #                   LogSeverity.WARNING,
+        #                   f'WOW CALM DOWN')
+        #     AppLog.save_new(event)
+
+
+def colored(text: str, color: str) -> str:
+    return f':{color}[{text}]'
 
 
 def switch_to_submit_successful(
@@ -61,14 +90,16 @@ def switch_page_bttn(
         page: StreamlitPage | str, *, label: str,
         q_params: dict[str, str|int] = None, key: str = None,
         type_: Literal["primary", "secondary", "tertiary"] = 'secondary',
-        icon: str = None):
-    """Don't use st.switch_page to go from current page P1 to another page P2 if
+        icon_: str = None):
+    """
+    Don't use st.switch_page to go from current page P1 to another page P2 if
     P1 has query parameters in its URL. The browser's back button
     will not restore these parameters if the user wants to go back. This will
     break navigation.
 
     To solve his, use an HTML link instead. This alternative is chosen
-    automatically if you use the present function."""
+    automatically if you use the present function.
+    """
     from logic.utils import to_ascii
 
     if isinstance(page, str):
@@ -82,10 +113,15 @@ def switch_page_bttn(
 
     # If there currently are q_parameters:
     if len(current_params()) > 0:
-        show_html_link(label, page, border=True, icon=icon, q_params=q_params)
+        show_html_link(label, page, border=True, icon_=icon_, q_params=q_params)
     else:
-        if st.button(f'{icon} {label}', key=key, type=type_):
+        bttn_label = f'{icon_} {label}' if icon_ else label
+        if st.button(bttn_label, key=key, type=type_):
             st.switch_page(page, query_params=q_params)
+
+
+def icon(google_material_name: str):
+    return f':material/{google_material_name}:'
 
 
 def convert_values_to_str(dict_: dict):
@@ -118,10 +154,10 @@ def st_page_link_html(label: str, page: StreamlitPage,
 
 
 def show_html_link(label: str, page: StreamlitPage, border: bool = False,
-                   icon: str = None, q_params: dict[str, str|int] = None):
+                   icon_: str = None, q_params: dict[str, str | int] = None):
     html = st_page_link_html(label, page, q_params=q_params)
-    if icon:
-        html = f'{icon} {html}'
+    if icon_:
+        html = f'{icon_} {html}'
     if not border:
         st.write(html, unsafe_allow_html=True)
     else:

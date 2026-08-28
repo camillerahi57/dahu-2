@@ -14,7 +14,7 @@ init_page(pages.browse_substrates, show_home_btn=False)
 
 st.set_page_config(layout="wide")
 
-switch_page_bttn(pages.new_substrate, label="Add a new substrate", icon='➕')
+switch_page_bttn(pages.new_substrate, label="Add a new substrate", icon_='➕')
 
 query = Substrate.select(
     Substrate.label.alias(ColName.label),

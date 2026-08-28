@@ -4,14 +4,13 @@ from time import sleep
 import streamlit as st
 
 from components.general import init_page, sess, app_metadata, \
-    compact_datetime_str, datetime_sentence
+    compact_datetime_str, datetime_sentence, switch_page_bttn
 from logic.app_restoration import Snapshot
 from logic.constants import SessionKeys as Sk
-from logic.lab_modelization.db_models import AppLog
 from logic.page_list import pages
 from logic.utils import database_to_excel_file_bytes
 
-init_page(pages.restore_app_state)
+init_page(pages.admin)
 st.set_page_config(layout='centered')
 
 
@@ -28,8 +27,7 @@ def restore_warning_dialog(snap: Snapshot):
 @st.dialog('Please wait')
 def restore_process_dialog(snap: Snapshot):
     del sess[Sk.SNAP_TO_RESTORE]
-    with st.spinner("Restoring..."):  # noqa
-        snap.restore()
+    snap.restore()
     st.success(f"**Dahu 2 data was restored successfully.**")
     sleep(5)
     st.rerun()
@@ -50,12 +48,8 @@ def body():
         snap = sess[Sk.SNAP_TO_RESTORE]
         restore_process_dialog(snap)
 
-    st.header("Internal Logs")
-    file_name = f'dahu_2_logs_{compact_datetime_str(datetime.now())}.csv'
-    st.download_button('Download as CSV', data=AppLog.all_rows_to_csv(),
-                       file_name=file_name)
-
-    st.divider()
+    st.subheader("Internal logs")
+    switch_page_bttn(pages.view_logs, label='View logs', key='logs')
 
     st.header("Explore Database")
 
