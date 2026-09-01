@@ -77,6 +77,10 @@ class MagnetronSputteringGenerator(StrEnum):
     DC_8 = 'DC-8'
 
 
+class IbeMachine(StrEnum):
+    IBE_NANO_FAB = 'IBE NanoFAB'
+
+
 class FilmModifType(StrEnum):
     LIFT_OFF = 'lift_off'
     ANNEALING = 'annealing'

@@ -4,7 +4,8 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
-from components.general import init_page, sess, switch_page_bttn, cookies
+from components.general import init_page, switch_page_bttn, icon
+from logic.global_variables import sess, cookies
 from dahu_2_config import SHOW_PROBLEM_BANNER
 from logic.constants import SessionKeys as Sk, IdType, CookieKeys
 from logic.lab_modelization.db_models import Library, Film, AppLog
@@ -21,7 +22,8 @@ def body():
         problem_banner()
 
     with st.container(horizontal=True, vertical_alignment='center'):
-        switch_page_bttn(pages.new_lib, label="Add a new library", icon_='➕')
+        switch_page_bttn(pages.new_lib, label="Add a new library",
+                         icon_=icon('add_2'))
         show_archived = st.checkbox('Show archived 📦')
 
     query = Library.select(

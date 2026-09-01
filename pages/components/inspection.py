@@ -3,7 +3,8 @@ from typing import Callable
 import streamlit as st
 
 from components.browsing import INSPECT_BUTTON_KEY
-from components.general import sess, switch_page_bttn
+from components.general import switch_page_bttn
+from logic.global_variables import sess
 from logic.constants import IdType
 from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse

@@ -6,7 +6,7 @@ from PIL.ImageFile import ImageFile
 from streamlit import dialog
 from streamlit_image_coordinates import streamlit_image_coordinates
 
-from components.general import sess
+from logic.global_variables import sess
 from logic.constants import PIXEL_COORDS
 from logic.constants import SessionKeys as Sk
 

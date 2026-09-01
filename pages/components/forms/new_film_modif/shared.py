@@ -8,12 +8,15 @@ from components.forms.new_film_modif.fields import ConstituentCountField, \
 from logic.lab_modelization.db_models import Pattern, IonBeamEtching, \
     PlasmaConstituent, FilmModification, Etching, Recipe
 from logic.lab_modelization.other_classes import MixtureConstituent
+from logic.page_list import pages
 
 
 class EtchingForm(Form):
     def __init__(self, default_etch: Etching|None):
 
-        st.subheader("Recipe")
+        st.subheader("Recipe (for additional info)")
+        st.write(f"**(If you want to add a new recipe, go to *Home Page* -> "
+                 f"*{pages.browse_recipes.title}*).**")
         recipe_label_fld = SelectRecipeLabelField(
             form_default=None,
             db_default=default_etch.recipe if default_etch else None,
@@ -71,6 +74,8 @@ class PatternForm(Form):
             has_default_pattern = default_etch and default_etch.pattern
             db_default_label = default_etch.pattern.label \
                 if has_default_pattern else None
+            st.write(f"**(If you want to add a new pattern, go to *Home Page* -> "
+                     f"*{pages.browse_patterns.title}*).**")
             pattern_fld = SelectPatternLabelField(
                 form_default=None,
                 db_default=db_default_label,

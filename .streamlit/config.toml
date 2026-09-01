@@ -2,7 +2,7 @@
 showSidebarNavigation = false
 
 [server]
-enableStaticServing = true
+enableStaticServing = false
 
 [[theme.fontFaces]]
 family = "Inter"

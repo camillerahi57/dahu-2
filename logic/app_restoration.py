@@ -39,6 +39,7 @@ class Snapshot:
         if result.returncode != 0:
             event = Event.from_restic_error(result.returncode)
             AppLog.save_new(event)
+            raise RuntimeError()  # TODO
         snap_dicts = json.loads(result.stdout)
         snap_list = [
             cls(
@@ -82,7 +83,7 @@ class Snapshot:
             if prune_excessive_snaps:
                 delete_excessive_snapshots()
 
-            from components.general import app_metadata
+            from logic.global_variables import app_metadata
             app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
             app_metadata.save()
 
@@ -145,7 +146,7 @@ class Snapshot:
 
         self.delete_subsequent()
 
-        from components.general import app_metadata
+        from logic.global_variables import app_metadata
         app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
         app_metadata.save()
 

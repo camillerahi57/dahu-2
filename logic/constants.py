@@ -10,8 +10,8 @@ class IdType(StrEnum):
     STATE = 'state_id'
 
 
-FILM_INIT_STATE = 'As deposited'
-NEW_TARGET = 'NOT BASED ON AN EXISTING TARGET'
+FILM_INIT_STATE = (0, 'Initial state (as deposited)')
+NEW_TARGET = 'Not based on an existing target'
 PIXEL_COORDS = 'pixel_selection'
 REDIRECT_PATH = 'redirect_path'
 RESOURCE_TYPE = 'object_type'

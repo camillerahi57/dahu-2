@@ -27,4 +27,4 @@ if redirect_path:
         redirect_path, label='Continue', q_params=redirect_q_params
     )
 else:
-    switch_page_bttn(pages.browse_libs, label='Home', icon_='🏠')
+    switch_page_bttn(pages.browse_libs, label='Home', icon_='🏠', key='home2')

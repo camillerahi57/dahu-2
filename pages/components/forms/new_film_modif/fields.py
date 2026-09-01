@@ -4,11 +4,12 @@ from typing import Iterable
 import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
-from components.general import sess
+from logic.global_variables import sess
 from logic.constants import SessionKeys as Sk, FILM_INIT_STATE
 from logic.lab_modelization.db_enums import FilmModifType, Furnace, \
     ChemicalElement, \
-    EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion
+    EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion, \
+    IbeMachine
 from logic.lab_modelization.db_models import FilmModification, Patch, \
     Pattern, Recipe
 from logic.units import ur
@@ -64,25 +65,30 @@ class MadeAfterField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
+        options = self.get_options()
+        index = options.index(prefill) if prefill in options else None
+        return st.selectbox(
+            'Previous film modification (if any):',
+            options=options, index=index, width=300)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ is None or input_ == '':
+            return False, 'Please select an option.'
+        return True, ''
+
+    @staticmethod
+    def get_options() -> list[str]:
         film = sess[Sk.CURRENT_FILM]
         film_modifs = (FilmModification.select()
                        .where(FilmModification.film == film))
         def get_modif_count(fm: FilmModification):
             return fm.modif_number
-        film_modifs = sorted(list(film_modifs), key=get_modif_count)
-        options = [
-            (modif.modif_number, modif.modif_type)
-            for modif in film_modifs
-        ]
-        options = sorted(options, key=lambda x: x[0])
-        options = [(-1, FILM_INIT_STATE)] + options
-        return st.selectbox(
-            'Made after', options=options, index=None, width=300)
-
-    def _validate(self, input_) -> tuple[bool, str]:
-        if input_ is None or input_ == '':
-            return False, 'Please select a previous state.'
-        return True, ''
+        film_modifs: Iterable[FilmModification] = sorted(list(film_modifs),
+                                                         key=get_modif_count)
+        options = [(modif.modif_number + 1, modif.modif_type)
+                   for modif in film_modifs]
+        options = [FILM_INIT_STATE] + options
+        return options
 
 
 class CommentField(Field):
@@ -123,13 +129,30 @@ class PumpingDurationField(UnitField):
         return True, ''
 
 
-class PressureField(UnitField):
+class StartPressureField(UnitField):
     type = Ft.ADVISED
     ui_unit = ur.millibar
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(
-            f'Pressure ({self.ui_unit})', min_value=0., width=300,
+            f'Start pressure ({self.ui_unit})', min_value=0., width=300,
+            value=prefill, key=key, step=0.0000000000001, format='%.12g',
+            placeholder="You can use the '3e-7' notation."
+        )
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ == 0:
+            return False, 'Pressure must be strictly positive.'
+        return True, ''
+
+
+class TargetPressureField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.millibar
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(
+            f'Target pressure ({self.ui_unit})', min_value=0., width=300,
             value=prefill, key=key, step=0.0000000000001, format='%.12g',
             placeholder="You can use the '3e-7' notation."
         )
@@ -190,12 +213,12 @@ class AngleField(UnitField):
         return True, ''
 
 
-class RotationField(UnitField):
+class RotationSpeedField(UnitField):
     type = Ft.ADVISED
-    ui_unit = ur.degrees
+    ui_unit = ur.rpm
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Rotation ({self.ui_unit})',
+        return st.number_input(f'Rotation speed ({self.ui_unit})',
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -251,22 +274,11 @@ class SelectRecipeLabelField(Field):
         recipes: Iterable[Recipe] = Recipe.select()
         options = [r.label for r in recipes]
         index = options.index(prefill) if prefill else None
-        return st.selectbox('Recipe', options, index=index)
+        return st.selectbox('Recipe',
+                            options, index=index)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
-
-
-# class RecipeLabelField(Field):
-#     type = Ft.MANDATORY
-#
-#     def _streamlit_input(self, prefill, key: str):
-#         return st.text_input('Recipe label', value=prefill)
-#
-#     def _validate(self, input_) -> tuple[bool, str]:
-#         if input_ and Recipe.label_is_taken(input_):
-#             return False, 'Label is already taken.'
-#         return True, ''
 
 
 class FurnaceField(Field):
@@ -288,7 +300,7 @@ class PowerField(UnitField):
     ui_unit = ur.watt
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Power ({self.ui_unit})', min_value=0.,
+        return st.number_input(f'Power RF ({self.ui_unit})', min_value=0.,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -458,13 +470,42 @@ class ConstituentCountField(Field):
 
 class IonDurationField(UnitField):
     type = Ft.ADVISED
-    ui_unit = ur.minutes
+    ui_unit = ur.seconds
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(f'Duration ({self.ui_unit})', min_value=0,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
+        if input_ <= 0:
+            return False, 'Must be strictly positive.'
+        return True, ''
+
+class PreEtchDurationField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.seconds
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Pre-etching duration ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ <= 0:
+            return False, 'Must be strictly positive.'
+        return True, ''
+
+
+class DcGridCurrentField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.A
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'DC grid current ({self.ui_unit})',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if input_ <= 0:
+            return False, 'Must be strictly positive.'
         return True, ''
 
 
@@ -508,6 +549,18 @@ class UsedUltrasoundField(Field):
         index = options.index(prefill) if prefill else None
         return st.radio('Used ultrasound', options, horizontal=True,
                         index=index)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class IbeMachineField(Field):
+    type = Ft.MANDATORY
+
+    def _streamlit_input(self, prefill, key: str):
+        options = list(IbeMachine)
+        index = options.index(prefill) if prefill else None
+        return st.selectbox('Machine', options, index=index)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''

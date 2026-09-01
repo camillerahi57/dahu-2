@@ -2,13 +2,13 @@ import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.annealing.sub_forms import AnnealingForm
-from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField, \
+from components.forms.new_film_modif.fields import MadeOnField, MadeAfterField,\
     MadeByField, CommentField, ModifTypeField
 from components.forms.new_film_modif.ion_beam_etching.sub_forms import \
     IonEtchingForm
 from components.forms.new_film_modif.lift_off.sub_forms import LiftOffForm
 from components.forms.new_film_modif.wet_etching.sub_forms import WetEtchingForm
-from components.general import cookies
+from logic.global_variables import cookies
 from logic.constants import FILM_INIT_STATE, CookieKeys as Ck
 from logic.lab_modelization.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
@@ -35,27 +35,28 @@ class ModifBaseInfoForm(Form):
                     if default_modif else None,
             )
 
-        made_after_db_default = None
-        previous_modif = None
-        if default_modif:
-            if default_modif.modif_number == 0:
-                made_after_db_default = (-1, FILM_INIT_STATE)
-            else:
-                previous_modif = default_modif.previous_modif
-                made_after_db_default = (
-                    previous_modif.modif_number,
-                    previous_modif.modif_type,
-                )
+        previous_modif = default_modif.previous_modif if default_modif else None
+
+        if default_modif and default_modif.modif_number == 0:
+            made_after_db_default = FILM_INIT_STATE
+        elif default_modif:
+            made_after_db_default = (previous_modif.modif_number + 1,
+                                     previous_modif.modif_type)
+        else:
+            made_after_db_default = None
+
         made_after_fld = MadeAfterField(
             form_default=None,
             db_default=made_after_db_default,
         )
+
         if made_after_fld.value is None:
-            modif_nb = None
+            current_modif_number = None
         else:
             # This field returns a couple (see field select box options).
             made_after_idx, made_after_type = made_after_fld.value
-            modif_nb = made_after_idx + 1
+            previous_modif_number = made_after_idx - 1
+            current_modif_number = previous_modif_number + 1
 
         comment_fld = CommentField(
             form_default='',
@@ -65,7 +66,7 @@ class ModifBaseInfoForm(Form):
 
         self.modif_type = modif_type_fld.value
         self.made_on = made_on_fld.value
-        self.modif_number = modif_nb
+        self.modif_number = current_modif_number
         self.previous_modif = previous_modif
         self.made_by = made_by_fld.value
         self.comment = comment_fld.value

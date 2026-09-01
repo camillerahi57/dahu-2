@@ -3,7 +3,7 @@ import streamlit as st
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_film_modif.fields import (
     PhaseTypeField, FurnaceField, \
-    PressureField, PumpingDurationField, IsRoomTemperatureField, \
+    StartPressureField, PumpingDurationField, IsRoomTemperatureField, \
     ReachedTempField, PhaseDurationField, AnnealingAtmosphereField, \
     PhaseCountField, AtmosphereIsVacuumField)
 from logic.lab_modelization.db_models import Annealing, FilmModification, \
@@ -20,7 +20,7 @@ class AnnealingIntroForm(Form):
                 db_default=None if default_annealing is None
                     else default_annealing.furnace,
             )
-            pressure_fld = PressureField(
+            pressure_fld = StartPressureField(
                 form_default=None,
                 db_default=None if default_annealing is None
                     else default_annealing.pressure,

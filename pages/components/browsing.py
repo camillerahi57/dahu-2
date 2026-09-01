@@ -4,11 +4,11 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from components.general import show_html_link
 from logic.constants import SessionKeys as Sk
-from logic.page_list import pages
 
 
 def browser_side_bar(dynamic_filters: DynamicFilters|None,
                      current_page: StreamlitPage):
+    from logic.page_list import pages
     sidebar_pages = [
         pages.browse_libs,
         pages.browse_targets,

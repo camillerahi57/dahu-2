@@ -2,7 +2,7 @@ import streamlit as st
 from PIL import Image
 
 from components.general import init_page, switch_page_bttn, \
-    switch_to_submit_successful, email_html, extensive_date_str
+    switch_to_submit_successful, email_html, extensive_date_str, icon
 from components.inspection import inspect_page_header
 from logic.constants import IdType
 from logic.lab_modelization.db_models import Target, DeteriorationState
@@ -41,7 +41,7 @@ def main_page():
     with st.container(horizontal=True, vertical_alignment="center"):
         st.subheader('Most Recent Deterioration State', width='content')
         switch_page_bttn(pages.new_state,
-                         label='Add New State', icon_='➕',
+                         label='Add New State', icon_=icon('add_2'),
                          q_params={IdType.TARGET: target_id})
 
     states = target.old_to_recent_states()

@@ -47,11 +47,11 @@ class Event:
         )
 
     @classmethod
-    def from_unknown_enum(cls, item: _BaseModel, enum_class: type[Enum],
+    def from_unknown_enum(cls, model_name: str, enum_class: type[Enum],
                           enum_val: Enum, field_name: str):
-        descr = (f"{enum_val} value for field {field_name} in "
-                 f"model {item.__class__.__name__} is not a known value in "
-                 f"{enum_class.__name__}.")
+        descr = (f"\"{enum_val}\" value for field \"{field_name}\" in "
+                 f"model \"{model_name}\" is not a known value in "
+                 f"\"{enum_class.__name__}\".")
         return cls(
             type=EventType.UNKNOWN_ENUM,
             notify=True,
@@ -191,7 +191,7 @@ class _BaseModel(Model):
             for item in cls.select().dicts():
                 if not item[fld_name] in enum_class:
                     yield Event.from_unknown_enum(
-                        item=item,
+                        model_name=cls.__name__,
                         enum_class=enum_class,
                         enum_val=item[fld_name],
                         field_name=fld_name,

@@ -6,9 +6,10 @@ from pandas import DataFrame
 from components.browsing import INSPECT_BUTTON_KEY
 from components.forms.new_library.fields import DepositTempField
 from components.general import (
-    sess, init_page, current_params, switch_page_bttn,
-    switch_to_submit_successful, link_html, email_html,
+    init_page, current_params, switch_page_bttn,
+    switch_to_submit_successful, link_html, email_html, icon,
 )
+from logic.global_variables import sess
 from components.inspection import inspect_page_header, show_film_layer
 from components.library_files import file_list_container
 from logic.constants import SessionKeys as Sk, IdType
@@ -213,7 +214,7 @@ def page_body():
             pages.new_film_modif,
             label='**Add**',
             type_='tertiary',
-            icon_='➕',
+            icon_=icon('add_2'),
             q_params={IdType.FILM: film.id}
         )
 

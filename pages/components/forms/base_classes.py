@@ -175,7 +175,7 @@ class FileUploadForm(Form):
     def __init__(self, default_file: UserUploadedFile|None,
                  key: str = 'default_key',
                  accepted_formats: list[str] | None = None):
-        from components.general import sess
+        from logic.global_variables import sess
         upload_fld = None
 
         if Sk.USE_DEFAULT_FILE+key not in sess:

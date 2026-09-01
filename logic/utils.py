@@ -2,6 +2,7 @@ import io
 import os
 import re
 import secrets
+from sqlite3 import OperationalError
 from time import sleep
 from typing import Any, Iterable
 from urllib import parse
@@ -21,7 +22,7 @@ def letter_count(text: str) -> int:
     return len(''.join(i for i in text if i.upper() in upper))
 
 def new_controller() -> CookieController:
-    from components.general import sess
+    from logic.global_variables import sess
     if 'cookie_controller' in sess:
         return sess['cookie_controller']
 
@@ -46,7 +47,7 @@ def new_controller() -> CookieController:
 
 
 def reset_session():
-    from components.general import sess
+    from logic.global_variables import sess
     for key in sess:
         if key in Sk:
             del sess[key]
@@ -61,7 +62,7 @@ def is_valid_email_address(email_address: str) -> bool:
     email_regex = r"(?:[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+(?:\.[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9\x2d]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"  # noqa Long line.
     match = re.fullmatch(email_regex, email_address)
     if match is not None:
-        from components.general import cookies
+        from logic.global_variables import cookies
         cookies.set(CookieKeys.LAST_EMAIL_USED, email_address)
         return True
     else:
@@ -129,18 +130,21 @@ def database_to_excel_file_bytes() -> bytes:
 
 
 def get_all_email_addresses() -> Iterable[str]:
-    for state in DeteriorationState.select():
-        state: DeteriorationState
-        yield state.made_by_email
-    for modif in FilmModification.select():
-        modif: FilmModification
-        yield modif.made_by_email
-    for film in Film.select():
-        film: Film
-        yield film.made_by_email
-    for target in Target.select():
-        target: Target
-        yield target.made_by_email
+    try:
+        for state in DeteriorationState.select():
+            state: DeteriorationState
+            yield state.made_by_email
+        for modif in FilmModification.select():
+            modif: FilmModification
+            yield modif.made_by_email
+        for film in Film.select():
+            film: Film
+            yield film.made_by_email
+        for target in Target.select():
+            target: Target
+            yield target.made_by_email
+    except:  # TODO
+        pass
 
 
 all_email_addresses = list(set(get_all_email_addresses()))

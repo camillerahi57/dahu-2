@@ -4,7 +4,8 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
-from components.general import init_page, switch_page_bttn, sess, cookies
+from components.general import init_page, switch_page_bttn, icon
+from logic.global_variables import sess, cookies
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
 from logic.lab_modelization.db_models import Substrate
 from logic.page_list import pages
@@ -14,7 +15,8 @@ init_page(pages.browse_substrates, show_home_btn=False)
 
 st.set_page_config(layout="wide")
 
-switch_page_bttn(pages.new_substrate, label="Add a new substrate", icon_='➕')
+switch_page_bttn(pages.new_substrate, label="Add a new substrate",
+                 icon_=icon('add_2'))
 
 query = Substrate.select(
     Substrate.label.alias(ColName.label),

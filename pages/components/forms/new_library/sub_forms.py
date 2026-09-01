@@ -16,7 +16,7 @@ from components.forms.new_library.fields import (
     PresputteringThicknessField, LayerCountField, TargetCountField, TargetField,
     TargetChoiceField, ConfirmOrderField, IsCoSputteringField,
 )
-from components.general import sess, cookies
+from logic.global_variables import sess, cookies
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
 from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \

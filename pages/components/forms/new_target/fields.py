@@ -64,8 +64,8 @@ class PatchCountField(Field):
                   step=1, width=300)
 
     def _validate(self, input_) -> tuple[bool, str]:
-        # if input_ < 1:
-        #     return False, 'Please add at least one patch.'
+        if input_ < 1:
+            return False, 'Please add at least one patch.'
         return True, ''
 
 

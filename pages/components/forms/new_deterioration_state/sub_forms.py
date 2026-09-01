@@ -4,7 +4,7 @@ from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_deterioration_state.fields import MadeByField, \
     IsItReallyDeteriorationField as Iirdf
 from components.forms.new_target.sub_forms import DeteriorationStateForm
-from components.general import cookies
+from logic.global_variables import cookies
 from logic.constants import CookieKeys as Ck
 from logic.lab_modelization.db_models import Target, DeteriorationState
 

@@ -45,7 +45,7 @@ class SubstrateLabelField(Field):
 
 class ThicknessField(UnitField):
     type = Ft.MANDATORY
-    ui_unit = ur.nm
+    ui_unit = ur.um
 
     def _streamlit_input(self, prefill, key):
         return st.number_input(

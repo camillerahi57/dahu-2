@@ -1,6 +1,6 @@
 import streamlit as st
 
-from components.general import switch_page_bttn
+from components.general import switch_page_bttn, icon
 from logic.constants import IdType
 from logic.lab_modelization.db_models import GeneralLibraryFile, Library
 from logic.page_list import pages
@@ -41,7 +41,8 @@ def file_list_container(files: list[GeneralLibraryFile], lib: Library):
 
         switch_page_bttn(
             pages.new_lib_file_upload,
-            label='Add ➕',
+            label='Add',
             q_params={IdType.LIB: lib.id},
+            icon_=icon('add_2')
         )
 

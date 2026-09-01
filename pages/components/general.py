@@ -1,5 +1,6 @@
 from datetime import date as dt_date, datetime
 from threading import Thread
+from time import sleep
 from typing import Literal
 
 import keyboard
@@ -13,13 +14,9 @@ from logic.constants import (
     IdType
 )
 from logic.db_integrity import get_problems
-from logic.lab_modelization.db_models import AppMetadata, AppLog
+from logic.global_variables import sess, app_metadata
+from logic.lab_modelization.db_models import AppLog
 from logic.page_list import pages
-from logic.utils import new_controller
-
-sess = st.session_state  # Shorthand.
-cookies = new_controller()
-app_metadata = AppMetadata.get_or_new()
 
 
 def init_page(page: StreamlitPage, show_home_btn = True):
@@ -47,7 +44,9 @@ def run_routines():
         Thread(target=Snapshot.backup).start()
 
     if now > app_metadata.next_problem_check_at:
-        for event in get_problems():
+        problems = list(get_problems())
+        # app_metadata.next_problem_check_at = datetime.now() + INTERVAL  # TODO
+        for event in problems:
             AppLog.save_new(event)
 
         # For testing:

@@ -4,7 +4,8 @@ from streamlit_dynamic_filters import DynamicFilters
 
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
-from components.general import init_page, switch_page_bttn, sess, cookies
+from components.general import init_page, switch_page_bttn, icon
+from logic.global_variables import sess, cookies
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
 from logic.lab_modelization.db_models import Target
 from logic.page_list import pages
@@ -16,7 +17,8 @@ init_page(pages.browse_targets, show_home_btn=False)
 st.set_page_config(layout="wide")
 
 with st.container(horizontal=True, vertical_alignment='center'):
-    switch_page_bttn(pages.new_target, label="Add a new target", icon_='➕')
+    switch_page_bttn(pages.new_target, label="Add a new target",
+                     icon_=icon('add_2'))
     show_archived = st.checkbox('Show archived 📦')
 
 

@@ -13,7 +13,7 @@ import streamlit as st
 from pandas import DataFrame
 from peewee import (
     CharField, DateTimeField, ForeignKeyField, FloatField, IntegerField,
-    BooleanField, DateField, TextField, Check, DoesNotExist, Query, )
+    BooleanField, DateField, TextField, Check, DoesNotExist)
 from pint.registry import Quantity
 from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
@@ -27,7 +27,7 @@ from logic.lab_modelization.base_classes import _BaseModel, \
 from logic.lab_modelization.db_enums import (
     SputteringSystem, FilmLayerFunction, MagnetronSputteringGenerator,
     FilmModifType, Furnace, MagnetronMachineModel, PixelCoordinateSystem,
-    ChemicalElement, LogSeverity, EventType,
+    ChemicalElement, LogSeverity, EventType, IbeMachine,
 )
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
@@ -803,10 +803,10 @@ class Annealing(_BaseModel):
 
     @property
     def title_db_value_input_fields(self):
-        from components.forms.new_film_modif.fields import PressureField, \
+        from components.forms.new_film_modif.fields import StartPressureField, \
             PumpingDurationField, FurnaceField
         return [
-            ('Pressure', self.pressure, PressureField),
+            ('Pressure', self.pressure, StartPressureField),
             ('Pumping duration', self.pumping_duration, PumpingDurationField),
             ('Furnace', self.furnace, FurnaceField),
         ]
@@ -969,12 +969,16 @@ class GeneralLibraryFile(UserUploadedFile):
 
 
 class IonBeamEtching(_BaseModel):
+    pre_etching_duration = FloatField(null=True)
     duration = FloatField(null=True)
     flow = FloatField(null=True)
     incidence_angle = FloatField(null=True)
     rotation = FloatField(null=True)
     power = FloatField(null=True)
-    pressure = FloatField(null=True)
+    start_pressure = FloatField(null=True)
+    target_pressure = FloatField(null=True)
+    dc_grid_current = FloatField(null=True)
+    machine: IbeMachine = CharField(null=True)
 
     etching: Etching = ForeignKeyField(
         Etching, on_delete='RESTRICT', backref='ion_etchings',
@@ -989,8 +993,12 @@ class IonBeamEtching(_BaseModel):
                  incidence_angle: float | None = None,
                  rotation: float | None = None,
                  power: float | None = None,
-                 pressure: float | None = None,
+                 start_pressure: float | None = None,
                  etching: Etching | None = None,
+                 target_pressure: float | None = None,
+                 pre_etching_duration: float | None = None,
+                 dc_grid_current: float | None = None,
+                 machine: IbeMachine | None = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1008,16 +1016,17 @@ class IonBeamEtching(_BaseModel):
     @property
     def title_db_value_input_fields(self):
         from components.forms.new_film_modif.fields import (
-            IonDurationField,FlowField, AngleField, RotationField, PowerField,
-            PressureField,
+            IonDurationField, FlowField, AngleField, RotationSpeedField,
+            PowerField,
+            StartPressureField,
         )
         return [
             ('Duration', self.duration, IonDurationField),
             ('Flow', self.flow, FlowField),
             ('Incidence angle', self.incidence_angle, AngleField),
-            ('Rotation', self.rotation, RotationField),
+            ('Rotation', self.rotation, RotationSpeedField),
             ('Power', self.power, PowerField),
-            ('Pressure', self.pressure, PressureField),
+            ('Pressure', self.start_pressure, StartPressureField),
         ]
 
 
@@ -1488,7 +1497,7 @@ class AppLog(_BaseModel):
                  marked_read: bool = False,
                  marked_solved: bool = False,
                  timestamp: datetime = None):
-        from components.general import cookies
+        from logic.global_variables import cookies
         new_log = cls(
             timestamp=timestamp or datetime.now(),
             ip_address=st.context.ip_address,
@@ -1506,7 +1515,7 @@ class AppLog(_BaseModel):
 
     @classmethod
     def filtered_query(cls, severities: list[LogSeverity] = None,
-                       show_read = True, show_solved=True) -> Query:
+                       show_read = True, show_solved=True):
         if severities is None:
             severities = list(LogSeverity)
         query = (AppLog.select()
