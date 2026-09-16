@@ -106,7 +106,7 @@ class PhaseDurationField(UnitField):
     ui_unit = ur.seconds
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Phase duration ({self.ui_unit})',
+        return st.number_input(f'Phase duration (**{self.ui_unit}**)',
                                min_value=0., value=prefill, key=key, width=150)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -120,7 +120,7 @@ class PumpingDurationField(UnitField):
     ui_unit = ur.minutes
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Pumping duration ({self.ui_unit})',
+        return st.number_input(f'Pumping duration (**{self.ui_unit}**)',
                                min_value=0., value=prefill, width=200)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -135,7 +135,7 @@ class StartPressureField(UnitField):
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(
-            f'Start pressure ({self.ui_unit})', min_value=0., width=300,
+            f'Start pressure (**{self.ui_unit}**)', min_value=0., width=300,
             value=prefill, key=key, step=0.0000000000001, format='%.12g',
             placeholder="You can use the '3e-7' notation."
         )
@@ -152,7 +152,7 @@ class TargetPressureField(UnitField):
 
     def _streamlit_input(self, prefill, key: str):
         return st.number_input(
-            f'Target pressure ({self.ui_unit})', min_value=0., width=300,
+            f'Target pressure (**{self.ui_unit}**)', min_value=0., width=300,
             value=prefill, key=key, step=0.0000000000001, format='%.12g',
             placeholder="You can use the '3e-7' notation."
         )
@@ -206,7 +206,7 @@ class AngleField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Angle ({self.ui_unit})',
+        return st.number_input(f'Angle (**{self.ui_unit}**)',
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -218,7 +218,7 @@ class RotationSpeedField(UnitField):
     ui_unit = ur.rpm
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Rotation speed ({self.ui_unit})',
+        return st.number_input(f'Rotation speed (**{self.ui_unit}**)',
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -300,7 +300,7 @@ class PowerField(UnitField):
     ui_unit = ur.watt
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Power RF ({self.ui_unit})', min_value=0.,
+        return st.number_input(f'Power RF (**{self.ui_unit}**)', min_value=0.,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -440,7 +440,7 @@ class AcidField(Field):
 
 
 class SolventField(Field):
-    type = Ft.OPTIONAL
+    type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
         options = list(EtchingSolventSuggestion)
@@ -448,8 +448,20 @@ class SolventField(Field):
             index = None
         else:
             index = options.index(prefill)
-        return st.selectbox('Solvent', options=options, index=index, key=key,
-                            accept_new_options=True)
+        return st.selectbox(
+            'Solvent', options=options, index=index, key=key,
+            accept_new_options=True, label_visibility='collapsed')
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        return True, ''
+
+
+class SolventCountField(Field):
+    type = Ft.OPTIONAL
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input('Number of solvents', value=prefill,
+                               min_value=1, step=1)
 
     def _validate(self, input_) -> tuple[bool, str]:
         return True, ''
@@ -473,7 +485,7 @@ class IonDurationField(UnitField):
     ui_unit = ur.seconds
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Duration ({self.ui_unit})', min_value=0,
+        return st.number_input(f'Duration (**{self.ui_unit}**)', min_value=0,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -486,7 +498,7 @@ class PreEtchDurationField(UnitField):
     ui_unit = ur.seconds
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Pre-etching duration ({self.ui_unit})',
+        return st.number_input(f'Pre-etching duration (**{self.ui_unit}**)',
                                min_value=0, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -500,7 +512,7 @@ class DcGridCurrentField(UnitField):
     ui_unit = ur.A
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'DC grid current ({self.ui_unit})',
+        return st.number_input(f'DC grid current (**{self.ui_unit}**)',
                                min_value=0, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -514,7 +526,7 @@ class HardBakeTempField(UnitField):
     ui_unit = ur.celsius
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Hard bake temperature ({self.ui_unit})',
+        return st.number_input(f'Hard bake temperature (**{self.ui_unit}**)',
                                min_value=0, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -525,15 +537,29 @@ class HardBakeTempField(UnitField):
 
 class AcidEtchingDurationField(UnitField):
     type = Ft.ADVISED
-    ui_unit = ur.seconds
+    ui_unit = ur.minutes
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Acid etching duration ({self.ui_unit})',
+        return st.number_input(f'Acid etching duration (**{self.ui_unit}**)',
                                min_value=0, value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if self._input <= 0:
             return False, 'Acid etching duration must be strictly positive.'
+        return True, ''
+
+
+class DevelopmentDurationField(UnitField):
+    type = Ft.ADVISED
+    ui_unit = ur.minutes
+
+    def _streamlit_input(self, prefill, key: str):
+        return st.number_input(f'Development duration (**{self.ui_unit}**)',
+                               min_value=0, value=prefill, key=key)
+
+    def _validate(self, input_) -> tuple[bool, str]:
+        if self._input <= 0:
+            return False, 'Development duration must be strictly positive.'
         return True, ''
 
 
@@ -581,8 +607,8 @@ class EtchingDepthSpeedField(UnitField):
     ui_unit = ur.microns / ur.second
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Etching depth speed ({self.ui_unit})',
-                               min_value=0, value=prefill, key=key)
+        return st.number_input(f'Etching depth speed (**{self.ui_unit}**)',
+                               min_value=0., value=prefill, key=key, step=0.001)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if self._input <= 0:
@@ -595,8 +621,8 @@ class EtchingLateralSpeedField(UnitField):
     ui_unit = ur.microns / ur.second
 
     def _streamlit_input(self, prefill, key: str):
-        return st.number_input(f'Etching lateral speed ({self.ui_unit})',
-                               min_value=0, value=prefill, key=key)
+        return st.number_input(f'Etching lateral speed (**{self.ui_unit}**)',
+                               min_value=0., value=prefill, key=key, step=0.001)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if self._input <= 0:

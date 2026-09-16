@@ -279,7 +279,7 @@ class MillimeterEquivalenceField(UnitField):
     ui_unit = ur.cm
 
     def _streamlit_input(self, prefill, key):
-        return st.number_input(f"Distance in **{self.ui_unit}**:",
+        return st.number_input(f"Distance in ****{self.ui_unit}****:",
                                min_value=0., step=1., value=prefill)
 
     def _validate(self, input_) -> tuple[bool, str]:

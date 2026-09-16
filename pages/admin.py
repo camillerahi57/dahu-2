@@ -87,7 +87,7 @@ def body():
     try:
         snapshots = Snapshot.list_available()
         if not snapshots:
-            st.write('_No restore point created yet._')
+            st.write('_No restore point available._')
         else:
             for snap in snapshots:
                 snapshot_row(snap)

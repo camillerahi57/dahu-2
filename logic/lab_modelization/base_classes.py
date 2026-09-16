@@ -9,95 +9,18 @@ from peewee import SqliteDatabase, IntegerField
 from playhouse.shortcuts import model_to_dict
 from playhouse.signals import Model
 
+from dahu_2_config import RESTIC_REPO_PATH
+from logic.constants import DB_PATH
 from logic.lab_modelization.db_enums import EventType, LogSeverity
 
-db = SqliteDatabase('user_data/dahu_2.db', pragmas={'foreign_keys': 1})
+
+db = SqliteDatabase(DB_PATH, pragmas={'foreign_keys': 1})
+
 
 type DependentBackref[T] = list[T]
 
 if TYPE_CHECKING:
     from logic.lab_modelization.db_models import UserUploadedFile, AppLog
-
-
-@dataclass
-class Event:
-    type: EventType
-    notify: bool
-    severity: LogSeverity
-    description: str
-
-    @classmethod
-    def from_saved_item(cls, saved: _BaseModel):
-        return cls(
-            type=EventType.SAVED_ITEM,
-            notify=False,
-            severity=LogSeverity.INFO,
-            description=f"Saved {saved.__class__.__name__}. Value: {saved}. "
-                        f"At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
-        )
-
-    @classmethod
-    def from_deleted_item(cls, deleted: _BaseModel):
-        return cls(
-            type=EventType.DELETED_ITEM,
-            notify=False,
-            severity=LogSeverity.INFO,
-            description=f"Saved {deleted.__class__.__name__}. Value: {deleted}"
-                        f". At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
-        )
-
-    @classmethod
-    def from_unknown_enum(cls, model_name: str, enum_class: type[Enum],
-                          enum_val: Enum, field_name: str):
-        descr = (f"\"{enum_val}\" value for field \"{field_name}\" in "
-                 f"model \"{model_name}\" is not a known value in "
-                 f"\"{enum_class.__name__}\".")
-        return cls(
-            type=EventType.UNKNOWN_ENUM,
-            notify=True,
-            severity=LogSeverity.CRITICAL,
-            description=descr,
-        )
-
-    @classmethod
-    def from_no_recent_backup(cls):
-        from logic.app_restoration import Snapshot
-        last_backup_timedelta = datetime.now() - Snapshot.get_latest().time
-        day_interval = last_backup_timedelta.days
-        descr = (f'Last backup (snapshot id {Snapshot.id}) is very old '
-                 f'(more than {day_interval} days ago).')
-        return cls(
-            type=EventType.NO_RECENT_BACKUP,
-            notify=True,
-            severity=LogSeverity.CRITICAL,
-            description=descr,
-        )
-
-    @classmethod
-    def from_file_missing(cls, file: UserUploadedFile):
-        from logic.app_restoration import user_files_abs_path
-        descr = (
-            f"File \"{file.internal_file_name}\" for class "
-            f"\"{file.__class__.__name__}\" "
-            f"could not be found in Dahu 2's storage folder "
-            f"\"{user_files_abs_path}\"."
-        )
-        return cls(
-            type=EventType.FILE_MISSING,
-            notify=False,
-            severity=LogSeverity.WARNING,
-            description=descr,
-        )
-
-    @classmethod
-    def from_restic_error(cls, error_code: str|int):
-        return cls(
-            EventType.RESTIC_ERROR,
-            notify=True,
-            severity=LogSeverity.WARNING,
-            description=f"Restic (tool for backup and restoration) error.\n\n"
-                        f"Error code: {error_code}",
-        )
 
 
 class _BaseModel(Model):
@@ -240,3 +163,87 @@ class _BaseModel(Model):
         return output.getvalue()
 
 
+@dataclass
+class Event:
+    type: EventType
+    notify: bool
+    severity: LogSeverity
+    description: str
+
+    @classmethod
+    def from_saved_item(cls, saved: _BaseModel):
+        return cls(
+            type=EventType.SAVED_ITEM,
+            notify=False,
+            severity=LogSeverity.INFO,
+            description=f"Saved {saved.__class__.__name__}. Value: {saved}. "
+                        f"At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+        )
+
+    @classmethod
+    def from_deleted_item(cls, deleted: _BaseModel):
+        return cls(
+            type=EventType.DELETED_ITEM,
+            notify=False,
+            severity=LogSeverity.INFO,
+            description=f"Saved {deleted.__class__.__name__}. Value: {deleted}"
+                        f". At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+        )
+
+    @classmethod
+    def from_unknown_enum(cls, model_name: str, enum_class: type[Enum],
+                          enum_val: Enum, field_name: str):
+        descr = (f"\"{enum_val}\" value for field \"{field_name}\" in "
+                 f"model \"{model_name}\" is not a known value in "
+                 f"\"{enum_class.__name__}\".")
+        return cls(
+            type=EventType.UNKNOWN_ENUM,
+            notify=True,
+            severity=LogSeverity.CRITICAL,
+            description=descr,
+        )
+
+    @classmethod
+    def from_no_recent_backup(cls):
+        from logic.app_restoration import Snapshot
+        last_backup_timedelta = datetime.now() - Snapshot.get_latest().time
+        day_interval = last_backup_timedelta.days
+        descr = (f'Last backup (snapshot id {Snapshot.id}) is very old '
+                 f'(more than {day_interval} days ago).')
+        return cls(
+            type=EventType.NO_RECENT_BACKUP,
+            notify=True,
+            severity=LogSeverity.CRITICAL,
+            description=descr,
+        )
+
+    @classmethod
+    def from_file_missing(cls, file: UserUploadedFile):
+        from logic.app_restoration import user_files_abs_path
+        descr = (
+            f"File \"{file.internal_file_name}\" for class "
+            f"\"{file.__class__.__name__}\" "
+            f"could not be found in Dahu 2's storage folder "
+            f"\"{user_files_abs_path}\"."
+        )
+        return cls(
+            type=EventType.FILE_MISSING,
+            notify=False,
+            severity=LogSeverity.WARNING,
+            description=descr,
+        )
+
+    @classmethod
+    def from_restic_error(cls, error_code: str|int):
+        if error_code == 10:
+            msg = (f"Restic repository not found. Dahu 2 config file says it's "
+                   f"supposed to be at location: \"{RESTIC_REPO_PATH}\".")
+        else:
+            msg = (f"Restic (tool for backup and restoration) error.\n\n"
+                   f"Restic error code: {error_code} (Google it).")
+        return cls(
+            EventType.RESTIC_ERROR,
+            notify=True,
+            severity=LogSeverity.CRITICAL,
+            description=msg,
+        )

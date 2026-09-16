@@ -2,10 +2,6 @@ import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
-from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
-    on_inspect_click
-from components.general import init_page, switch_page_bttn, icon
-from logic.global_variables import sess, cookies
 from dahu_2_config import SHOW_PROBLEM_BANNER
 from logic.constants import SessionKeys as Sk, IdType, CookieKeys
 from logic.lab_modelization.db_models import Library, Film, AppLog
@@ -13,11 +9,17 @@ from logic.page_list import pages
 from logic.table_columns import LibraryBrowserColumnName as ColName
 from logic.utils import get_email_user_name
 
-init_page(pages.browse_libs, show_home_btn=False)
-
-st.set_page_config(layout="wide")
 
 def body():
+    from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
+        on_inspect_click
+    from components.general import init_page, switch_page_bttn, icon
+    from logic.global_variables import sess, cookies
+
+    init_page(pages.browse_libs, show_home_btn=False)
+
+    st.set_page_config(layout="wide")
+
     if SHOW_PROBLEM_BANNER:
         problem_banner()
 
@@ -86,6 +88,8 @@ def body():
 
 
 def problem_banner():
+    from components.general import switch_page_bttn
+
     warning_count = AppLog.unread_warning_notif_count()
     critical_count = AppLog.unsolved_critical_notif_count()
     if warning_count + critical_count == 0:

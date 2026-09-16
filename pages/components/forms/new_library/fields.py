@@ -244,7 +244,7 @@ class DepositDurationField(UnitField):
     ui_unit = ur.second
     
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit duration ({self.ui_unit})",
+        return st.number_input(f"Deposit duration (**{self.ui_unit}**)",
                                min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -258,7 +258,7 @@ class NominalThicknessField(UnitField):
     ui_unit = ur.nm
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Nominal thickness ({self.ui_unit})",
+        return st.number_input(f"Nominal thickness (**{self.ui_unit}**)",
                                min_value=0., key=key, value=prefill)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -283,7 +283,7 @@ class DepositPowerField(UnitField):
     ui_unit = ur.watt
     
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit power ({self.ui_unit})",
+        return st.number_input(f"Deposit power (**{self.ui_unit}**)",
                                min_value=0., key=key, value=prefill)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -307,7 +307,7 @@ class DepositDistanceField(UnitField):
     ui_unit = ur.mm
     
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit distance ({self.ui_unit})",
+        return st.number_input(f"Deposit distance (**{self.ui_unit}**)",
                                min_value=0., key=key, value=prefill)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -321,7 +321,7 @@ class DepositAngleField(UnitField):
     ui_unit = ur.degrees
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit angle ({self.ui_unit})",
+        return st.number_input(f"Deposit angle (**{self.ui_unit}**)",
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -362,7 +362,7 @@ class RotationSpeedField(UnitField):
     ui_unit = ur.rpm
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Rotation ({self.ui_unit})",
+        return st.number_input(f"Rotation (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -375,7 +375,7 @@ class FilamentCurrentStartField(UnitField):
 
     def _streamlit_input(self, prefill: float, key):
         return st.number_input(
-            f"Filament current at the beginning ({self.ui_unit})",
+            f"Filament current at the beginning (**{self.ui_unit}**)",
             key=key, value=prefill, min_value=0.
         )
 
@@ -391,7 +391,7 @@ class FilamentCurrentEndField(UnitField):
 
     def _streamlit_input(self, prefill: float, key):
         return st.number_input(
-            f"Filament current at the end ({self.ui_unit})",
+            f"Filament current at the end (**{self.ui_unit}**)",
             key=key, value=prefill, min_value=0.
         )
 
@@ -406,7 +406,7 @@ class AnodeCurrentField(UnitField):
     ui_unit = ur.A
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Anode current ({self.ui_unit})",
+        return st.number_input(f"Anode current (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -420,7 +420,7 @@ class AnodeVoltageField(UnitField):
     ui_unit = ur.volt
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Anode voltage ({self.ui_unit}",
+        return st.number_input(f"Anode voltage (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -434,7 +434,7 @@ class CathodeCurrentField(UnitField):
     ui_unit = ur.A
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Cathode current ({self.ui_unit})",
+        return st.number_input(f"Cathode current (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -448,7 +448,7 @@ class CathodeVoltageField(UnitField):
     ui_unit = ur.volt
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Cathode voltage ({self.ui_unit})",
+        return st.number_input(f"Cathode voltage (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -462,7 +462,7 @@ class DepositRateField(UnitField):
     ui_unit = ur.nm / ur.second
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Deposit rate ({self.ui_unit})",
+        return st.number_input(f"Deposit rate (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -476,7 +476,7 @@ class ArgonFlowField(UnitField):
     ui_unit = ur.m**3 / ur.s
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Argon flow ({self.ui_unit})",
+        return st.number_input(f"Argon flow (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -505,7 +505,7 @@ class PressureField(UnitField):
     ui_unit = ur.Pa
 
     def _streamlit_input(self, prefill: float, key):
-        return st.number_input(f"Pressure ({self.ui_unit})",
+        return st.number_input(f"Pressure (**{self.ui_unit}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -520,7 +520,7 @@ class PresputteringThicknessField(UnitField):
 
     def _streamlit_input(self, prefill: float, key):
         return st.number_input(
-            f"Presputtering thickness ({self.ui_unit}), if any:",
+            f"Presputtering thickness (**{self.ui_unit}**), if any:",
                 value=prefill, key=key, min_value=0.)
 
     def _validate(self, input_) -> tuple[bool, str]:

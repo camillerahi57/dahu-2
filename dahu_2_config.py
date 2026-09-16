@@ -9,6 +9,7 @@ RESTIC_REPO_PATH = r'O:\DAHU2\dev\backups\restic_snapshot_repo'  # Path to the
 # Restic repository (on the server where the backups are stored).
 DAHU_2_CODE_BASE_PATH = r'C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2'
 # Path to the root of this Python project.
+APP_VERSION: int = 10  # Must be an int.
 
 
 class BackupsToKeep(IntEnum):

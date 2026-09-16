@@ -7,9 +7,10 @@ from logic.constants import IdType
 from logic.lab_modelization.base_classes import db
 from logic.page_list import pages
 
-init_page(pages.new_substrate)
 
-try:
+def body():
+    init_page(pages.new_substrate)
+
     root_form = RootForm(default_sub=None)
     root_form.show_layers()
 
@@ -27,5 +28,9 @@ try:
             object_id=substrate.id,
         )
 
+
+
+try:
+    body()
 except PausePageRun:
     pass

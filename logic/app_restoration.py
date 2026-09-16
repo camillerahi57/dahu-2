@@ -31,15 +31,16 @@ class Snapshot:
 
     @classmethod
     def list_available(cls) -> list[Self]:
-        result = subprocess.run(
-            ["restic", "snapshots", "--json", "--repo", RESTIC_REPO_PATH],
-            capture_output=True, text=True,
-            env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ}
-        )
+        with st.spinner("Listing available snapshots...", show_time=True):  # noqa
+            result = subprocess.run(
+                ["restic", "snapshots", "--json", "--repo", RESTIC_REPO_PATH],
+                capture_output=True, text=True,
+                env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ}
+            )
         if result.returncode != 0:
             event = Event.from_restic_error(result.returncode)
             AppLog.save_new(event)
-            raise RuntimeError()  # TODO
+            return []
         snap_dicts = json.loads(result.stdout)
         snap_list = [
             cls(
@@ -79,6 +80,7 @@ class Snapshot:
             if result.returncode != 0:
                 event = Event.from_restic_error(result.returncode)
                 AppLog.save_new(event)
+                raise RuntimeError(result.stderr)
 
             if prune_excessive_snaps:
                 delete_excessive_snapshots()
@@ -112,6 +114,7 @@ class Snapshot:
         if result.returncode != 0:
             event = Event.from_restic_error(result.returncode)
             AppLog.save_new(event)
+            raise RuntimeError(result.stderr)
 
     def restore(self):
         subtree_to_restore = user_files_abs_path
@@ -143,6 +146,7 @@ class Snapshot:
         if process.returncode != 0:
             event = Event.from_restic_error(process.returncode)
             AppLog.save_new(event)
+            raise RuntimeError(process.stderr)
 
         self.delete_subsequent()
 

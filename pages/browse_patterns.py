@@ -3,17 +3,17 @@ from typing import Iterable
 
 import streamlit as st
 
-from components.browsing import browser_side_bar
 from components.general import init_page, show_html_link
 from logic.constants import IdType
-from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe, \
+from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe,\
     Etching
 from logic.page_list import pages
 
 init_page(pages.browse_patterns, show_home_btn=False)
-browser_side_bar(None, pages.browse_patterns)
 
 def body():
+    from components.browsing import browser_side_bar
+    browser_side_bar(None, pages.browse_patterns)
 
     st.set_page_config(layout="wide")
 

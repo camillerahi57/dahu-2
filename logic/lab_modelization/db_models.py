@@ -19,7 +19,7 @@ from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
-from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL
+from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL, APP_VERSION
 from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
                              USER_DATA_PATH, CookieKeys as Ck)
 from logic.lab_modelization.base_classes import _BaseModel, \
@@ -1088,26 +1088,28 @@ class LiftOffEtching(_BaseModel):
 
 class WetEtching(_BaseModel):
     hard_bake_temperature = FloatField(null=True)
-    duration = FloatField(null=True)
+    etching_duration = FloatField(null=True)
+    development_duration = FloatField(null=True)
     used_ultrasound = BooleanField(null=True)
     ultrasound_config = CharField(null=True)
     base = CharField(null=True)
     acid = CharField(null=True)
-    solvent = CharField(null=True)
     acid_etching_depth_speed = FloatField(null=True)
     acid_etching_lateral_speed = FloatField(null=True)
 
     etching: Etching = ForeignKeyField(
         Etching, on_delete='RESTRICT', backref='wet_etchings', unique=True)
 
+    solvents: DependentBackref[EtchingSolvent]
+
     def __init__(self, *args,
                  hard_bake_temperature: float | None = None,
-                 duration: float | None = None,
+                 etching_duration: float | None = None,
+                 development_duration: float | None = None,
                  used_ultrasound: bool | None = None,
                  ultrasound_config: str | None = None,
                  base: str | None = None,
                  acid: str | None = None,
-                 solvent: str | None = None,
                  acid_etching_depth_speed: float | None = None,
                  acid_etching_lateral_speed: float | None = None,
                  etching: Etching = None,
@@ -1117,7 +1119,8 @@ class WetEtching(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
-        pass
+        for s in self.solvents:
+            s.delete_with_parts()
 
     @property
     def title_db_value_input_fields(self):
@@ -1126,21 +1129,38 @@ class WetEtching(_BaseModel):
             UltrasoundConfigField, EtchingDepthSpeedField,
             EtchingLateralSpeedField, BaseField, AcidField, SolventField,
         )
+        solvent_str = ' '.join([f'**{s.step_idx+1}.** *{s.label}*'
+                                 for s in self.solvents]) + '.'
         return [
             ('Hard bake temperature', self.hard_bake_temperature,
              HardBakeTempField),
-            ('Duration', self.duration, AcidEtchingDurationField),
+            ('Duration', self.etching_duration, AcidEtchingDurationField),
             ('Used ultrasound', self.used_ultrasound, UsedUltrasoundField),
             ('Ultrasound config', self.ultrasound_config,
              UltrasoundConfigField),
             ('Base', self.base, BaseField),
             ('Acid', self.acid, AcidField),
-            ('Solvent', self.solvent, SolventField),
+            ('Solvents', solvent_str, SolventField),
             ('Etching depth speed', self.acid_etching_depth_speed,
              EtchingDepthSpeedField),
             ('Etching lateral speed', self.acid_etching_lateral_speed,
              EtchingLateralSpeedField),
         ]
+
+
+class EtchingSolvent(_BaseModel):
+    etching: WetEtching = ForeignKeyField(
+        WetEtching, on_delete='RESTRICT', backref='solvents')
+    label: str = CharField()
+    step_idx: int = IntegerField()
+
+    def __init__(self, *args, etching: WetEtching = None, label: str = None,
+                 step_idx: int = None, **kwargs):
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
+
+    def delete_parts(self):
+        pass
 
 
 class DeteriorationState(_BaseModel):
@@ -1449,12 +1469,14 @@ class AppMetadata(_BaseModel):
     db_units_description = TextField()
     next_backup_at = DateTimeField()
     next_problem_check_at = DateTimeField()
+    current_app_version = IntegerField()
 
     def __init__(self, *args,
                  is_the_only_row: bool = True,
                  db_units_description: str = db_units_explanation,
                  next_backup_at: datetime = None,
                  next_problem_check_at: datetime = None,
+                 current_app_version: int = None,
                  **kwargs):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
@@ -1467,7 +1489,13 @@ class AppMetadata(_BaseModel):
             return cls(
                 next_backup_at=datetime.now(),
                 next_problem_check_at=datetime.now() + PROBLEM_CHECK_INTERVAL,
+                current_app_version=APP_VERSION,
             )
+
+    def save(self, force_insert: bool = False, only: list = None,
+             *args, **kwargs):
+        self.current_app_version = APP_VERSION
+        super().save(force_insert=force_insert, only=only, *args, **kwargs)
 
 
 class AppLog(_BaseModel):

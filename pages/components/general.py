@@ -1,6 +1,5 @@
 from datetime import date as dt_date, datetime
 from threading import Thread
-from time import sleep
 from typing import Literal
 
 import keyboard
@@ -8,7 +7,7 @@ import streamlit as st
 from peewee import DateField
 from streamlit.navigation.page import StreamlitPage
 
-from dahu_2_config import DOMAIN
+from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL
 from logic.constants import (
     SessionKeys as Sk, REDIRECT_PATH, RESOURCE_TYPE, OBJ_ID,
     IdType
@@ -37,30 +36,19 @@ def current_params() -> dict[str, str]:
 
 
 def run_routines():
+    from logic.app_restoration import Snapshot
+
     now = datetime.now()
 
     if now > app_metadata.next_backup_at:
-        from logic.app_restoration import Snapshot
         Thread(target=Snapshot.backup).start()
 
     if now > app_metadata.next_problem_check_at:
         problems = list(get_problems())
-        # app_metadata.next_problem_check_at = datetime.now() + INTERVAL  # TODO
+        now = datetime.now()
+        app_metadata.next_problem_check_at = now + PROBLEM_CHECK_INTERVAL
         for event in problems:
             AppLog.save_new(event)
-
-        # For testing:
-
-        # if random() > .5:
-        #     event = Event(EventType.UNKNOWN_ENUM, True, LogSeverity.CRITICAL,
-        #                   f'BE CAREFUL {random()}')
-        #     AppLog.save_new(event)
-        #
-        # if random() > .5:
-        #     event = Event(EventType.NO_RECENT_BACKUP, True,
-        #                   LogSeverity.WARNING,
-        #                   f'WOW CALM DOWN')
-        #     AppLog.save_new(event)
 
 
 def colored(text: str, color: str) -> str:

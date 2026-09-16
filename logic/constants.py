@@ -19,6 +19,7 @@ OBJ_ID = 'object_id'
 DAHU_2_TIMEZONE = 'Europe/Paris'
 DB_UNIT_SYSTEM = 'SI'
 ROOM_TEMPERATURE_CELSIUS = 20
+DB_PATH = Path('user_data/dahu_2.db')
 USER_DATA_PATH = Path('user_data')
 LOG_PAGE_LENGTH = 50
 

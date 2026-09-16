@@ -130,21 +130,18 @@ def database_to_excel_file_bytes() -> bytes:
 
 
 def get_all_email_addresses() -> Iterable[str]:
-    try:
-        for state in DeteriorationState.select():
-            state: DeteriorationState
-            yield state.made_by_email
-        for modif in FilmModification.select():
-            modif: FilmModification
-            yield modif.made_by_email
-        for film in Film.select():
-            film: Film
-            yield film.made_by_email
-        for target in Target.select():
-            target: Target
-            yield target.made_by_email
-    except:  # TODO
-        pass
+    for state in DeteriorationState.select():
+        state: DeteriorationState
+        yield state.made_by_email
+    for modif in FilmModification.select():
+        modif: FilmModification
+        yield modif.made_by_email
+    for film in Film.select():
+        film: Film
+        yield film.made_by_email
+    for target in Target.select():
+        target: Target
+        yield target.made_by_email
 
 
 all_email_addresses = list(set(get_all_email_addresses()))
