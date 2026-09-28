@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, Enum
 from typing import Any, final, Iterable, get_type_hints, TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from peewee import SqliteDatabase, IntegerField
 from playhouse.shortcuts import model_to_dict
 from playhouse.signals import Model
 
 from dahu_2_config import RESTIC_REPO_PATH
-from logic.constants import DB_PATH
+from logic.constants import DB_PATH, DAHU_2_TIMEZONE
 from logic.lab_modelization.db_enums import EventType, LogSeverity
 
 
@@ -206,7 +207,10 @@ class Event:
     @classmethod
     def from_no_recent_backup(cls):
         from logic.app_restoration import Snapshot
-        last_backup_timedelta = datetime.now() - Snapshot.get_latest().time
+
+        # With timezone for difference between two tz-aware date-times:
+        paris_now = datetime.now(tz=ZoneInfo(DAHU_2_TIMEZONE))
+        last_backup_timedelta = paris_now - Snapshot.get_latest().time
         day_interval = last_backup_timedelta.days
         descr = (f'Last backup (snapshot id {Snapshot.id}) is very old '
                  f'(more than {day_interval} days ago).')
