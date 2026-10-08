@@ -6,6 +6,7 @@ from typing import Any
 import streamlit as st
 from pint.registry import Unit
 
+from dahu_2_config import MAX_UPLOAD_SIZE_MB
 from logic.constants import SessionKeys as Sk
 from logic.lab_modelization.db_models import UserUploadedFile
 from logic.units import to_db_unit, from_db_unit, ur
@@ -163,7 +164,8 @@ class FileUploadField(Field):
     type = FieldType.OPTIONAL
 
     def _streamlit_input(self, prefill, key: str):
-        return st.file_uploader('Select a file', key=key, max_upload_size=2**16)
+        return st.file_uploader('Select a file', key=key,
+                                max_upload_size=MAX_UPLOAD_SIZE_MB)
 
     def _validate(self, input_) -> tuple[bool, str]:
         if input_ is None:

@@ -4,6 +4,7 @@ showSidebarNavigation = false
 [server]
 enableStaticServing = false
 port = 80
+maxUploadSize = 65536
 
 [[theme.fontFaces]]
 family = "Inter"

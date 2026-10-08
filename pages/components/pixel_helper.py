@@ -27,15 +27,15 @@ def show_pixel_helper(target_img):
     )
     if coords:
         x, y = coords['x'], coords['y']
-        pyperclip.copy(f'{x} , {y}')
+        # pyperclip.copy(f'{x} , {y}')
         with coord_container.container(border=False, width='content'):
             coord_container.write(f"Clicked at (x , y):   **{x} , {y}**")
-        with coord_container.container(width='content'):
-            coord_container.success(f"Copied to clipboard.")
+        # with coord_container.container(width='content'):
+        #     coord_container.success(f"Copied to clipboard.")
         if Sk.PREVIOUS_PIXEL_COORDS in sess:
             previous_x, previous_y = sess[Sk.PREVIOUS_PIXEL_COORDS]
             distance = round(sqrt((previous_x - x)**2 + (previous_y - y)**2))
-            coord_container.write(f"Distance to previous pixel: **{distance}**"
+            coord_container.write(f"Distance to previous click: **{distance}**"
                                   f" pixels.")
         sess[Sk.PREVIOUS_PIXEL_COORDS] = (x, y)
 

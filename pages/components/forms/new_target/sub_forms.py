@@ -363,8 +363,8 @@ class XYCoordinatesForm(Form):
 class DiscPatchForm(Form):
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None):
-        st.write("Arbitrarily choose 3 points that are far apart "
-                 "on the disc circumference:")
+        st.write("Arbitrarily choose 3 points that are far apart from each "
+                 "other, on the disc circumference:")
 
         class Default(SimpleNamespace):
             vertex1 = None
