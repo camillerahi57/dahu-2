@@ -12,6 +12,7 @@ from logic.page_list import pages
 from logic.table_columns import TargetBrowserColumnName as ColName
 from logic.utils import get_email_user_name
 
+
 init_page(pages.browse_targets, show_home_btn=False)
 
 st.set_page_config(layout="wide")

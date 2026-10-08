@@ -128,7 +128,7 @@ class UnitField(Field):
 
 
 class Form(ABC):
-    def __init__(self, fields: list[Field], sub_forms: list[Form],
+    def __init__(self, fields: list[Field|None], sub_forms: list[Form|None],
                  *args, **kwargs):
         fields = [f for f in fields if f is not None]  # Remove Nones.
         sub_forms = [s for s in sub_forms if s is not None]

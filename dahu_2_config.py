@@ -1,13 +1,15 @@
 from datetime import timedelta
 from enum import IntEnum
 
-DOMAIN = 'localhost:8501'  # URL of the DAHU 2 app on Neel's network
-# (IP address with port number).
+# DOMAIN = 'localhost:80'
+# DOMAIN = 'localhost:8501'
+DOMAIN = 'dahu-db.neel.cnrs.fr:80'  # URL of the DAHU 2 app on Neel's network
+# (IP address with port number). Port is also in the file ".streamlit/config.toml".
 RESTIC_PASSWORD = 'no_password'  # Password of the Restic repository, probably
 # 'no_password' as suggested in the Dahu 2 setup manual.
 RESTIC_REPO_PATH = r'O:\DAHU2\dev\backups\restic_snapshot_repo'  # Path to the
 # Restic repository (on the server where the backups are stored).
-DAHU_2_CODE_BASE_PATH = r'C:\Users\Camille.RAHI\Documents\Documents\Code\dahu-2'
+DAHU_2_CODE_BASE_PATH = r'C:\Users\camille.rahi\Documents\dahu-2'
 # Path to the root of this Python project.
 APP_VERSION: int = 10  # Must be an int.
 

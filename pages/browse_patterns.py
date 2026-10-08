@@ -3,6 +3,7 @@ from typing import Iterable
 
 import streamlit as st
 
+from components.browsing import file_row
 from components.general import init_page, show_html_link
 from logic.constants import IdType
 from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe,\
@@ -65,27 +66,6 @@ def show_rename_dialog(file: UserUploadedFile):
         file.save()
         sleep(.1)
         st.rerun()
-
-
-def file_row(file: UserUploadedFile):
-    with st.container(
-            border=True, horizontal=True, vertical_alignment='center',
-            width='content'):
-        if not file.file_bytes:
-            st.write('File could not be found.')
-        else:
-            st.download_button('', file.file_bytes, file.download_file_name,
-                               icon=':material/download:',
-                               key=f'download_{file.id}')
-        if isinstance(file, Pattern):
-            if st.button('Show', key=f'show_{file.id}'):
-                show_pattern(file)
-        with st.container(width=300):
-            st.write(f'**{file.label}**')
-        if st.button('✏️ Rename', key=f'rename_{file.id}'):
-            show_rename_dialog(file)
-        if st.button('❌ Delete', key=f'delete_{file.id}'):
-            show_delete_dialog(file)
 
 
 body()

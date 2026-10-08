@@ -74,7 +74,7 @@ def body():
     - any other change made in the database 
     
     Moreover, going back to a past restore point will **delete subsequent 
-    restore points** (but no the selected restore point).
+    restore points** (but not the selected restore point).
     
     **Restoration will affect data of all users.**
     """

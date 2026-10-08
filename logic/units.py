@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from pint import UnitRegistry
+from pint.facets.plain import PlainUnit
 from pint.registry import Unit, Quantity
 
 from logic.constants import DB_UNIT_SYSTEM
@@ -12,7 +13,7 @@ to SI using Pint's `to_base_units` method, with
 `ur = UnitRegistry(system='SI')`."""
 
 
-def to_db_unit(quantity: Quantity = None, unit: Unit = None) -> Unit|float:
+def to_db_unit(quantity: Quantity|None = None, unit: Unit|None = None) -> Unit|float|PlainUnit:
     """Convert either a quantity or a unit to the equivalent database unit."""
     assert quantity is not None or unit is not None
     assert quantity is None or unit is None

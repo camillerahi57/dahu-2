@@ -15,7 +15,7 @@ class PatternUploadForm(FileUploadForm):
     def _is_coherent(self) -> tuple[bool, str]:
         if self.label and Pattern.label_is_taken(self.label):
             return False, 'Label is already taken.'
-        return True, ''
+        return super()._is_coherent()
 
 
 st.header(f'New Pattern')

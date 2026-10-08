@@ -168,6 +168,15 @@ the newly opened tab. Otherwise, put an HTML link.
 The `switch_page_bttn` function handles this automatically by detecting current
 query parameters. Just use this all the time.
 
+#### Double page load
+
+In the code of a page P1, don't import code from another page P2. 
+If you do, when P1 loads, the import line will load P2. So navigating 
+to P1 will load both pages one after another.
+
+That is why we create component files, so that P1 and P2 can share 
+code without loading one another.
+
 ### Minor changes
 
 #### Units

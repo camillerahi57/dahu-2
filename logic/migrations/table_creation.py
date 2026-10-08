@@ -17,3 +17,4 @@ connexion = sqlite3.connect(DB_PATH)
 Snapshot.delete_all_snaps()
 # Create the tables in the DB:
 db.create_tables(dahu_2_models)
+

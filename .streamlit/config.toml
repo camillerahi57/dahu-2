@@ -3,6 +3,7 @@ showSidebarNavigation = false
 
 [server]
 enableStaticServing = false
+port = 80
 
 [[theme.fontFaces]]
 family = "Inter"
