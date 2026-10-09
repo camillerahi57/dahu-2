@@ -135,7 +135,7 @@ code base from GitHub and put it inside the virtual env. Install all required
 libraries using requirements.txt.
 
 Copy-paste the Restic repository folder used in production to have a dev
-version (so as not to break production backups). Update the Dahu 2 config file
+version (so as not to break production backups). Update the Dahu DB config file
 to indicate the new location of the repository.
 
 Also copy-paste the database file to have a dev version of it. To do this, go

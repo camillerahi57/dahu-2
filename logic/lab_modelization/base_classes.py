@@ -227,7 +227,7 @@ class Event:
         descr = (
             f"File \"{file.internal_file_name}\" for class "
             f"\"{file.__class__.__name__}\" "
-            f"could not be found in Dahu 2's storage folder "
+            f"could not be found in Dahu DB's storage folder "
             f"\"{user_files_abs_path}\"."
         )
         return cls(
@@ -240,8 +240,8 @@ class Event:
     @classmethod
     def from_restic_error(cls, error_code: str|int):
         if error_code == 10:
-            msg = (f"Restic repository not found. Dahu 2 config file says it's "
-                   f"supposed to be at location: \"{RESTIC_REPO_PATH}\".")
+            msg = (f"Restic repository not found. Dahu DB config file says it's"
+                   f" supposed to be at location: \"{RESTIC_REPO_PATH}\".")
         else:
             msg = (f"Restic (tool for backup and restoration) error.\n\n"
                    f"Restic error code: {error_code} (Google it).")

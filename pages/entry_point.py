@@ -13,7 +13,7 @@ from logic.page_list import pages
 
 if not DB_PATH.exists():
     raise RuntimeError(f'Database connection failed. please check presence of '
-                       f'file \"{DB_PATH}\" in Dahu 2 code base.')
+                       f'file \"{DB_PATH}\" in Dahu DB code base.')
 
 tables = db.get_tables()
 if not tables:

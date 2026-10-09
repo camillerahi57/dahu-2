@@ -18,7 +18,7 @@ st.set_page_config(layout='centered')
 @st.dialog('ARE YOU SURE YOU WANT TO RESET ALL DATA TO THIS POINT?')
 def restore_warning_dialog(snap: Snapshot):
     time_str = datetime_sentence(snap.time)
-    msg = f"""The state of Dahu 2 will be reset to:\n\n**{time_str}**."""
+    msg = f"""The state of Dahu DB will be reset to:\n\n**{time_str}**."""
     st.error(msg)
     entered_password = st.text_input("Dahu DB admin password:",
                                      type='password')
@@ -32,7 +32,7 @@ def restore_warning_dialog(snap: Snapshot):
 def restore_process_dialog(snap: Snapshot):
     del sess[Sk.SNAP_TO_RESTORE]
     snap.restore()
-    st.success(f"**Dahu 2 data was restored successfully.**")
+    st.success(f"**Dahu DB data was restored successfully.**")
     sleep(5)
     st.rerun()
 
@@ -93,7 +93,7 @@ def body():
         if not snapshots:
             st.write('_No restore point available._')
         else:
-            for snap in snapshots:
+            for snap in reversed(snapshots):
                 snapshot_row(snap)
     except RuntimeError as e:
         st.error(f"**Unable to list available restore points. "

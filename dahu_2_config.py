@@ -16,12 +16,12 @@ else:
                      'environment variable.')
 
 if ON_PRODUCTION:
-    DOMAIN = 'dahu-db.neel.cnrs.fr:80'  # URL of the DAHU 2 app on Neel's
+    DOMAIN = 'dahu-db.neel.cnrs.fr:80'  # URL of the DAHU DB app on Neel's
     # network (IP address with port number). Port is also in the file
     # ".streamlit/config.toml".
 
     RESTIC_PASSWORD = 'no_password'  # Password of the Restic repository,
-    # probably 'no_password' as suggested in the Dahu 2 setup manual.
+    # probably 'no_password' as suggested in the Dahu DB setup manual.
 
     RESTIC_REPO_PATH = r'O:\DAHU2\dev\backups\restic_snapshot_repo'
     # Path to the Restic repository (on the server where the backups
