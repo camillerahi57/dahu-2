@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from time import sleep
 
@@ -19,7 +20,10 @@ def restore_warning_dialog(snap: Snapshot):
     time_str = datetime_sentence(snap.time)
     msg = f"""The state of Dahu 2 will be reset to:\n\n**{time_str}**."""
     st.error(msg)
-    if st.button('⚠️ **Confirm** ⚠️'):
+    entered_password = st.text_input("Dahu DB admin password:",
+                                     type='password')
+    correct_password = entered_password == os.environ['dahu_admin_password']
+    if st.button('⚠️ **Confirm** ⚠️', disabled=not correct_password):
         sess[Sk.SNAP_TO_RESTORE] = snap
         st.rerun()
 

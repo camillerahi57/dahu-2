@@ -22,6 +22,7 @@ if not tables:
 page = st.navigation(list(pages))
 
 try:
+    print(f"Page run at {datetime.now()}")
     page.run()
 except Exception as e:
     st.error("ERROR:")
