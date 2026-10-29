@@ -38,9 +38,9 @@ every step needed to change the schema.
 #### Example
 
 Let's imagine that in the model `TriodeSputtering` there's an attribute called 
-`argon_flow`. After a few  years, we realise we could use something different 
+`argon_flow`. After a few years, we realise we could use something different 
 that argon. So, we want to split de column `argon_flow` into two separate 
-columns: `flow` and `flow_composition`. In order to do that, here are the 
+columns: `flow` and `flow_composition`. To do that, here are the 
 steps needed (what the migration script should do):
 1. Create a new table called `TriodeSputterginNew` with the right columns.
 2. Copy data from TriodeSputtering to TriodeSputteringNew, with the difference 
@@ -52,8 +52,8 @@ everywhere.
 
 At the step 3, because TriodeSputtering is deleted, all other models pointing
 to it (we call these pointers "foreign keys") will break, which will lead to 
-an error. That is why there is, in fact, a step 0 which will disable the 
-foreign key constraint, in order to avoid this error. This will allow a foreign
+an error. That is why there is, in fact, step 0 which will disable the 
+foreign key constraint to avoid this error. This will allow a foreign
 key to point towards a row/insance that doesn't exist any more.
 
 Then, at the end of the migration script, we re-enable this constraint 
@@ -90,7 +90,7 @@ db.execute_sql("PRAGMA foreign_keys=ON")
 print("Migration complete")
 ```
 We can notice that TriodeSputtering is automatically renamed triode_sputtering 
-in database by Peewee (Peewee is the library we use to interface Python with
+in the database by Peewee (Peewee is the library we use to interface Python with
 the database). That's because it's the convention in the database management 
 world. 
 
@@ -105,7 +105,7 @@ world.
 
 Note: don't use DataGrip to edit data or the database schema, as 
 reproducibility is impossible when modifications are done manually. This could
-lead to errors. Manual edits could also lead to data incoherence, because 
+lead to errors. Manual edits could also lead to data incoherence because 
 sometimes modifications must be done together (even though we try to limit 
 these cases). Only use this software to read and explore the data.
 

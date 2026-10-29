@@ -18,7 +18,4 @@ def body():
     for r in recipes:
         file_row(r)
 
-# On vient de finir une feature et de la commit. Prochaine feature:
-# Ajouter des champs dans UserUploaded ?
-
 body()

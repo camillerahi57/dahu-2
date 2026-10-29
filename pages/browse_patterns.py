@@ -6,8 +6,8 @@ import streamlit as st
 from components.browsing import file_row
 from components.general import init_page, show_html_link
 from logic.constants import IdType
-from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe, \
-    Etching
+from logic.lab_modelization.db_models import (
+    Pattern, UserUploadedFile, Recipe, Etching)
 from logic.page_list import pages
 
 init_page(pages.browse_patterns, show_home_btn=False)

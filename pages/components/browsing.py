@@ -43,7 +43,8 @@ def on_inspect_click(object_idx_list: list[int]):
 
 
 def file_row(file: UserUploadedFile):
-    from browse_patterns import show_pattern, show_rename_dialog, show_delete_dialog
+    from browse_patterns import (
+        show_pattern, show_rename_dialog, show_delete_dialog)
     with st.container(
             border=True, horizontal=True, vertical_alignment='center',
             width='content'):

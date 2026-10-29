@@ -26,7 +26,7 @@ def show_pixel_helper(target_img):
     )
     if coords:
         x, y = coords['x'], coords['y']
-        # pyperclip.copy(f'{x} , {y}')
+        # pyperclip.copy(f'{x} , {y}')  # TODO doesn't work, IDK why.
         with coord_container.container(border=False, width='content'):
             coord_container.write(f"Clicked at (x , y):   **{x} , {y}**")
         # with coord_container.container(width='content'):
