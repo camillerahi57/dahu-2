@@ -2,48 +2,20 @@ import io
 import os
 import re
 import secrets
-from sqlite3 import OperationalError
-from time import sleep
 from typing import Any, Iterable
 from urllib import parse
 
 import pandas as pd
-from streamlit_cookies_controller import CookieController
+from peewee import IntegerField
 
 from logic.constants import SessionKeys as Sk, CookieKeys
-from logic.lab_modelization.base_classes import Event
-from logic.lab_modelization.db_enums import EventType, LogSeverity
-from logic.lab_modelization.db_models import dahu_2_models, AppLog, \
-    DeteriorationState, FilmModification, Film, Target
+from logic.lab_modelization.db_models import (dahu_2_models, DeteriorationState,
+                                              FilmModification, Film, Target)
 
 
 def letter_count(text: str) -> int:
     upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     return len(''.join(i for i in text if i.upper() in upper))
-
-def new_controller() -> CookieController:
-    from logic.global_variables import sess
-    if 'cookie_controller' in sess:
-        return sess['cookie_controller']
-
-    controller = CookieController()
-    waited = 0
-    while not controller.get('cookie_ready'):
-        controller.set('cookie_ready', True)
-        sleep(0.1)
-        waited += 0.1
-        if waited > 5:
-            event = Event(
-                type=EventType.UI_ERROR,
-                notify=False,
-                severity=LogSeverity.WARNING,
-                description="Cookie feature in user interface is not working "
-                            "properly. Cookie could not be loaded.",
-            )
-            AppLog.save_new(event)
-
-    sess['cookie_controller'] = controller
-    return controller
 
 
 def reset_session():
@@ -62,7 +34,7 @@ def is_valid_email_address(email_address: str) -> bool:
     email_regex = r"(?:[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+(?:\.[a-z0-9!#$%&'*+\x2f=?^_`\x7b-\x7d~\x2d]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9\x2d]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9\x2d]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"  # noqa Long line.
     match = re.fullmatch(email_regex, email_address)
     if match is not None:
-        from logic.global_variables import cookies
+        from logic.cookie_init import cookies
         cookies.set(CookieKeys.LAST_EMAIL_USED, email_address)
         return True
     else:
@@ -73,7 +45,8 @@ def get_file_extension(file_name: str):
     return os.path.splitext(file_name)[1].removeprefix('.')
 
 
-def q_param_str(q_params: dict[str, str|int], include_question_mark=False):
+def q_param_str(q_params: dict[str, str|int|IntegerField],
+                include_question_mark=False):
     q_params = q_params or {}
     for k, v in q_params.items():
         # If there are numbers, converts them to strings:

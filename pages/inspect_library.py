@@ -9,15 +9,15 @@ from components.general import (
     init_page, current_params, switch_page_bttn,
     switch_to_submit_successful, link_html, email_html, icon,
 )
-from logic.global_variables import sess
 from components.inspection import inspect_page_header, show_film_layer
 from components.library_files import file_list_container
 from logic.constants import SessionKeys as Sk, IdType
+from logic.global_variables import sess
 from logic.lab_modelization.base_classes import db
-from logic.lab_modelization.db_enums import FilmModifType
+from logic.lab_modelization.db_enums import FilmModifType, CharacType
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching)
+    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching, Charac, Edx)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -116,6 +116,67 @@ def lift_off_info(process: LiftOffEtching):
              f"**Ultrasound config**: {process.ultrasound_config}\n\n")
 
 
+def edx_info(edx: Edx):
+    st.write(f"**Electron energy**: {edx.electron_energy_quantity}\n\n"
+             f"**Working distance**: {edx.working_distance_quantity}\n\n"
+             f"**Magnification**: {edx.magnification}\n\n"
+             f"**Acquisition duration**: {edx.acquisition_duration_quantity}")
+    st.subheader("Elements")
+    for element in edx.elements:
+        if element.quantified:
+            st.write(f"**{element.element}**\n"
+                     f"- Minimum: {element.min_atom_percent} %\n"
+                     f"- Maximum: {element.max_atom_percent} %\n"
+                     f"- Mean: {element.mean_atom_percent} %\n"
+                     f"- Xline: {element.x_line}")
+        else:
+            st.write(f"**{element.element}**\n"
+                     f"- Quantified: {element.quantified}\n"
+                     f"- Xline: {element.x_line}")
+
+
+@st.dialog(title="Characterisation")
+def charac_dialog(charac: Charac):
+    last_modif = charac.last_modif
+    if last_modif is None:
+        last_modif_str = "_Deposition (no film modification)_"
+    else:
+        last_modif_str = f"{last_modif.modif_number}. {last_modif.modif_type}"
+    st.write(f"**Made on**: {charac.made_on}\n\n"
+             f"**Made by**: {charac.made_by_email}\n\n"
+             f"**Comment**: _{charac.comment}_\n\n"
+             f"**Made after**: {last_modif_str}")
+    st.subheader(charac.type_)
+    match charac.type_:
+        case CharacType.EDX:
+            edx_info(charac.edx)
+        case _:
+            raise RuntimeError(f"Unknown charac type: {charac.type_}")
+
+    st.divider()
+    if st.button("Delete characterisation ❌"):
+        if charac.refs:
+            charac_ref_delete(charac)
+        else:
+            with db.atomic():
+                charac.delete_with_parts()
+            st.rerun()
+    st.write("(files will not be deleted)")
+
+
+@st.dialog(title="Warning")
+def charac_ref_delete(charac: Charac):
+    warning_str = "⚠️ Other libraries reference to this characterisation:"
+    for ref in charac.refs:
+        warning_str += f"\n- {ref.lib.label}"
+    st.warning(warning_str)
+    if st.button("Confirm deletion"):
+        with db.atomic():
+            charac.delete_with_parts()
+        st.rerun()
+
+
+
 @st.dialog('Modification Process')
 def film_modif_info(modif_: FilmModification):
     st.write(f"**Made on**&ensp;{modif_.made_on}&ensp;**by**&ensp;"
@@ -124,17 +185,21 @@ def film_modif_info(modif_: FilmModification):
     process = modif_.modification_process()
 
     if modif_.modif_type == FilmModifType.ANNEALING:
+        process: Annealing
         annealing_info(process)
 
     elif modif_.modif_type == FilmModifType.ION_BEAM_ETCHING:
+        process: IonBeamEtching
         etching_base_info(process.etching)
         ion_beam_etch_info(process)
 
     elif modif_.modif_type == FilmModifType.WET_ETCHING:
+        process: WetEtching
         etching_base_info(process.etching)
         wet_etch_info(process)
 
     elif modif_.modif_type == FilmModifType.LIFT_OFF:
+        process: LiftOffEtching
         etching_base_info(process.etching)
         lift_off_info(process)
 
@@ -143,7 +208,7 @@ def film_modif_info(modif_: FilmModification):
 
     st.divider()
     if st.button("Delete film modification ❌"):
-        with (db.atomic()):
+        with db.atomic():
             modif_.delete_with_parts()
         st.rerun()
 
@@ -163,6 +228,65 @@ def archive_dialog():
         lib.is_archived = True
         lib.save()
         st.rerun()
+
+
+def film_modif_section():
+    with (st.container(horizontal=True, vertical_alignment='center',
+                      horizontal_alignment='left', border=True)):
+        st.write("**Film modifications:**")
+
+        modif_names = {
+            FilmModifType.LIFT_OFF: '🔦 Lift off',
+            FilmModifType.ANNEALING: '♨️ Annealing',
+            FilmModifType.WET_ETCHING: '🧪 Wet etching',
+            FilmModifType.ION_BEAM_ETCHING: '☄️ Ion beam etching',
+        }
+        modifs = film.ordered_modifs()
+        for i, modif in enumerate(modifs):
+            if i != 0:
+                st.write("->")
+            if st.button(f'{modif_names[modif.modif_type]}', key=f'btn_{i}'):
+                film_modif_info(modif)
+        st.container(width=300)
+        switch_page_bttn(
+            pages.new_film_modif,
+            label='**Add**',
+            type_='tertiary',
+            icon_=icon('add_2'),
+            q_params={IdType.FILM: film.id}
+        )
+
+
+def charac_section():
+    with (st.container(horizontal=True, vertical_alignment='center',
+                      horizontal_alignment='left', border=True)):
+        st.write("**Characterisations:**")
+
+        charac_names = {
+            CharacType.EDX: 'EDX',
+            CharacType.PROFILO: 'PROFILO',
+        }
+        characs = lib.all_characs()
+
+        for i, charac in enumerate(characs):
+            # "direct charac" means not a reference charac.
+            is_direct_charac = charac.film.id == film.id
+            if is_direct_charac:
+                bttn_label = f'**{charac_names[charac.type_]}**'
+            else:
+                bttn_label = f'{charac_names[charac.type_]}*'
+            if st.button(bttn_label, key=f'char_btn_{i}'):
+                charac_dialog(charac)
+        st.container(width=300)
+        switch_page_bttn(
+            # Temporary. Should be "new charac" page/dialog:
+            pages.browse_libs,
+            label='**Add**',
+            type_='tertiary',
+            icon_=icon('add_2'),
+            q_params={}
+        )
+    st.write("_* reference characterisation_")
 
 
 def page_body():
@@ -193,30 +317,7 @@ def page_body():
         label='Edit name or comment', icon_='✏️', q_params={IdType.LIB: lib.id}
     )
 
-    with (st.container(horizontal=True, vertical_alignment='center',
-                      horizontal_alignment='left', border=True)):
-        st.write("**Film modifications:**")
-
-        modif_names = {
-            FilmModifType.LIFT_OFF: '🔦 Lift off',
-            FilmModifType.ANNEALING: '♨️ Annealing',
-            FilmModifType.WET_ETCHING: '🧪 Wet etching',
-            FilmModifType.ION_BEAM_ETCHING: '☄️ Ion beam etching',
-        }
-        modifs = film.ordered_modifs()
-        for i, modif in enumerate(modifs):
-            if i != 0:
-                st.write("->")
-            if st.button(f'{modif_names[modif.modif_type]}', key=f'btn_{i}'):
-                film_modif_info(modif)
-        st.container(width=300)
-        switch_page_bttn(
-            pages.new_film_modif,
-            label='**Add**',
-            type_='tertiary',
-            icon_=icon('add_2'),
-            q_params={IdType.FILM: film.id}
-        )
+    film_modif_section()
 
     col1, col2 = st.columns([40, 60])
 

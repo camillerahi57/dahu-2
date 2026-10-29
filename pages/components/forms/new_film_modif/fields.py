@@ -4,8 +4,8 @@ from typing import Iterable
 import streamlit as st
 
 from components.forms.base_classes import Field, FieldType as Ft, UnitField
-from logic.global_variables import sess
 from logic.constants import SessionKeys as Sk, FILM_INIT_STATE
+from logic.global_variables import sess
 from logic.lab_modelization.db_enums import FilmModifType, Furnace, \
     ChemicalElement, \
     EtchingBaseSuggestion, EtchingAcidSuggestion, EtchingSolventSuggestion, \

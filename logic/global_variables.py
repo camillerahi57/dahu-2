@@ -1,8 +1,13 @@
+import os
+
 import streamlit as st
 
-from logic.lab_modelization.db_models import AppMetadata
-from logic.utils import new_controller
-
 sess = st.session_state  # Shorthand.
-cookies = new_controller()
-app_metadata = AppMetadata.get_or_new()
+
+if os.environ['dahu_db_production_mode'] == 'False':
+    ON_PRODUCTION = False
+elif os.environ['dahu_db_production_mode'] == 'True':
+    ON_PRODUCTION = True
+else:
+    raise ValueError('Invalid value for dahu_db_production_mode. Please add'
+                     'environment variable.')

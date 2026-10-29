@@ -16,8 +16,8 @@ type VertexList = list[Point]
 @dataclass
 class Polygon:
     vertices: VertexList
-    label: str = None
-    color: str = None
+    label: str|None = None
+    color: str|None = None
 
     def __iter__(self):
         return iter(self.vertices)

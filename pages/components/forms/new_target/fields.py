@@ -209,7 +209,7 @@ class HasCommentField(Field):
         NO = 'No'
 
     def _streamlit_input(self, prefill: str, key):
-        options = list(self.Option)
+        options = [str(o) for o in self.Option]
         index = options.index(prefill) if prefill else None
         return st.radio('No label', options, horizontal=True,
                         index=index, label_visibility='collapsed', )
@@ -249,6 +249,8 @@ class PhotoUploadField(Field):
     def _streamlit_input(self, prefill, key):
         fld = st.file_uploader("Select target photo",
                                 type=["jpg", "png"])
+        if isinstance(fld, list):
+            raise RuntimeError('Should only be one file.')
         self.file_name = fld.name if fld else None
         return fld
 

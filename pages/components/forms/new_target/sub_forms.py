@@ -15,19 +15,20 @@ from components.forms.new_target.fields import MadeAtField, \
     PhotoDateField, CalibrationFactorField, CoordinateField, PatchCountField, \
     ShapeField, PreviousVersionField, HasCommentField, IsBasePatchField, \
     IsCorrectFigureField, HasCorrectOrientationField
-from logic.global_variables import sess, cookies
 from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET, CookieKeys as Ck
+from logic.cookie_init import cookies
+from logic.global_variables import sess
 from logic.lab_modelization.db_enums import PixelCoordinateSystem, ShapeType
 from logic.lab_modelization.db_models import Target, \
     DeteriorationState, Patch, Vertex, TargetPhoto
 from logic.math_tools import VertexList, Disc, Point, points_are_collinear
-from logic.units import ur, to_db_unit
+from logic.units import ur, to_db_magnitude
 from logic.utils import get_file_extension
 
 
 class BasicInfoForm(Form):
-    def __init__(self, default_target: Target = None):
+    def __init__(self, default_target: Target|None = None):
         col1, col2 = st.columns(2)
         with col1:
             made_on_fld = MadeAtField(
@@ -83,7 +84,7 @@ class BasicInfoForm(Form):
                                "target.")
         return True, ''
 
-    def to_target(self, is_archived: bool, id_: int = None) -> Target:
+    def to_target(self, is_archived: bool, id_: int|None = None) -> Target:
         if not self.is_valid:
             raise PausePageRun
 
@@ -104,7 +105,7 @@ class PixelEquivalenceForm(Form):
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
         if default_state:
-            default_db_length = to_db_unit(100 * ur.mm)  # Only ratio is
+            default_db_length = to_db_magnitude(100 * ur.mm)  # Only ratio is
             # stored in DB, so we arbitrarily chose a length to show it's
             # equivalent in pixels.
         else:
@@ -312,7 +313,7 @@ class StateForm(Form):
                            'the target was made.')
         return True, ''
 
-    def to_deterioration_state(self, target: Target, email: str = None) \
+    def to_deterioration_state(self, target: Target, email: str|None = None) \
             -> DeteriorationState:
         if not self.is_valid:
             raise PausePageRun
@@ -603,8 +604,8 @@ class PatchListForm(Form):
 
 
 class DeteriorationStateForm(Form):
-    def __init__(self, target: Target, email: str = None,
-                 default_state: DeteriorationState = None):
+    def __init__(self, target: Target, email: str|None = None,
+                 default_state: DeteriorationState|None = None):
         state_info_form = StateForm(target.made_on,
                                     default_state=default_state)
         st.divider()

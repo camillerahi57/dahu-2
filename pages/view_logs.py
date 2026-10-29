@@ -4,8 +4,8 @@ import streamlit as st
 
 from components.general import init_page, compact_datetime_str, icon, \
     colored
-from logic.global_variables import sess
 from logic.constants import SessionKeys as Sk, LOG_PAGE_LENGTH
+from logic.global_variables import sess
 from logic.lab_modelization.db_enums import LogSeverity
 from logic.lab_modelization.db_models import AppLog
 from logic.page_list import pages

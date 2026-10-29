@@ -13,7 +13,7 @@ from logic.lab_modelization.db_models import WetEtching, \
 
 
 class WetEtchingForm(Form):
-    def __init__(self, default_wet_etch: WetEtching=None):
+    def __init__(self, default_wet_etch: WetEtching|None = None):
         base_fld = BaseField(
             form_default=None,
             db_default=default_wet_etch.base

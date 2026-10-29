@@ -4,7 +4,7 @@ from typing import Literal
 
 import keyboard
 import streamlit as st
-from peewee import DateField
+from peewee import DateField, IntegerField
 from streamlit.navigation.page import StreamlitPage
 
 from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL
@@ -13,8 +13,9 @@ from logic.constants import (
     IdType
 )
 from logic.db_integrity import get_problems
-from logic.global_variables import sess, app_metadata
+from logic.global_variables import sess
 from logic.lab_modelization.db_models import AppLog
+from logic.meta_data_init import app_metadata
 from logic.page_list import pages
 
 
@@ -56,8 +57,8 @@ def colored(text: str, color: str) -> str:
 
 
 def switch_to_submit_successful(
-        redirect_to: StreamlitPage = None, id_type: IdType = None,
-        object_id: int = None):
+        redirect_to: StreamlitPage|None = None, id_type: IdType|None = None,
+        object_id: int|None = None):
     from logic.page_list import pages
 
     params = {}
@@ -72,16 +73,17 @@ def switch_to_submit_successful(
 
 def switch_page_bttn(
         page: StreamlitPage | str, *, label: str,
-        q_params: dict[str, str|int] = None, key: str = None,
+        q_params: dict[str, str|int|IntegerField]|None = None,
+        key: str|None = None,
         type_: Literal["primary", "secondary", "tertiary"] = 'secondary',
-        icon_: str = None):
+        icon_: str|None = None):
     """
     Don't use st.switch_page to go from current page P1 to another page P2 if
     P1 has query parameters in its URL. The browser's back button
     will not restore these parameters if the user wants to go back. This will
     break navigation.
 
-    To solve his, use an HTML link instead. This alternative is chosen
+    To solve this, use an HTML link instead. This alternative is chosen
     automatically if you use the present function.
     """
     from logic.utils import to_ascii
@@ -101,7 +103,7 @@ def switch_page_bttn(
     else:
         bttn_label = f'{icon_} {label}' if icon_ else label
         if st.button(bttn_label, key=key, type=type_):
-            st.switch_page(page, query_params=q_params)
+            st.switch_page(page, query_params=q_params)  # noqa IntegerField is like an int.
 
 
 def icon(google_material_name: str):
@@ -123,7 +125,7 @@ def link_html(label: str, url: str):
 
 
 def st_page_link_html(label: str, page: StreamlitPage,
-                      q_params: dict[str, str|int] = None):
+                      q_params: dict[str, str|int|IntegerField]|None = None):
     from logic.utils import q_param_str
 
     q_param_string = q_param_str(q_params, include_question_mark=True) \
@@ -138,7 +140,8 @@ def st_page_link_html(label: str, page: StreamlitPage,
 
 
 def show_html_link(label: str, page: StreamlitPage, border: bool = False,
-                   icon_: str = None, q_params: dict[str, str | int] = None):
+                   icon_: str|None = None,
+                   q_params: dict[str, str|int|IntegerField]|None = None):
     html = st_page_link_html(label, page, q_params=q_params)
     if icon_:
         html = f'{icon_} {html}'
@@ -149,7 +152,7 @@ def show_html_link(label: str, page: StreamlitPage, border: bool = False,
             st.write(html, unsafe_allow_html=True)
 
 
-def email_html(email: str, label: str=None):
+def email_html(email: str, label: str|None = None):
     if label is None:
         label = email
     return f'<a href="mailto:{email}">{label}</a>'

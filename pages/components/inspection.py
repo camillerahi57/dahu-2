@@ -4,15 +4,15 @@ import streamlit as st
 
 from components.browsing import INSPECT_BUTTON_KEY
 from components.general import switch_page_bttn
-from logic.global_variables import sess
 from logic.constants import IdType
+from logic.global_variables import sess
 from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import FilmLayer, Target, TargetUse
 from logic.page_list import pages
 
 
 def inspect_page_header(object_type: str, instance_name: str,
-                        on_delete: Callable, on_edit: Callable = None):
+                        on_delete: Callable, on_edit: Callable|None = None):
     col1, col2 = st.columns(2)
     with col1:
         with st.container(horizontal=True, vertical_alignment="center"):

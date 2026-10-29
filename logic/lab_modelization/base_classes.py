@@ -14,7 +14,6 @@ from dahu_2_config import RESTIC_REPO_PATH
 from logic.constants import DB_PATH, DAHU_2_TIMEZONE
 from logic.lab_modelization.db_enums import EventType, LogSeverity
 
-
 db = SqliteDatabase(DB_PATH, pragmas={'foreign_keys': 1})
 
 
@@ -25,10 +24,10 @@ if TYPE_CHECKING:
 
 
 class _BaseModel(Model):
-    id: int | IntegerField
+    id: IntegerField
 
     # A list of attributes with title, corresponding attribute and input field.
-    title_db_value_input_fields: list[tuple[str, Any, type]] = None
+    title_db_value_input_fields: list[tuple[str, Any, type]]|None = None
     # Write a new log at save/deletion if set to True in subclass:
     log_db_write: bool = False
 
@@ -140,13 +139,13 @@ class _BaseModel(Model):
             AppLog.save_new(event)
         super().delete_instance(recursive, delete_nullable, *args, **kwargs)
 
-    def save(self, force_insert: bool = False, only: list = None,
+    def save(self, force_insert: bool = False, only: list|None = None,
              *args, **kwargs):
         from logic.lab_modelization.db_models import AppLog
         if self.log_db_write:
             event = Event.from_saved_item(self)
             AppLog.save_new(event)
-        super().save(force_insert, only, *args, **kwargs)
+        super().save(force_insert, only)
 
     @classmethod
     def all_rows_to_csv(cls, delimiter: str = ',') -> str:
@@ -160,7 +159,7 @@ class _BaseModel(Model):
             output, fieldnames=field_names, quoting=csv.QUOTE_NONNUMERIC,  # noqa
             delimiter=delimiter)
         writer.writeheader()
-        writer.writerows(row_dicts)
+        writer.writerows(row_dicts)  # noqa
         return output.getvalue()
 
 

@@ -13,16 +13,16 @@ to SI using Pint's `to_base_units` method, with
 `ur = UnitRegistry(system='SI')`."""
 
 
-def to_db_unit(quantity: Quantity|None = None, unit: Unit|None = None) -> Unit|float|PlainUnit:
+def to_db_unit(*, unit: Unit)\
+        -> Unit|float|PlainUnit:
     """Convert either a quantity or a unit to the equivalent database unit."""
-    assert quantity is not None or unit is not None
-    assert quantity is None or unit is None
-    if quantity is not None:  # If we want to convert a number.
-        return quantity.to_base_units().magnitude
-    else:  # If we want to convert a unit.
-        ui_unity: Quantity = 1 * unit  # noqa, wrong warning.
-        db_unity = ui_unity.to_base_units()
-        return db_unity.units
+    ui_unity: Quantity = 1 * unit  # noqa, wrong warning.
+    db_unity = ui_unity.to_base_units()
+    return db_unity.units
+
+
+def to_db_magnitude(quantity: Quantity) -> float:
+    return quantity.to_base_units().magnitude
 
 
 def from_db_unit(db_value: float|None, target_unit: Unit) -> Quantity|None:

@@ -6,7 +6,7 @@ import streamlit as st
 from components.browsing import file_row
 from components.general import init_page, show_html_link
 from logic.constants import IdType
-from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe,\
+from logic.lab_modelization.db_models import Pattern, UserUploadedFile, Recipe, \
     Etching
 from logic.page_list import pages
 
@@ -58,9 +58,10 @@ def show_delete_dialog(file: UserUploadedFile):
 
 @st.dialog('Rename')
 def show_rename_dialog(file: UserUploadedFile):
-    new_label = st.text_input('New label:', file.label)
+    new_label = st.text_input('New label:', file.label) or ''
     file_type = file.__class__
     is_valid = bool(new_label) and not file_type.label_is_taken(new_label)
+
     if st.button('Confirm', disabled=not is_valid):
         file.label = new_label
         file.save()

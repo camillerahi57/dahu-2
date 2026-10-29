@@ -85,7 +85,7 @@ class Snapshot:
             if prune_excessive_snaps:
                 delete_excessive_snapshots()
 
-            from logic.global_variables import app_metadata
+            from logic.meta_data_init import app_metadata
             app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
             app_metadata.save()
 
@@ -134,7 +134,7 @@ class Snapshot:
         )
 
         progress_bar = st.progress(0, text="Restoring…")
-        for line in process.stdout:
+        for line in process.stdout:  # noqa
             try:
                 data = json.loads(line)
             except json.JSONDecodeError:
@@ -150,7 +150,7 @@ class Snapshot:
 
         self.delete_subsequent()
 
-        from logic.global_variables import app_metadata
+        from logic.meta_data_init import app_metadata
         app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
         app_metadata.save()
 
@@ -167,7 +167,7 @@ def delete_excessive_snapshots():
         '--prune',
         '--repo', RESTIC_REPO_PATH,
     ]
-    start = datetime.now()
+    # start = datetime.now()
     result = subprocess.run(
         command, capture_output=True, text=True,
         env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},

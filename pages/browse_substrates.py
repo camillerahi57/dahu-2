@@ -5,8 +5,9 @@ from streamlit_dynamic_filters import DynamicFilters
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click
 from components.general import init_page, switch_page_bttn, icon
-from logic.global_variables import sess, cookies
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
+from logic.cookie_init import cookies
+from logic.global_variables import sess
 from logic.lab_modelization.db_models import Substrate
 from logic.page_list import pages
 from logic.table_columns import SubstrateBrowserColumnName as ColName

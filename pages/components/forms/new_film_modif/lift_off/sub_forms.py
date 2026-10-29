@@ -7,7 +7,7 @@ from logic.lab_modelization.db_models import LiftOffEtching, FilmModification, \
 
 
 class LiftOffForm(Form):
-    def __init__(self, default_lift_off: LiftOffEtching=None):
+    def __init__(self, default_lift_off: LiftOffEtching|None = None):
         used_ultrasound_fld = UsedUltrasoundField(
             form_default=None,
             db_default=default_lift_off.used_ultrasound

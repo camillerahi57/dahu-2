@@ -9,7 +9,7 @@ from pint.registry import Unit
 from dahu_2_config import MAX_UPLOAD_SIZE_MB
 from logic.constants import SessionKeys as Sk
 from logic.lab_modelization.db_models import UserUploadedFile
-from logic.units import to_db_unit, from_db_unit, ur
+from logic.units import from_db_unit, ur, to_db_magnitude
 
 
 class FieldType(StrEnum):
@@ -88,7 +88,7 @@ class UnitField(Field):
     def ui_unit(self) -> Unit:
         raise NotImplementedError
 
-    ui_unit_alias: str = None
+    ui_unit_alias: str|None = None
 
     @property
     def value(self) -> Any:
@@ -96,12 +96,12 @@ class UnitField(Field):
 
     @property
     def in_db_unit(self) -> float|None:
-        """Returns value but with DB unit if not None,else None."""
+        """Returns value but with DB unit if not None, else None."""
         if super().value is None:
             return None
         elif isinstance(super().value, int) or isinstance(super().value, float):
             as_ui_unit = ur.Quantity(super().value, self.ui_unit)
-            return to_db_unit(as_ui_unit)
+            return to_db_magnitude(as_ui_unit)
         else:
             raise ValueError(f"Type {type(super().value)} cannot have a unit.")
 

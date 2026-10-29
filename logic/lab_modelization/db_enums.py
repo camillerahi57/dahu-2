@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Self
 
 
 # ##################################################################
@@ -346,7 +345,7 @@ class ChemicalElement(StrEnum):
     RADON = 'Rn'
 
     @classmethod
-    def from_short(cls, short: str) -> Self:
+    def from_short(cls, short: str) -> ChemicalElement:
         return short_to_enum_elements[short]
 
     @staticmethod

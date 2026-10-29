@@ -1,9 +1,9 @@
 from datetime import datetime
-from time import sleep
 
 import streamlit as st
 
 from logic.constants import DB_PATH
+from logic.global_variables import ON_PRODUCTION
 from logic.lab_modelization.base_classes import db
 from logic.page_list import pages
 
@@ -25,5 +25,8 @@ try:
     print(f"Page run at {datetime.now()}")
     page.run()
 except Exception as e:
-    st.error("ERROR:")
-    st.error(e)
+    if ON_PRODUCTION:
+        st.error("ERROR")
+        st.error(e)
+    else:
+        raise e

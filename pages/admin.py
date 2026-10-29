@@ -4,10 +4,12 @@ from time import sleep
 
 import streamlit as st
 
-from components.general import init_page, compact_datetime_str, datetime_sentence, switch_page_bttn
-from logic.global_variables import sess, app_metadata
+from components.general import init_page, compact_datetime_str, \
+    datetime_sentence, switch_page_bttn
 from logic.app_restoration import Snapshot
 from logic.constants import SessionKeys as Sk
+from logic.global_variables import sess
+from logic.meta_data_init import app_metadata
 from logic.page_list import pages
 from logic.utils import database_to_excel_file_bytes
 

@@ -14,7 +14,8 @@ def body():
     from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
         on_inspect_click
     from components.general import init_page, switch_page_bttn, icon
-    from logic.global_variables import sess, cookies
+    from logic.global_variables import sess
+    from logic.cookie_init import cookies
 
     init_page(pages.browse_libs, show_home_btn=False)
 
@@ -28,28 +29,27 @@ def body():
                          icon_=icon('add_2'))
         show_archived = st.checkbox('Show archived 📦')
 
-    query = Library.select(
-        Library.label.alias(ColName.lib_name),
-        Library.id.alias(IdType.LIB),
-        Library.comment.alias(ColName.comment),
-        Film.made_on.alias(ColName.made_on),
-        Film.made_by_email.alias(ColName.experimenter),
-        Library.is_archived.alias(ColName.is_archived),
-    ).join(Film).order_by(Library.last_inspected_at.desc()).dicts()
+    rows = []
+    lib_id_list = []
+    for film in (Film.select(Film, Library)
+                 .join(Library)
+                 .order_by(Library.last_inspected_at.desc())):
+        library = film.library
+        if library.is_archived and not show_archived:
+            continue
 
+        lib_name = library.label
+        if library.is_archived:
+            lib_name += ' · 📦 ARCHIVED'
 
-    for row in query:
-        experimenter = row[ColName.experimenter]
-        row[ColName.experimenter] = get_email_user_name(experimenter)
-        row[ColName.inspect_link] = 'Inspect'
-        if row[ColName.is_archived]:
-            row[ColName.lib_name] += ' · 📦 ARCHIVED'
-
-    rows = [row for row in query]
-    if not show_archived:
-        rows = [row for row in rows if not row[ColName.is_archived]]
-
-    lib_id_list = [row[IdType.LIB] for row in query]
+        rows.append({
+            ColName.made_on: film.made_on,
+            ColName.lib_name: lib_name,
+            ColName.inspect_link: 'Inspect',
+            ColName.experimenter: get_email_user_name(film.made_by_email),
+            ColName.comment: library.comment,
+        })
+        lib_id_list.append(library.id)
 
     column_config = {
         ColName.made_on: st.column_config.DateColumn(help="Date of sputtering.",

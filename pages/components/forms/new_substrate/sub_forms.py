@@ -170,7 +170,7 @@ class RootForm(Form):
                 st.text('\n'.join(layer_strings))
                 st.write("⬆️ Bottom layer")
 
-    def to_substrate(self, id_: int = None) -> Substrate:
+    def to_substrate(self, id_: int|None = None) -> Substrate:
         substrate = Substrate(
             id=id_ if id_ is not None else None,
             label=self.substrate_name,
