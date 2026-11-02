@@ -93,6 +93,8 @@ class SubstrateLayer(_BaseModel):
     k: IntegerField|None = IntegerField(null=True)
     l: IntegerField|None = IntegerField(null=True)
     position_from_back = IntegerField()
+    # We use cast to tell the IDE that the output of the ForeignKeyField is a
+    # Model.
     substrate: Substrate = cast(Any, ForeignKeyField(
         Substrate, on_delete='RESTRICT', backref='layers'))
 
