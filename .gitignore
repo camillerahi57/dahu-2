@@ -208,3 +208,4 @@ __marimo__/
 
 # Dahu DB
 /user_data/*
+.idea/
