@@ -1,3 +1,14 @@
+"""Enumerations (fixed lists of named constants) used by the data model
+and the forms.
+
+Each class here is a `StrEnum`: its members are strings, so
+`SputteringSystem.TRIODE == 'triode'` is True. Most of them are the
+allowed values of a database column (`CharField`); the string value is
+what is stored in the DB. Others are only suggestions offered in forms.
+
+Read the warning below before editing any value.
+"""
+
 from enum import StrEnum
 
 
@@ -17,28 +28,41 @@ from enum import StrEnum
 
 
 class ShapeType(StrEnum):
+    """Shape a user draws for a patch in the target form.
+
+    Not stored in the DB: a disc is converted to a polygon before saving
+    (see `Disc.to_vertices`).
+    """
     POLYGON = 'polygon'
     DISC = 'disc'
 
 
 class SputteringSystem(StrEnum):
+    """Kind of sputtering machine used for a film layer.
+
+    Stored in `FilmLayer.sputtering_system`; it says whether the layer's
+    details are in a `TriodeSputtering` or a `MagnetronSputtering` row.
+    """
     TRIODE = 'triode'
     MAGNETRON = 'magnetron'
 
 
 class FilmLayerFunction(StrEnum):
+    """Role of a layer in a film stack. Stored in `FilmLayer.function`."""
     BUFFER = 'buffer'
     ACTIVE = 'active'
     CAPPING = 'capping'
 
 
 class LogSeverity(StrEnum):
+    """How serious a logged event is. Stored in `AppLog.severity`."""
     INFO = 'info'
     WARNING = 'warning'
     CRITICAL = 'critical'
 
     @property
     def icon(self):
+        """Emoji shown next to a log entry of this severity."""
         match self:
             case LogSeverity.INFO:
                 return '🟢'
@@ -49,6 +73,14 @@ class LogSeverity(StrEnum):
 
 
 class EventType(StrEnum):
+    """Kind of event written to the logs. Stored in `AppLog.event_type`.
+
+    The first group are events during normal use, the second group are
+    problems found by the integrity check (`logic.db_integrity`). Note
+    that the stored string of `RESTIC_ERROR` is 'dump_error' and that of
+    `BACKUP_PERFORMED` is 'backup_completed' (older names kept so that
+    old log rows stay valid).
+    """
     SAVED_ITEM = 'saved_item'
     DELETED_ITEM = 'deleted_item'
     MULTIPLICITY_ERROR = 'multiplicity_error'
@@ -62,6 +94,11 @@ class EventType(StrEnum):
 
 
 class MagnetronSputteringGenerator(StrEnum):
+    """Generators that can be chosen for a magnetron sputtering.
+
+    Stored in `MagnetronSputtering.generator`. The prefix is RF or DC
+    (radio-frequency or direct-current sputtering).
+    """
     RF_1 = 'RF-1'
     RF_2 = 'RF-2'
     RF_3 = 'RF-3'
@@ -77,10 +114,15 @@ class MagnetronSputteringGenerator(StrEnum):
 
 
 class IbeMachine(StrEnum):
+    """Ion beam etching machines. Stored in `IonBeamEtching.machine`."""
     IBE_NANO_FAB = 'IBE NanoFAB'
 
 
 class FilmModifType(StrEnum):
+    """Kind of film modification. Stored in
+    `FilmModification.modif_type`; it says which subtype table holds the
+    details (`Annealing` or an `Etching` and its own subtype).
+    """
     LIFT_OFF = 'lift_off'
     ANNEALING = 'annealing'
     WET_ETCHING = 'wet_etching'
@@ -88,15 +130,28 @@ class FilmModifType(StrEnum):
 
 
 class PixelCoordinateSystem(StrEnum):
+    """Convention of the pixel coordinates of a target photo. Stored in
+    `DeteriorationState.pixel_coordinate_system`, so that coordinates
+    saved today stay readable if the convention ever changes.
+
+    The only value reads: x is the horizontal axis (width) and y the
+    vertical one (height), both positive, origin at the top-left corner
+    of the image, as in Plotly images.
+    """
     PLOTLY = "x,y=w,h;both-positive;top-left-origin"
 
 
 class Furnace(StrEnum):
+    """Furnaces available for an annealing. Stored in `Annealing.furnace`."""
     TUBE = 'Tube furnace'
     RTA = 'Rapid Thermal Annealing'
 
 
 class CharacType(StrEnum):
+    """Kind of characterization. Stored in `Charac.type_`.
+
+    Only EDX has its own subtype table (`Edx`).
+    """
     MOKE = 'moke'
     PROFILO = 'profilo'
     VSM_SQUID = 'vsm_squid'
@@ -106,33 +161,47 @@ class CharacType(StrEnum):
 
 
 class MokeMachine(StrEnum):
+    """MOKE (magneto-optical Kerr effect) setups. Not used by any column
+    or form yet."""
     S_MOKE = 's_moke'
     NEW_MOKE = 'new_moke'
 
 
 class CoilModel(StrEnum):
+    """Coils of a magnetic measurement setup. Not used by any column or
+    form yet."""
     COIL_1 = 'coil_1'
     COIL_2 = 'coil_2'
 
 
 class XLine(StrEnum):
+    """X-ray emission line family (K, L or M) of an EDX measurement.
+
+    Stored in `ChemicalElementEdx.x_line`.
+    """
     K = 'K'
     L = 'L'
     M = 'M'
 
 
 class SweepType(StrEnum):
+    """Quantity swept during a measurement (field or temperature). Not
+    used by any column or form yet."""
     FIELD_SWEEP = 'field_sweep'
     TEMPERATURE_SWEEP = 'temperature_sweep'
 
 
 class SampleHolderType(StrEnum):
+    """Sample holders of a magnetometer measurement. Not used by any
+    column or form yet."""
     QUARTZ = 'quartz'
     STRAW = 'straw'
     PLEXI = 'plexi'
 
 
 class VsmSquidOrientation(StrEnum):
+    """Orientation of the sample in a VSM/SQUID measurement relative to
+    the field. Not used by any column or form yet."""
     IN_PLANE = 'in_plane'
     OUT_OF_PLANE = 'out_of_plane'
 
@@ -140,6 +209,11 @@ class VsmSquidOrientation(StrEnum):
 # Usage order: base -> acid -> solvent
 # Available products: https://nanofab.neel.cnrs.fr/mg-chimie-liste-des-produits/
 class EtchingBaseSuggestion(StrEnum):
+    """Bases (basic solutions or developers) suggested for a wet etching.
+
+    Only suggestions: the form accepts any other text, so the stored
+    value is not necessarily a member of this enum.
+    """
     AMMONIA = "Ammonia"
     AR_300_44 = "AR 300-44"
     AR_300_46 = "AR 300-46"
@@ -161,6 +235,8 @@ class EtchingBaseSuggestion(StrEnum):
 
 
 class EtchingAcidSuggestion(StrEnum):
+    """Acids and etchants suggested for a wet etching. Only suggestions,
+    like `EtchingBaseSuggestion`."""
     ACETIC_ACID_CH3COOH_100 = "100% Acetic Acid (CH3COOH)"
     HYDROCHLORIC_ACID_HCL_36 = "36% Hydrochloric Acid (HCl)"
     CITRIC_ACID_MONOHYDRATE_C6H8O7 = "Citric Acid Monohydrate (C6H8O7)"
@@ -191,6 +267,8 @@ class EtchingAcidSuggestion(StrEnum):
 
 
 class EtchingSolventSuggestion(StrEnum):
+    """Solvents suggested for a wet etching. Only suggestions, like
+    `EtchingBaseSuggestion`."""
     ETHANOL = "Ethanol"
     ACETONE = "Acetone"
     ISOPROPYL_ALCOHOL_IPA = "Isopropyl alcohol (IPA)"
@@ -208,11 +286,16 @@ class EtchingSolventSuggestion(StrEnum):
 
 
 class XrayType(StrEnum):
+    """X-ray diffraction setups. Not used by any column or form yet."""
     SMART_LAB = 'smart_lab'
     ESRF = 'esrf'
 
 
 class StoichioOf(StrEnum):
+    """Kinds of object that can own a `StoichioElement` (a chemical
+    composition). Not used by any column or form yet: `StoichioElement`
+    uses one nullable foreign key per owner instead.
+    """
     SUBSTRATE_LAYER = 'substrate_layer'
     PATCH = 'patch'
     NOMINAL_FILM_LAYER = 'nominal_film_layer'
@@ -221,10 +304,18 @@ class StoichioOf(StrEnum):
 
 
 class MagnetronMachineModel(StrEnum):
+    """Magnetron sputtering machine models. Stored in
+    `MagnetronSputtering.machine_model`."""
     DP850 = 'Allianceconcept_DP850'
 
 
 class ChemicalElement(StrEnum):
+    """Chemical elements, with their symbol as value (e.g. 'Fe').
+
+    Stored in `StoichioElement.element` and `ChemicalElementEdx.element`.
+    Also used to check the formulas typed by users. The order of the
+    members is not the periodic table order.
+    """
     ASTATINE = 'At'
     FRANCIUM = 'Fr'
     FERMIUM = 'Fm'
@@ -346,13 +437,28 @@ class ChemicalElement(StrEnum):
 
     @classmethod
     def from_short(cls, short: str) -> ChemicalElement:
+        """Finds an element from its chemical symbol.
+
+        Args:
+            short: Symbol, e.g. 'Fe' (case sensitive).
+
+        Returns:
+            The matching member.
+
+        Raises:
+            KeyError: If the symbol is unknown.
+        """
         return short_to_enum_elements[short]
 
     @staticmethod
     def all_short_str():
+        """Returns all the chemical symbols (a view of the keys of
+        `short_to_enum_elements`)."""
         return short_to_enum_elements.keys()
 
 
+# Chemical symbol -> member. Built after the class because it needs all the
+# members; `ChemicalElement.from_short` and `all_short_str` read it.
 short_to_enum_elements = {
     element.value: element
     for element in ChemicalElement
