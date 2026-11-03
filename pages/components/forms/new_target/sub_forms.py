@@ -1,3 +1,17 @@
+"""Sub-forms of the "new target" page, ending with `RootForm`.
+
+A target is recorded with its first `DeteriorationState`: a cropped
+photo of the target, the photo scale, and the patches drawn as polygons
+in pixel coordinates on that photo. `BasicInfoForm` is reused by the
+edit target page, and `DeteriorationStateForm` by the new / edit
+deterioration state pages.
+
+Vocabulary: Streamlit runs the page script again from the top after
+every user action (a "rerun"); `st.rerun()` forces one. Values that
+must survive reruns are kept in "session state" (`st.session_state`,
+here `sess`), a dictionary kept per browser tab.
+"""
+
 import io
 from datetime import datetime
 from types import SimpleNamespace
@@ -28,7 +42,25 @@ from logic.utils import get_file_extension
 
 
 class BasicInfoForm(Form):
+    """Target label, creation date and email, and previous version.
+
+    Attributes:
+        made_on: Date entered in `MadeAtField`.
+        made_by_email: Email entered in `MadeByField`.
+        label: Label entered in `TargetLabelField`.
+        built_from: `Target` this one was built from, or None.
+        default_target: Target being edited, or None on the new page.
+    """
     def __init__(self, default_target: Target|None = None):
+        """Draw the fields.
+
+        The email defaults to the last one used in this browser (a
+        cookie is a small value the browser keeps for the site).
+
+        Args:
+            default_target: Existing target used to prefill the fields
+                (edit page), or None.
+        """
         col1, col2 = st.columns(2)
         with col1:
             made_on_fld = MadeAtField(
@@ -77,6 +109,7 @@ class BasicInfoForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Refuse a target built from itself. See `Form._is_coherent`."""
         default, built_from = self.default_target, self.built_from
         if default is not None and built_from is not None:
             if default.id == built_from.id:
@@ -85,6 +118,19 @@ class BasicInfoForm(Form):
         return True, ''
 
     def to_target(self, is_archived: bool, id_: int|None = None) -> Target:
+        """Build an unsaved `Target` from the form values.
+
+        Args:
+            is_archived: Value of `Target.is_archived`.
+            id_: Id to give the target (to replace an existing one on
+                the edit page), or None for a new id.
+
+        Returns:
+            The unsaved target, without states.
+
+        Raises:
+            PausePageRun: If the form is not valid.
+        """
         if not self.is_valid:
             raise PausePageRun
 
@@ -102,8 +148,21 @@ class BasicInfoForm(Form):
 
 
 class PixelEquivalenceForm(Form):
+    """Photo scale: a length and its equivalent number of pixels.
+
+    Attributes:
+        ratio: Length of one pixel, in m per pixel, or None if a field
+            is invalid.
+    """
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
+        """Draw the pixel helper button and the two fields.
+
+        Args:
+            target_img: Cropped target photo, shown by the pixel helper.
+            default_state: State whose `length_per_px` prefills the
+                fields, or None.
+        """
         if default_state:
             default_db_length = to_db_magnitude(100 * ur.mm)  # Only ratio is
             # stored in DB, so we arbitrarily chose a length to show it's
@@ -144,11 +203,32 @@ class PixelEquivalenceForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field check. See `Form._is_coherent`."""
         return True, ''
 
 
 class UploadAndCropForm(Form):
+    """Upload the target photo, then crop it.
+
+    A small state machine kept in session state, one step per rerun:
+    no photo -> uploader; uploaded (`Sk.UPLOADED_TARGET_IMG`) ->
+    cropper; cropped (`Sk.CROPPED_TARGET_IMG`) -> preview and the
+    orientation checkbox. Only the last step completes the form.
+
+    Attributes:
+        cropped_target_img: The cropped photo (PIL image).
+        file_name: Original file name of the photo.
+    """
     def __init__(self, default_state: DeteriorationState | None):  # noqa
+        """Draw the current step.
+
+        Args:
+            default_state: State whose photo is preloaded (edit and new
+                state pages), or None.
+
+        Raises:
+            PausePageRun: While the photo is not uploaded and cropped.
+        """
         self._seed_default_photo_if_needed(default_state)
 
         if Sk.CROPPED_TARGET_IMG in sess:
@@ -165,7 +245,13 @@ class UploadAndCropForm(Form):
     @staticmethod
     def _seed_default_photo_if_needed(default_state):
         """If we have a default state and haven't opted out, try to preload
-        its photo into session state so the user doesn't have to upload."""
+        its photo into session state so the user doesn't have to upload.
+
+        If the photo file is missing, opts out instead.
+
+        Args:
+            default_state: State whose photo to preload, or None.
+        """
         if default_state is None:
             return
         if Sk.USE_DEFAULT_TARGET_PIC not in sess:
@@ -180,6 +266,7 @@ class UploadAndCropForm(Form):
             sess[Sk.USE_DEFAULT_TARGET_PIC] = False
             return
 
+        # The saved photo is already cropped, so the cropper is skipped.
         sess[Sk.CROPPED_TARGET_IMG] = img
         sess[Sk.UPLOADED_TARGET_IMG] = img.tobytes()
         sess[Sk.IMG_FILE_NAME] = default_state.photos[0].original_file_name
@@ -202,6 +289,8 @@ class UploadAndCropForm(Form):
                 if st.button("❌ Delete photo"):
                     del sess[Sk.CROPPED_TARGET_IMG]
                     del sess[Sk.UPLOADED_TARGET_IMG]
+                    # Otherwise the default photo would be preloaded
+                    # again on the next rerun.
                     sess[Sk.USE_DEFAULT_TARGET_PIC] = False
                     st.rerun()
 
@@ -236,12 +325,37 @@ class UploadAndCropForm(Form):
             st.rerun()
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field check. See `Form._is_coherent`."""
         return True, ''
 
 
 class StateForm(Form):
+    """Photo, photo date, scale, calibration and comment of a state.
+
+    Attributes:
+        length_per_px: Photo scale in m per pixel, or None.
+        target_img: Cropped photo (PIL image).
+        img_format: File extension of the photo, used as PIL format.
+        img_bytes: Cropped photo encoded in `img_format`.
+        photo_file_name: Original file name of the photo.
+        state_date: Date the photo was taken.
+        calibration_factor: Calibration factor description.
+        comment: Comment, `''` if none.
+        target_date: Date the target was made.
+    """
     def __init__(self, target_date: datetime,
                  default_state: DeteriorationState | None):
+        """Draw the sub-forms and fields.
+
+        Args:
+            target_date: Date the target was made; the photo can't be
+                older.
+            default_state: State used to prefill the form, or None.
+
+        Raises:
+            PausePageRun: While the photo is not cropped or the comment
+                question is unanswered.
+        """
         db_has_comment = None
         if default_state:
             if default_state.comment != '':
@@ -308,6 +422,8 @@ class StateForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Refuse a photo older than the target. See
+        `Form._is_coherent`."""
         if self.state_date < self.target_date:
             return False, ('Picture date cannot be anterior to the date '
                            'the target was made.')
@@ -315,6 +431,19 @@ class StateForm(Form):
 
     def to_deterioration_state(self, target: Target, email: str|None = None) \
             -> DeteriorationState:
+        """Build an unsaved state with its `TargetPhoto`.
+
+        Args:
+            target: Target the state belongs to.
+            email: Who recorded the state; defaults to the target's
+                `made_by_email`.
+
+        Returns:
+            The unsaved state, with `photos` set but no patches.
+
+        Raises:
+            PausePageRun: If the form is not valid.
+        """
         if not self.is_valid:
             raise PausePageRun
         coord_system = PixelCoordinateSystem.PLOTLY
@@ -338,13 +467,27 @@ class StateForm(Form):
             upload_date=datetime.now(),
             target_state=state,
         )
+        # Written to `user_data/` when the state is saved.
         photo_upload.file_bytes = self.img_bytes
         state.photos = [photo_upload]
         return state
 
 
 class XYCoordinatesForm(Form):
+    """One point in pixel coordinates on the target photo.
+
+    Attributes:
+        x: X coordinate in pixels, or None if invalid.
+        y: Y coordinate in pixels, or None if invalid.
+    """
     def __init__(self, key: str | int, default_vertex: Vertex | None):
+        """Draw the coordinate field.
+
+        Args:
+            key: Makes the widget key unique on the page.
+            default_vertex: Vertex used to prefill the field (rounded to
+                whole pixels), or None.
+        """
         if default_vertex:
             x = round(default_vertex.pixel_x)
             y = round(default_vertex.pixel_y)
@@ -359,21 +502,40 @@ class XYCoordinatesForm(Form):
         super().__init__(fields=[coord_fld], sub_forms=[], )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field check. See `Form._is_coherent`."""
         return True, ''
 
 
 class DiscPatchForm(Form):
+    """A disc patch, given by 3 points on its circumference.
+
+    Attributes:
+        pt_forms: The three `XYCoordinatesForm`s.
+        point_1: First point (pixels).
+        point_2: Second point (pixels).
+        point_3: Third point (pixels).
+    """
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None):
+        """Draw the pixel helper and the three point inputs.
+
+        Args:
+            key: Makes the widget keys unique on the page.
+            target_img: Cropped target photo, shown by the pixel helper.
+            default_patch: Patch used to prefill the points, or None.
+        """
         st.write("Arbitrarily choose 3 points that are far apart from each "
                  "other, on the disc circumference:")
 
         class Default(SimpleNamespace):
+            """Default vertices of the three points (None if none)."""
             vertex1 = None
             vertex2 = None
             vertex3 = None
 
         if default_patch:
+            # A saved disc is a polygon with many vertices; take three
+            # spread around it.
             vertices = default_patch.vertices
             vertex_count = len(vertices)
             Default.vertex1 = vertices[0]
@@ -406,6 +568,8 @@ class DiscPatchForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Require 3 distinct, non-collinear points (otherwise no
+        circle passes through them). See `Form._is_coherent`."""
         distinct_points = {self.point_1, self.point_2, self.point_3}
         valid_coords = all(f.is_valid for f in self.pt_forms)
         if valid_coords:
@@ -417,8 +581,22 @@ class DiscPatchForm(Form):
 
 
 class PolygonPatchForm(Form):
+    """A polygon patch, given by its vertices.
+
+    Attributes:
+        vertices: List of `(x, y)` pixel coordinates (None where
+            invalid).
+        xy_forms: One `XYCoordinatesForm` per vertex.
+    """
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None):
+        """Draw the vertex count and one point input per vertex.
+
+        Args:
+            key: Makes the widget keys unique on the page.
+            target_img: Cropped target photo, shown by the pixel helper.
+            default_patch: Patch used to prefill the vertices, or None.
+        """
         default_vertices = None if default_patch is None \
             else default_patch.vertices
 
@@ -456,6 +634,8 @@ class PolygonPatchForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Require at least 3 distinct vertices. See
+        `Form._is_coherent`."""
         distinct_points = set(self.vertices)
         if len(distinct_points) < 3 and all(f.is_valid for f in self.xy_forms):
             return False, 'Vertices must be distinct. Some points are equal.'
@@ -463,11 +643,35 @@ class PolygonPatchForm(Form):
 
 
 class PatchForm(Form):
+    """One patch: base-patch flag, shape, stoichiometry and geometry.
+
+    Attributes:
+        form: `DiscPatchForm`, `PolygonPatchForm`, or None while no
+            shape is chosen.
+        shape: Chosen `ShapeType`, or None.
+        stoichio: Chemical formula entered.
+        stack_idx: Position in the stack of patches (0 = bottom).
+        updated_patch: Patch used as default, or None.
+        is_base_patch: Whether the patch is the base patch.
+    """
     def __init__(self, key: str, target_img: ImageFile,
                  default_patch: Patch | None,
                  is_first_patch: bool, stack_idx: int):
+        """Draw the fields and the shape sub-form.
+
+        Args:
+            key: Makes the widget keys unique on the page.
+            target_img: Cropped target photo, shown by the pixel helper.
+            default_patch: Patch used to prefill the form, or None.
+            is_first_patch: Whether this is the first patch of the list.
+            stack_idx: Position in the stack of patches (0 = bottom).
+        """
+        # Discs are saved as polygons with many vertices (see
+        # `Disc.to_vertices`), so a large count means it was a disc.
         if default_patch is None:
             default_shape = None
+        # TODO Fix the assumption, that a polygon with more than 100 vetices
+        #  is a disc:
         elif len(default_patch.vertices) > 100:
             default_shape = ShapeType.DISC
         else:
@@ -515,16 +719,40 @@ class PatchForm(Form):
                              [form])
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field check. See `Form._is_coherent`."""
         return True, ''
 
     def to_patch_or_none(self, state: DeteriorationState) -> Patch | None:
+        """Build the unsaved patch, or None if the form is incomplete.
+
+        Lets the figure show the patches already filled in before the
+        whole form is valid.
+
+        Args:
+            state: State the patch belongs to.
+
+        Returns:
+            The unsaved patch, or None.
+        """
         if not self.is_valid or self.shape not in ShapeType:
             return None
 
         return self.to_patch(state)
 
     def to_patch(self, state: DeteriorationState)\
-            -> Patch | None:
+            -> Patch | None:  # TODO remove None?
+        """Build the unsaved patch (a disc becomes a polygon).
+
+        Args:
+            state: State the patch belongs to.
+
+        Returns:
+            The unsaved patch.
+
+        Raises:
+            PausePageRun: If the form is not valid.
+            RuntimeError: If the shape is unknown.
+        """
         if not self.is_valid:
             raise PausePageRun
         if self.shape == ShapeType.DISC:
@@ -553,8 +781,23 @@ class PatchForm(Form):
 
 
 class PatchListForm(Form):
+    """The number of patches, then one `PatchForm` per patch.
+
+    Attributes:
+        patch_forms: The `PatchForm`s, bottom patch first.
+    """
     def __init__(self, target_img: ImageFile,
                  default_state: DeteriorationState | None):
+        """Draw the patch count field and the patch forms.
+
+        Args:
+            target_img: Cropped target photo, shown by pixel helpers.
+            default_state: State whose patches prefill the forms, or
+                None.
+
+        Raises:
+            PausePageRun: While the patch count is invalid.
+        """
         default_patches = None if default_state is None \
             else default_state.patches
 
@@ -572,6 +815,7 @@ class PatchListForm(Form):
         st.divider(width=50)
         patch_forms: list[PatchForm] = []
         for i in range(patch_count):
+            # Inside this loop, `default_state` holds a default *patch*.
             if default_patches is not None and i < len(default_patches):
                 default_state = default_patches[i]
             else:
@@ -588,6 +832,8 @@ class PatchListForm(Form):
         super().__init__(fields=[patch_count_fld], sub_forms=self.patch_forms)
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Require exactly one base patch, first in the list. See
+        `Form._is_coherent`."""
         base_patch_count = len([f for f in self.patch_forms if f.is_base_patch])
         zero_patch = len(self.patch_forms) == 0
         if base_patch_count != 1 and not zero_patch:
@@ -600,13 +846,46 @@ class PatchListForm(Form):
 
     def to_patches(self, state: DeteriorationState) \
             -> list[Patch | None]:
+        """Build the unsaved patches.
+
+        Args:
+            state: State the patches belong to.
+
+        Returns:
+            One patch per form, None where the form is incomplete.
+        """
         return [form.to_patch_or_none(state)
                 for form in self.patch_forms]
 
 
 class DeteriorationStateForm(Form):
+    """A full deterioration state: photo, scale, patches and preview.
+
+    Also used by the new / edit deterioration state pages. Builds the
+    unsaved object graph: `target.states = [state]` and
+    `state.patches`.
+
+    Attributes:
+        target: The target, with `states` set.
+        target_img: Cropped photo.
+        all_patches: One entry per patch form, None where incomplete.
+        filled_patches: `all_patches` without the Nones.
+        state: The unsaved `DeteriorationState`.
+    """
     def __init__(self, target: Target, email: str|None = None,
                  default_state: DeteriorationState|None = None):
+        """Draw the sub-forms, the patch figure and the confirmation.
+
+        Args:
+            target: Target the state belongs to (may be unsaved).
+            email: Who records the state; defaults to the target's
+                `made_by_email`.
+            default_state: State used to prefill the form, or None.
+
+        Raises:
+            PausePageRun: While the state info is incomplete or
+                invalid.
+        """
         state_info_form = StateForm(target.made_on,
                                     default_state=default_state)
         st.divider()
@@ -638,6 +917,8 @@ class DeteriorationStateForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """Require every patch form to be filled. See
+        `Form._is_coherent`."""
         missing_patch_count = len(self.all_patches) - len(self.filled_patches)
         if missing_patch_count > 0:
             return False, (f"Please enter data for all patches. "
@@ -646,7 +927,18 @@ class DeteriorationStateForm(Form):
 
 
 class RootForm(Form):
+    """Whole "new target" form: basic info and first state.
+
+    Attributes:
+        target: Unsaved `Target`, with its state, photo and patches.
+        target_img: Cropped photo.
+    """
     def __init__(self):
+        """Draw the whole form.
+
+        Raises:
+            PausePageRun: While an earlier step is unfinished.
+        """
         basic_info_form = BasicInfoForm()
         target = basic_info_form.to_target(is_archived=False)
 
@@ -661,4 +953,5 @@ class RootForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field check. See `Form._is_coherent`."""
         return True, ''
