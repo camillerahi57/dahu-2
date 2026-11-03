@@ -1,3 +1,9 @@
+"""The list of every page of the app.
+
+Each page file in `pages/` must be registered here; `entry_point.py`
+passes them all to `st.navigation`. Use `pages.<name>` wherever a page
+is needed (`init_page`, `switch_page_bttn`...), instead of a file path.
+"""
 from dataclasses import dataclass, asdict
 from typing import Iterable
 
@@ -7,6 +13,18 @@ from streamlit.navigation.page import StreamlitPage
 
 @dataclass
 class _Pages:
+    """Registry of the app's pages, one attribute per page.
+
+    A dataclass is a class whose attributes are declared as annotated
+    class variables; Python writes `__init__` for it. Here every
+    attribute's default is a `st.Page`, built once when this module is
+    imported.
+
+    File paths are relative to `pages/` (hence `../pages/...`).
+    `url_path` is the part of the URL after the domain; other code finds
+    pages by it (see `from_url_path`), so changing one breaks saved
+    links. `st.Page` raises at startup if a file is missing.
+    """
     browse_libs: StreamlitPage = Page(
         '../pages/browse_libs.py', url_path='browse_libs',
         title='Browse Libraries', icon="🐐")
@@ -93,16 +111,36 @@ class _Pages:
         title='Test Page', icon="🐐")
 
     def __iter__(self) -> Iterable[StreamlitPage]:
-        """Add 'StreamlitPage' type hint to make it appear in the iteration."""
+        """Add 'StreamlitPage' type hint to make it appear in the iteration.
+
+        Lets `for page in pages` and `list(pages)` go through every page.
+
+        Returns:
+            An iterator over the pages, in declaration order.
+        """
         return iter(asdict(self).values())
 
     def from_url_path(self, url_path: str) -> StreamlitPage:
+        """Finds a page by its `url_path`.
+
+        Used by `switch_page_bttn` when it is given a URL path string.
+
+        Args:
+            url_path: The page's `url_path`, e.g. `'inspect_lib'`.
+
+        Returns:
+            The matching page.
+
+        Raises:
+            RuntimeError: No page has this `url_path`.
+        """
         for page in self:
             if page.url_path == url_path:
                 return page
         raise RuntimeError(f'Page {url_path} not found.')
 
 
+# The single instance to import: `from logic.page_list import pages`.
 pages = _Pages()
 
 

@@ -1,3 +1,17 @@
+"""Creates an empty Dahu DB database. For fresh installs only.
+
+Run once, from the repo root:
+`python -m logic.migrations.table_creation`.
+
+WARNING: it also deletes every snapshot in the Restic repository set in
+`dahu_2_config.py`. Never run it on an existing installation.
+
+What it does, in order:
+    1. Creates the SQLite file at `DB_PATH` if it doesn't exist.
+    2. Deletes all Restic snapshots.
+    3. Creates one table per model in `dahu_2_models` (Peewee skips
+       tables that already exist).
+"""
 import sqlite3
 
 from logic.app_restoration import Snapshot
