@@ -1239,6 +1239,26 @@ class TriodeSputtering(_BaseModel):
 
 
 class UserUploadedFile(_BaseModel):
+    """Base model for a file uploaded by a user.
+
+    The DB row holds the metadata; the file bytes live in
+    `user_data/<internal_file_name>`. Subclasses (`Pattern`, `Recipe`,
+    `LibraryFile`, `TargetPhoto`) each get their own table with copies
+    of these columns (Peewee inheritance, no shared parent table).
+
+    Attributes:
+        label: Name chosen by the user, shown on download buttons. Not
+            NULL. `Pattern` and `Recipe` pages require it to be unique
+            (see `label_is_taken`), but the DB does not enforce it.
+        internal_file_name: Name of the file in `user_data/` (see
+            `new_internal_file_name`). Unique, not NULL.
+        original_file_name: Name of the file on the user's computer
+            when uploaded. Not NULL.
+        upload_date: Day of the upload. Not NULL.
+        _file_bytes: Cache of the file content, not stored in the DB.
+            Set it before `save_bytes`, or let `file_bytes` read it
+            from disk.
+    """
     label: str = cast(Any, CharField())
     internal_file_name: str = cast(Any, CharField(unique=True))
     original_file_name: str = cast(Any, CharField())
@@ -1251,16 +1271,42 @@ class UserUploadedFile(_BaseModel):
                  original_file_name: str | None = None,
                  upload_date: datetime | None = None,
                  **kwargs):
+        """Create an unsaved uploaded-file row.
+
+        Each keyword sets the column of the same name. The file bytes
+        are not written: set `file_bytes`, then call `save_bytes`.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See the class docstring.
+            internal_file_name: See the class docstring.
+            original_file_name: See the class docstring.
+            upload_date: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @property
     def download_file_name(self):
+        """File name proposed to the browser when downloading.
+
+        `<class name>_<label>_<original file name>`.
+        """
         class_name = self.__class__.__name__
         return f'{class_name}_{self.label}_{self.original_file_name}'
 
     @classmethod
     def get_problems(cls) -> Iterable[Event]:
+        """Yield the integrity problems of this table.
+
+        Adds one "file missing" event for each row whose file is not in
+        `user_data/`, then the checks of `_BaseModel.get_problems`.
+
+        Returns:
+            The problems found, as `Event`s (written to `AppLog` by
+            `logic.db_integrity`).
+        """
         # Finding files that don't exist any more:
         for file in cls.select():
             file: UserUploadedFile
@@ -1272,24 +1318,56 @@ class UserUploadedFile(_BaseModel):
 
     @classmethod
     def new_internal_file_name(cls, label: str, original_file_name: str):
+        """Build a new name for storing a file in `user_data/`.
+
+        A random string makes the name unique, even if two uploads have
+        the same label and original name.
+
+        Args:
+            label: The file's label.
+            original_file_name: Name of the file on the user's computer.
+
+        Returns:
+            `<class name>_<label>_<random string>_<original file name>`.
+        """
         from logic.utils import rand_str
         return f'{cls.__name__}_{label}_{rand_str()}_{original_file_name}'
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     def delete_related_files(self):
+        """Delete the stored file from `user_data/`, if it exists.
+
+        Called by `delete_with_parts` after the row is deleted. See
+        `_BaseModel.delete_related_files`.
+        """
         try:
             Path.unlink(self.get_path())
+            # Reason for the 0.1 s pause unknown (see DOC_NOTES.md).
             sleep(.1)
         except FileNotFoundError:
             pass
 
     def get_path(self):
+        """Path of the stored file.
+
+        Returns:
+            `user_data/<internal_file_name>`, relative to the repo root.
+        """
         return USER_DATA_PATH.joinpath(self.internal_file_name)
 
     @property
     def file_bytes(self):
+        """Content of the file, read from disk on first access.
+
+        The result is cached in `_file_bytes`. None if the file is
+        missing from `user_data/`.
+        """
         if self._file_bytes is None:
             try:
                 with open(self.get_path(), 'rb') as file:
@@ -1300,14 +1378,35 @@ class UserUploadedFile(_BaseModel):
 
     @file_bytes.setter
     def file_bytes(self, file_bytes: bytes):
+        """Set the content to write later with `save_bytes`.
+
+        Args:
+            file_bytes: The new file content.
+        """
         self._file_bytes = file_bytes
 
     def retrieve_file_bytes(self):
+        """Read the file from disk into the `file_bytes` cache.
+
+        Unlike `file_bytes`, always reads the disk.
+
+        Raises:
+            FileNotFoundError: If the file is missing.
+        """
         with open(self.get_path(), 'rb') as file:
             bytes_ = file.read()
         self.file_bytes = bytes_
 
     def save_bytes(self):
+        """Write `file_bytes` to `user_data/<internal_file_name>`.
+
+        Called by the upload pages after the row is saved. Overwrites
+        any file of the same name.
+
+        Raises:
+            ValueError: If `file_bytes` is None or empty. The file has
+                then already been created (empty) on disk.
+        """
         file_bytes = self.file_bytes
 
         with open(self.get_path(), 'wb') as file:
@@ -1317,6 +1416,10 @@ class UserUploadedFile(_BaseModel):
                 raise ValueError("File cannot be empty.")
 
     def download_bttn(self):
+        """Draw a Streamlit download button for this file.
+
+        Shows "_File missing_" instead if the file is not on disk.
+        """
         file_bytes = self.file_bytes
 
         if file_bytes is None:
@@ -1331,12 +1434,38 @@ class UserUploadedFile(_BaseModel):
 
     @classmethod
     def label_is_taken(cls, label: str) -> bool:
+        """Tell whether a row of this table already uses `label`.
+
+        Args:
+            label: The label to check.
+
+        Returns:
+            True if some row of this subclass's table has this label.
+        """
         patterns = cls.select()
         labels = [p.label for p in patterns]
         return label in labels
 
 
 class FilmModification(_BaseModel):
+    """A process applied to a film after deposition.
+
+    The process details are in a subtype row, chosen by `modif_type`:
+    an `Annealing`, or an `Etching` (itself an `IonBeamEtching`,
+    `WetEtching` or `LiftOffEtching`). See `modification_process`.
+
+    Attributes:
+        made_on: Day the modification was made. Not NULL.
+        modif_number: Position of this modification in the film's
+            history, starting at 0 for the first one. Not NULL. `save`
+            and `delete_instance` shift the numbers of the later
+            modifications.
+        made_by_email: Email address of the person who made it. Not
+            NULL.
+        comment: Free comment. Can be NULL.
+        modif_type: Kind of process, a `FilmModifType` value. Not NULL.
+        film: Foreign key to the modified `Film`. Not NULL.
+    """
     made_on = DateField()
     modif_number: int = cast(Any, IntegerField())
     made_by_email = CharField()
@@ -1358,10 +1487,28 @@ class FilmModification(_BaseModel):
                  modif_type: FilmModifType | None = None,
                  film: Film | None = None,
                  **kwargs):
+        """Create an unsaved film modification row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            made_on: See the class docstring.
+            modif_number: See the class docstring.
+            made_by_email: See the class docstring.
+            comment: See the class docstring.
+            modif_type: See the class docstring.
+            film: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the annealing or etching subtype row, with its parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         for a in self.annealings:
             a.delete_with_parts()
         for e in self.etchings:
@@ -1369,7 +1516,28 @@ class FilmModification(_BaseModel):
 
     def save(self, shift_subsequent_modifs=True):  # noqa
         """Saves a film modification with its modif_number, and adds 1 to all
-        modif_number attributes of subsequent film modifications."""
+        modif_number attributes of subsequent film modifications.
+
+        This makes room for the new modification in the numbering. The
+        shift saves every modification whose number is at least this
+        one's, in all films (see DOC_NOTES.md). Writes `AppLog` rows.
+
+        Args:
+            shift_subsequent_modifs: False to save this row only, without
+                shifting the others (used for the shifted rows
+                themselves, to avoid an endless recursion).
+        """
+        # TODO POSSIBLE BUG: This method
+        #   shifts `modif_number` of every modification with a number >= this one,
+        #   in *all films*, not only `self.film`. Same in `delete_instance`
+        #   (line 1537). Inserting a modification on film A renumbers film B, and
+        #   `previous_modif` (which filters by film) can then fail.
+        # TODO Other bug: takes no `*args/**kwargs`, so `save_with_dependent(force_insert=True)`
+        #   (the edit pattern from CLAUDE.md) would raise `TypeError`. No edit page
+        #   for modifications exists yet.
+        # TODO Third bug: also shifts when
+        #   updating an existing row, so re-saving a modification bumps its
+        #   successors (and the row itself, if it is fetched in the loop).
         if shift_subsequent_modifs:
             for modif in FilmModification.select():
                 if modif.modif_number >= self.modif_number:
@@ -1380,8 +1548,19 @@ class FilmModification(_BaseModel):
     def delete_instance(self, recursive: bool = False,
                         delete_nullable: bool = False,
                         *args, **kwargs):
-        """Saves a film modification with its modif_number, and adds 1 to all
-        modif_number attributes of subsequent film modifications."""
+        """Deletes a film modification, and subtracts 1 from the
+        modif_number attributes of subsequent film modifications.
+
+        (This docstring used to be a copy of `save`'s.) Like `save`, the
+        shift applies to all films (see DOC_NOTES.md). Writes `AppLog`
+        rows.
+
+        Args:
+            recursive: See Peewee's `Model.delete_instance`.
+            delete_nullable: See Peewee's `Model.delete_instance`.
+            *args: Passed on to Peewee's `Model.delete_instance`.
+            **kwargs: Passed on to Peewee's `Model.delete_instance`.
+        """
         for modif in FilmModification.select():
             if modif.modif_number >= self.modif_number:
                 modif.modif_number -= 1
@@ -1391,6 +1570,15 @@ class FilmModification(_BaseModel):
 
     def modification_process(self) \
             -> (Annealing | WetEtching | LiftOffEtching | IonBeamEtching):
+        """Return the subtype row holding the process details.
+
+        Used by the inspect-library page.
+
+        Returns:
+            The `Annealing`, `WetEtching`, `IonBeamEtching` or
+            `LiftOffEtching` matching `modif_type`. None for an unknown
+            `modif_type`.
+        """
         fmt = FilmModifType
         match self.modif_type:
             case fmt.ANNEALING:
@@ -1404,6 +1592,11 @@ class FilmModification(_BaseModel):
 
     @property
     def previous_modif(self) -> FilmModification|None:
+        """The modification just before this one on the same film.
+
+        None for the first modification (`modif_number` 0). Raises
+        Peewee's `DoesNotExist` if the numbering has a gap.
+        """
         if self.modif_number == 0:
             return None
         else:
@@ -1414,6 +1607,20 @@ class FilmModification(_BaseModel):
 
 
 class Annealing(_BaseModel):
+    """Annealing parameters of one `FilmModification` (a subtype).
+
+    The temperature profile is a list of `AnnealingStep`s, the points
+    of a piecewise-linear temperature-versus-time curve.
+
+    Attributes:
+        pressure: Pressure at the start, in Pa (UI unit: mbar, see
+            `StartPressureField`). Can be NULL.
+        pumping_duration: Pumping time before heating, in s (UI unit:
+            min, see `PumpingDurationField`). Can be NULL.
+        furnace: Furnace used, a `Furnace` value. Can be NULL.
+        film_modif: Foreign key to the modification. Unique, so a
+            modification has at most one annealing row. Not NULL.
+    """
     pressure = FloatField(null=True)
     pumping_duration = FloatField(null=True)
     furnace: Furnace | None = cast(Any, CharField(null=True))
@@ -1429,34 +1636,81 @@ class Annealing(_BaseModel):
                  furnace: Furnace | None = None,
                  film_modif: FilmModification | None = None,
                  **kwargs):
+        """Create an unsaved annealing row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            pumping_duration: See the class docstring.
+            pressure: See the class docstring.
+            furnace: See the class docstring.
+            film_modif: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the steps, with their atmospheres.
+
+        See `_BaseModel.delete_parts`.
+        """
         for s in self.steps:
             s.delete_with_parts()
 
     @property
     def temperatures(self) -> set[Quantity]:
+        """The distinct step temperatures, as Pint quantities in K.
+
+        Room-temperature steps count as `ROOM_TEMPERATURE_CELSIUS`.
+        """
         return {s.temp_quantity for s in self.steps}
 
     @property
     def max_temperature(self) -> Quantity:
+        """The highest step temperature, as a Pint quantity in K."""
         return max(self.temperatures)  # noqa Wrong warning.
 
     @property
     def ordered_steps(self):
+        """The steps sorted by `timestamp`."""
         def key(step: AnnealingStep):
+            """Sort key: the step's timestamp, in s.
+
+            Args:
+                step: The step to sort.
+
+            Returns:
+                Its timestamp.
+            """
             return step.timestamp
 
         return sorted(self.steps, key=key)
 
     def save(self, *args, **kwargs):
+        """Check the step profile, then save the row.
+
+        The steps must already be attached (`self.steps`), as done by
+        `save_with_dependent`.
+
+        Args:
+            *args: Passed on to `_BaseModel.save`.
+            **kwargs: Passed on to `_BaseModel.save`.
+
+        Raises:
+            AssertionError: See `assert_valid_annealing`.
+        """
         self.assert_valid_annealing()
         super().save(*args, **kwargs)
 
     @property
     def duration(self) -> float:
+        """Total duration, in s: the timestamp of the last step.
+
+        Raises AssertionError if the first or last step is not at room
+        temperature.
+        """
         steps = self.ordered_steps
         assert steps[0].is_room_temperature and steps[-1].is_room_temperature, (
             f"Annealing must start with and end with room temperature. Got "
@@ -1466,6 +1720,13 @@ class Annealing(_BaseModel):
         return steps[-1].timestamp
 
     def assert_valid_annealing(self):
+        """Check that the step profile is a complete annealing.
+
+        Raises:
+            AssertionError: If there are fewer than 3 steps, if the
+                first or last step is not at room temperature, or if
+                the first step's timestamp is not 0.
+        """
         steps = self.ordered_steps
         assert len(steps) >= 3, (
             "There must be at least 3 steps: initial (room temp.), "
@@ -1475,10 +1736,19 @@ class Annealing(_BaseModel):
         assert steps[0].timestamp == 0, "First step must have timestamp 0."
 
     def get_figure(self) -> Figure:
+        """Plot the temperature profile.
+
+        Returns:
+            A Plotly figure, see `AnnealingStep.get_figure`.
+        """
         return AnnealingStep.get_figure(self.steps)
 
     @property
     def title_db_value_input_fields(self):
+        """`(title, DB value, field class)` for each displayed column.
+
+        See `FilmLayer.title_db_value_input_fields`.
+        """
         from components.forms.new_film_modif.fields import StartPressureField, \
             PumpingDurationField, FurnaceField
         return [
@@ -1488,6 +1758,15 @@ class Annealing(_BaseModel):
         ]
 
     def phase_stoichio_strings(self):
+        """Describe the atmosphere of each phase.
+
+        A phase is the time between two consecutive steps. Used by the
+        inspect-library page.
+
+        Returns:
+            One string per phase: `'vacuum'`, or the gas composition
+            (see `StoichioElement.to_str`).
+        """
         stoichio_strings = []
         for i_, step in enumerate(self.steps):
             if i_ == 0:
@@ -1501,6 +1780,26 @@ class Annealing(_BaseModel):
 
 
 class AnnealingStep(_BaseModel):
+    """One point of an annealing's temperature-versus-time profile.
+
+    Between two consecutive steps the temperature changes linearly (a
+    "ramp"), or stays constant (a "plateau", see `is_plateau`). Each
+    step except the first also stores the atmosphere of the phase that
+    ends at it (`preceding_atmosphere`, `StoichioElement` rows).
+
+    Attributes:
+        timestamp: Time since the start of the annealing, in s (the
+            form enters phase durations in s, see `PhaseDurationField`).
+            0 for the first step. Not NULL.
+        temperature: Temperature reached, in K (UI unit: °C, see
+            `ReachedTempField`). Can be NULL; not used when
+            `is_room_temperature` is True (see `temp_quantity`).
+        is_room_temperature: Whether the step is at room temperature
+            (`ROOM_TEMPERATURE_CELSIUS`). Not NULL.
+        preceding_was_vacuum: Whether the phase ending at this step was
+            under vacuum. NULL for the first step.
+        annealing: Foreign key to the `Annealing`. Not NULL.
+    """
     timestamp: float = cast(Any, FloatField())
     temperature = FloatField(null=True)
     is_room_temperature = BooleanField()
@@ -1518,14 +1817,42 @@ class AnnealingStep(_BaseModel):
                  preceding_was_vacuum: bool | None = None,
                  annealing: Annealing | None = None,
                  **kwargs):
+        """Create an unsaved annealing step row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            timestamp: See the class docstring.
+            temperature: See the class docstring.
+            is_room_temperature: See the class docstring.
+            preceding_was_vacuum: See the class docstring.
+            annealing: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the composition rows of the preceding atmosphere.
+
+        See `_BaseModel.delete_parts`.
+        """
         for se in self.preceding_atmosphere:
             se.delete_with_parts()
 
     def is_plateau(self, previous_step: AnnealingStep) -> bool:
+        """Tell whether the temperature is constant since `previous_step`.
+
+        Used by the annealing form to rebuild its phases when editing.
+
+        Args:
+            previous_step: The step just before this one.
+
+        Returns:
+            True if both steps are at room temperature, or both have
+            the same `temperature`.
+        """
         both_room_temp = (self.is_room_temperature
                           and previous_step.is_room_temperature)
         if both_room_temp:
@@ -1538,6 +1865,18 @@ class AnnealingStep(_BaseModel):
 
     @classmethod
     def get_figure(cls, steps: list[AnnealingStep]) -> Figure:
+        """Plot temperature against time for a list of steps.
+
+        Times and temperatures are converted from the DB units (s, K)
+        to the UI units of `PhaseDurationField` and `ReachedTempField`.
+
+        Args:
+            steps: The steps to plot, in time order. They can be unsaved
+                (the new-modification page plots them before submit).
+
+        Returns:
+            A Plotly line chart with one marker per step.
+        """
         from components.forms.new_film_modif.fields import (PhaseDurationField,
                                                             ReachedTempField)
         timestamps = []
@@ -1567,6 +1906,10 @@ class AnnealingStep(_BaseModel):
 
     @property
     def temp_quantity(self) -> Quantity:
+        """The step temperature, as a Pint quantity in K.
+
+        Uses `ROOM_TEMPERATURE_CELSIUS` for room-temperature steps.
+        """
         if self.is_room_temperature:
             room_temp = ur.Quantity(ROOM_TEMPERATURE_CELSIUS, ur.celsius)
             return room_temp.to(db_units.temperature)
@@ -1575,6 +1918,11 @@ class AnnealingStep(_BaseModel):
 
 
 class Pattern(UserUploadedFile):
+    """An uploaded pattern (lithography mask design) file, used by etchings.
+
+    Uploaded on the new-pattern page, then picked by label in the
+    etching forms. Columns: see `UserUploadedFile`.
+    """
     etchings: DependentBackref[Etching]
 
     log_db_write = True
@@ -1584,11 +1932,29 @@ class Pattern(UserUploadedFile):
                  original_file_name: str | None = None,
                  upload_date: datetime | None = None,
                  **kwargs):
+        """Create an unsaved pattern row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See `UserUploadedFile`.
+            internal_file_name: See `UserUploadedFile`.
+            original_file_name: See `UserUploadedFile`.
+            upload_date: See `UserUploadedFile`.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class Recipe(UserUploadedFile):
+    """An uploaded etching recipe file, used by etchings.
+    A recipe is a set of steps that describe a process (etching, for example).
+
+    Uploaded on the new-recipe page, then picked by label in the
+    etching forms. Columns: see `UserUploadedFile`.
+    """
     etchings: DependentBackref[Etching]
 
     log_db_write = True
@@ -1598,11 +1964,37 @@ class Recipe(UserUploadedFile):
                  original_file_name: str | None = None,
                  upload_date: datetime | None = None,
                  **kwargs):
+        """Create an unsaved recipe row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See `UserUploadedFile`.
+            internal_file_name: See `UserUploadedFile`.
+            original_file_name: See `UserUploadedFile`.
+            upload_date: See `UserUploadedFile`.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class Etching(_BaseModel):
+    """Common part of an etching `FilmModification` (a subtype).
+
+    The etching itself is in one more subtype row, chosen by the
+    modification's `modif_type`: `IonBeamEtching`, `WetEtching` or
+    `LiftOffEtching`.
+
+    Attributes:
+        has_a_pattern: Whether the etching used a pattern. Not NULL.
+        film_modif: Foreign key to the modification. Unique, so a
+            modification has at most one etching row. Not NULL.
+        pattern: Foreign key to the `Pattern` file used. Can be NULL,
+            even when `has_a_pattern` is True (none selected).
+        recipe: Foreign key to the `Recipe` file used. Can be NULL.
+    """
     has_a_pattern = BooleanField()
 
     film_modif: FilmModification = cast(Any, ForeignKeyField(
@@ -1623,10 +2015,27 @@ class Etching(_BaseModel):
                  pattern: Pattern | None = None,
                  recipe: Recipe | None = None,
                  **kwargs):
+        """Create an unsaved etching row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            has_a_pattern: See the class docstring.
+            film_modif: See the class docstring.
+            pattern: See the class docstring.
+            recipe: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the ion-beam, wet or lift-off subtype row.
+
+        The `Pattern` and `Recipe` files are shared, so they are kept.
+        See `_BaseModel.delete_parts`.
+        """
         for ie in self.ion_etchings:
             ie.delete_with_parts()
         for we in self.wet_etchings:
@@ -1636,6 +2045,14 @@ class Etching(_BaseModel):
 
 
 class LibraryFile(UserUploadedFile):
+    """A file uploaded for a `Library`.
+
+    It can be a general file, or the data file of a `Charac` (see
+    `charac`). Columns: see `UserUploadedFile`, plus `library`.
+
+    Attributes:
+        library: Foreign key to the `Library`. Not NULL.
+    """
     library = ForeignKeyField(Library, backref='general_files')
 
     characs: DependentBackref[Charac]
@@ -1648,20 +2065,62 @@ class LibraryFile(UserUploadedFile):
                  upload_date: datetime | None = None,
                  library: Library | None = None,
                  **kwargs):
+        """Create an unsaved library file row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See `UserUploadedFile`.
+            internal_file_name: See `UserUploadedFile`.
+            original_file_name: See `UserUploadedFile`.
+            upload_date: See `UserUploadedFile`.
+            library: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @property
     def charac(self):
+        """The `Charac` whose data is this file, or None."""
         characs = list(self.characs)
         return characs[0] if characs else None
 
     @property
     def is_a_charac_file(self):
+        """Whether this file holds the data of a `Charac`."""
         return self.charac is not None
 
 
 class IonBeamEtching(_BaseModel):
+    """Ion beam etching parameters of an `Etching` (a subtype).
+
+    The plasma gases are `PlasmaConstituent` rows. UI units are those
+    of the field class named in brackets, in
+    `components.forms.new_film_modif.fields`.
+
+    Attributes:
+        pre_etching_duration: Pre-etching duration, in s
+            (`PreEtchDurationField`, s). Can be NULL.
+        duration: Etching duration, in s (`IonDurationField`, s). Can
+            be NULL.
+        flow: Gas flow, in m³/s (`FlowField`, cm³/min). Can be NULL.
+        incidence_angle: Beam incidence angle, in rad (`AngleField`,
+            degree). Can be NULL.
+        rotation: Sample rotation speed, in rad/s
+            (`RotationSpeedField`, rpm). Can be NULL.
+        power: Power, in W (`PowerField`, W). Can be NULL.
+        start_pressure: Pressure at the start, in Pa
+            (`StartPressureField`, mbar). Can be NULL.
+        target_pressure: Aimed pressure, in Pa (`TargetPressureField`,
+            mbar). Can be NULL.
+        dc_grid_current: DC grid current, in A (`DcGridCurrentField`,
+            A). Can be NULL.
+        machine: Machine used, an `IbeMachine` value. Can be NULL.
+        etching: Foreign key to the `Etching`. Unique, so an etching
+            has at most one ion beam row. Not NULL.
+    """
     pre_etching_duration = FloatField(null=True)
     duration = FloatField(null=True)
     flow = FloatField(null=True)
@@ -1693,14 +2152,43 @@ class IonBeamEtching(_BaseModel):
                  dc_grid_current: float | None = None,
                  machine: IbeMachine | None = None,
                  **kwargs):
+        """Create an unsaved ion beam etching row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            duration: See the class docstring.
+            flow: See the class docstring.
+            incidence_angle: See the class docstring.
+            rotation: See the class docstring.
+            power: See the class docstring.
+            start_pressure: See the class docstring.
+            etching: See the class docstring.
+            target_pressure: See the class docstring.
+            pre_etching_duration: See the class docstring.
+            dc_grid_current: See the class docstring.
+            machine: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the plasma constituents, with their compositions.
+
+        See `_BaseModel.delete_parts`.
+        """
         for c in self.constituents:
             c.delete_with_parts()
 
     def to_mixture_constituents(self) -> list[MixtureConstituent]:
+        """Convert the plasma constituents for the edit form.
+
+        Returns:
+            One `MixtureConstituent` (proportion, composition string)
+            per `PlasmaConstituent`.
+        """
         return [
             MixtureConstituent(proportion=c.proportion, stoichio=c.stoichio_str)
             for c in self.constituents
@@ -1708,6 +2196,11 @@ class IonBeamEtching(_BaseModel):
 
     @property
     def title_db_value_input_fields(self):
+        """`(title, DB value, field class)` for each displayed column.
+
+        Only some columns are shown. See
+        `FilmLayer.title_db_value_input_fields`.
+        """
         from components.forms.new_film_modif.fields import (
             IonDurationField, FlowField, AngleField, RotationSpeedField,
             PowerField,
@@ -1724,6 +2217,17 @@ class IonBeamEtching(_BaseModel):
 
 
 class PlasmaConstituent(_BaseModel):
+    """One gas of an ion beam etching plasma, with its share.
+
+    Its chemical composition is in `nominal_stoichio` (a list of
+    `StoichioElement` rows).
+
+    Attributes:
+        proportion: Fraction of the plasma made of this gas, in (0, 1].
+            The form normalizes the proportions so they sum to 1. Not
+            NULL.
+        ion_etching: Foreign key to the `IonBeamEtching`. Not NULL.
+    """
     proportion: float = cast(Any, FloatField())
 
     ion_etching: IonBeamEtching = cast(Any, ForeignKeyField(
@@ -1734,20 +2238,49 @@ class PlasmaConstituent(_BaseModel):
     def __init__(self, *args, proportion: float | None = None,
                  ion_etching: IonBeamEtching | None = None,
                  **kwargs):
+        """Create an unsaved plasma constituent row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            proportion: See the class docstring.
+            ion_etching: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the composition rows.
+
+        See `_BaseModel.delete_parts`.
+        """
         for se in self.nominal_stoichio:
             se.delete_with_parts()
 
     @property
     def stoichio_str(self):
+        """The composition as a string, see `StoichioElement.to_str`."""
         return StoichioElement.to_str(self.nominal_stoichio)
 
     @classmethod
     def from_stoichio(cls, stoichio: str, proportion: float,
                       etching: IonBeamEtching) -> PlasmaConstituent:
+        """Build an unsaved constituent with its composition rows.
+
+        Args:
+            stoichio: Composition string, parsed by
+                `StoichioElement.from_str`.
+            proportion: See the class docstring.
+            etching: The ion beam etching it belongs to.
+
+        Returns:
+            The constituent, with `nominal_stoichio` filled in.
+
+        Raises:
+            AssertionError: If `proportion` is not in (0, 1].
+        """
         assert 0 < proportion <= 1
         constituent = cls(
             proportion=proportion,
@@ -1764,6 +2297,15 @@ class PlasmaConstituent(_BaseModel):
 
 
 class LiftOffEtching(_BaseModel):
+    """Lift-off parameters of an `Etching` (a subtype).
+
+    Attributes:
+        used_ultrasound: Whether ultrasound was used. Can be NULL.
+        ultrasound_config: Free description of the ultrasound settings.
+            Can be NULL.
+        etching: Foreign key to the `Etching`. Unique, so an etching
+            has at most one lift-off row. Not NULL.
+    """
     used_ultrasound = BooleanField(null=True)
     ultrasound_config = CharField(null=True)
     etching: Etching = cast(Any, ForeignKeyField(
@@ -1773,14 +2315,54 @@ class LiftOffEtching(_BaseModel):
     def __init__(self, *args, used_ultrasound: bool | None = None,
                  ultrasound_config: str | None = None,
                  etching: Etching | None = None, **kwargs):
+        """Create an unsaved lift-off row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            used_ultrasound: See the class docstring.
+            ultrasound_config: See the class docstring.
+            etching: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
 class WetEtching(_BaseModel):
+    """Wet (chemical) etching parameters of an `Etching` (a subtype).
+
+    The solvents used, in order, are `EtchingSolvent` rows. UI units are
+    those of the field class named in brackets, in
+    `components.forms.new_film_modif.fields`.
+
+    Attributes:
+        hard_bake_temperature: Hard bake temperature, in K
+            (`HardBakeTempField`, °C). Can be NULL.
+        etching_duration: Time in the acid, in s
+            (`AcidEtchingDurationField`, min). Can be NULL.
+        development_duration: Development time, in s
+            (`DevelopmentDurationField`, min). Can be NULL.
+        used_ultrasound: Whether ultrasound was used. Can be NULL.
+        ultrasound_config: Free description of the ultrasound settings.
+            Can be NULL.
+        base: Base used (`BaseField`). Can be NULL.
+        acid: Acid used (`AcidField`). Can be NULL.
+        acid_etching_depth_speed: Etching speed into the depth, in m/s
+            (`EtchingDepthSpeedField`, µm/s). Can be NULL.
+        acid_etching_lateral_speed: Lateral etching speed, in m/s
+            (`EtchingLateralSpeedField`, µm/s). Can be NULL.
+        etching: Foreign key to the `Etching`. Unique, so an etching
+            has at most one wet etching row. Not NULL.
+    """
     hard_bake_temperature = FloatField(null=True)
     etching_duration = FloatField(null=True)
     development_duration = FloatField(null=True)
@@ -1809,15 +2391,43 @@ class WetEtching(_BaseModel):
                  etching: Etching | None = None,
                  **kwargs
                  ):
+        """Create an unsaved wet etching row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            hard_bake_temperature: See the class docstring.
+            etching_duration: See the class docstring.
+            development_duration: See the class docstring.
+            used_ultrasound: See the class docstring.
+            ultrasound_config: See the class docstring.
+            base: See the class docstring.
+            acid: See the class docstring.
+            acid_etching_depth_speed: See the class docstring.
+            acid_etching_lateral_speed: See the class docstring.
+            etching: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the solvent rows.
+
+        See `_BaseModel.delete_parts`.
+        """
         for s in self.solvents:
             s.delete_with_parts()
 
     @property
     def title_db_value_input_fields(self):
+        """`(title, DB value, field class)` for each displayed column.
+
+        The "Solvents" entry is a Markdown string listing the solvents
+        (`**1.** *label* **2.** ...`), not a DB value. See
+        `FilmLayer.title_db_value_input_fields`.
+        """
         from components.forms.new_film_modif.fields import (
             HardBakeTempField, AcidEtchingDurationField, UsedUltrasoundField,
             UltrasoundConfigField, EtchingDepthSpeedField,
@@ -1843,6 +2453,14 @@ class WetEtching(_BaseModel):
 
 
 class EtchingSolvent(_BaseModel):
+    """One solvent used in a `WetEtching`, at a given position.
+
+    Attributes:
+        etching: Foreign key to the `WetEtching`. Not NULL.
+        label: Name of the solvent (`SolventField`). Not NULL.
+        step_idx: Position of this solvent in the sequence, starting at
+            0 (displayed as 1). Not NULL.
+    """
     etching: WetEtching = cast(Any, ForeignKeyField(
         WetEtching, on_delete='RESTRICT', backref='solvents'))
     label: str = cast(Any, CharField())
@@ -1851,10 +2469,25 @@ class EtchingSolvent(_BaseModel):
     def __init__(self, *args, etching: WetEtching | None = None,
                  label: str | None = None,
                  step_idx: int | None = None, **kwargs):
+        """Create an unsaved etching solvent row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            etching: See the class docstring.
+            label: See the class docstring.
+            step_idx: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
