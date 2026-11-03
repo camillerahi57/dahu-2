@@ -1,3 +1,14 @@
+"""Forms of the new and edit substrate pages.
+
+Nesting: `RootForm` → `LayerListForm` → one `LayerForm` per layer →
+`CrystalOrientationForm`. `RootForm.to_substrate` turns the validated
+input into an unsaved `Substrate` with its `SubstrateLayer`s, which
+the page saves with `save_with_dependent()`.
+
+On the edit page, each form gets the existing substrate or layer as
+its default, so its fields are prefilled from the DB.
+"""
+
 import streamlit as st
 
 from components.forms.base_classes import Form
@@ -10,7 +21,27 @@ from logic.lab_modelization.db_models import Substrate, SubstrateLayer, \
 
 
 class CrystalOrientationForm(Form):
+    """Crystal orientation of one layer, as Miller indices (h, k, l).
+
+    Asks whether the layer has an orientation; if so, shows the h, k
+    and l fields.
+
+    Attributes:
+        has_orientation: True, False, or None if not answered yet.
+        h: h index, or None without orientation.
+        k: k index, or None without orientation.
+        l: l index, or None without orientation.
+    """
+
     def __init__(self, key: str, default_layer: SubstrateLayer|None):
+        """Draw the fields.
+
+        Args:
+            key: Distinguishes the widgets of the different layers.
+            default_layer: Existing layer to prefill from, or None.
+                A layer whose `h` is NULL counts as having no
+                orientation.
+        """
         fields = []
         st.write(f"**Crystal Orientation**")
         with st.container(horizontal=True, vertical_alignment='top'):
@@ -22,6 +53,7 @@ class CrystalOrientationForm(Form):
             )
             fields.append(has_orientation_fld)
             if has_orientation_fld.value is True:
+                # The first column stays empty, as an indent.
                 col1_, col2_, col3_, col4_ = st.columns(4)
                 with col2_:
                     h_fld = HField(
@@ -52,6 +84,7 @@ class CrystalOrientationForm(Form):
         super().__init__(fields, [])
 
     def _is_coherent(self):
+        """Refuse the orientation (0, 0, 0). See `Form._is_coherent`."""
         if self.has_orientation:
             if (self.h, self.k, self.l) != (0, 0, 0):
                 return True, ''
@@ -62,7 +95,22 @@ class CrystalOrientationForm(Form):
 
 
 class LayerForm(Form):
+    """One substrate layer: composition, thickness and orientation.
+
+    Attributes:
+        stoichio: Chemical formula string, or None if invalid.
+        thickness: Thickness in m (typed in µm), or None if invalid.
+        cryst_orient_form: The layer's `CrystalOrientationForm`.
+    """
+
     def __init__(self, key: str, default_layer: SubstrateLayer|None):
+        """Draw the layer's fields and sub-form.
+
+        Args:
+            key: Distinguishes the widgets of the different layers
+                (the layer index).
+            default_layer: Existing layer to prefill from, or None.
+        """
         with st.container(horizontal=True, vertical_alignment='center'):
             stoichio_fld = StoichiometryField(
                 key,
@@ -87,11 +135,28 @@ class LayerForm(Form):
         )
 
     def _is_coherent(self):
+        """No cross-field rule. See `Form._is_coherent`."""
         return True, ''
 
 
 class LayerListForm(Form):
+    """The stack of layers: a layer count, then one `LayerForm` each.
+
+    Layers are listed from the bottom (index 0) to the top.
+
+    Attributes:
+        layer_forms: One `LayerForm` per layer, bottom first; empty
+            while the layer count is invalid.
+    """
+
     def __init__(self, default_sub: Substrate|None):
+        """Draw the layer count and the layer forms.
+
+        Args:
+            default_sub: Existing substrate whose layers prefill the
+                forms, or None. Layer i is prefilled from
+                `default_sub.layers[i]`.
+        """
         st.subheader("Layers:")
 
         layer_count_fld = LayerCountField(
@@ -112,6 +177,14 @@ class LayerListForm(Form):
                     layer_label = f"Layer {i+1}"
                 with st.container(border=True):
                     st.subheader(layer_label)
+                    # No default when the user adds more layers than
+                    # the substrate had (IndexError) or on the "new"
+                    # page, where `default_sub` is None
+                    # (AttributeError).
+                    # TODO layer i is
+                    #   prefilled from `default_sub.layers[i]`, but the `layers` backref has
+                    #   no `order_by(position_from_back)`; the order relies on SQLite
+                    #   returning rows in insertion order.
                     try:
                         default_layer = default_sub.layers[i]
                     except IndexError, AttributeError:
@@ -129,13 +202,30 @@ class LayerListForm(Form):
         )
 
     def _is_coherent(self):
+        """Require at least one layer. See `Form._is_coherent`."""
         if len(self.layer_forms) == 0:
             return False, "Please add layer(s)."
         return True, ''
 
 
 class RootForm(Form):
+    """The whole substrate form: name, comment and layers.
+
+    Used by `pages/new_substrate.py` and `pages/edit_substrate.py`.
+
+    Attributes:
+        substrate_name: The substrate's label, or None if invalid.
+        comment: The comment, or None if empty.
+        layer_list_form: The `LayerListForm`.
+    """
+
     def __init__(self, default_sub: Substrate|None):
+        """Draw the whole form.
+
+        Args:
+            default_sub: Substrate being edited, or None on the "new"
+                page.
+        """
         sub_label_fld = SubstrateLabelField(
             form_default=None,
             db_default=default_sub.label if default_sub else None,
@@ -156,9 +246,15 @@ class RootForm(Form):
         )
 
     def _is_coherent(self):
+        """No cross-field rule. See `Form._is_coherent`."""
         return True, ''
 
     def show_layers(self):
+        """Draw a sketch of the stack, top layer first.
+
+        Shows one line per layer with its formula, only when the form
+        is valid.
+        """
         st.divider()
         layer_forms = self.layer_list_form.layer_forms
         if self.is_valid:
@@ -171,6 +267,20 @@ class RootForm(Form):
                 st.write("⬆️ Bottom layer")
 
     def to_substrate(self, id_: int|None = None) -> Substrate:
+        """Build the unsaved substrate and its layers from the input.
+
+        Call only when the form is valid. Nothing is written to the
+        DB; the page saves the result with `save_with_dependent()`.
+
+        Args:
+            id_: Id to give the substrate (the old id on the edit
+                page), or None to let the DB choose one.
+
+        Returns:
+            A `Substrate` whose `layers` list holds one unsaved
+            `SubstrateLayer` per layer form, with `position_from_back`
+            0 for the bottom layer.
+        """
         substrate = Substrate(
             id=id_ if id_ is not None else None,
             label=self.substrate_name,
