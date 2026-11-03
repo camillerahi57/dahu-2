@@ -322,6 +322,7 @@ class StateForm(Form):
         state = DeteriorationState(
             date=self.state_date,
             length_per_px=self.length_per_px,
+            # TODO what do we want here? It seems like a half refactorization?
             calibration_factor_comment=self.calibration_factor,
             comment=self.comment,
             pixel_coordinate_system=coord_system,

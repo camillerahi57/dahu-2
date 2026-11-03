@@ -1,3 +1,44 @@
+"""All the Peewee models (DB tables) of Dahu DB.
+
+A Peewee "model" is an ORM class (Object Relational Mapping: a class
+whose instances are rows of a DB table, and whose class attributes are
+its columns). Every model subclasses `_BaseModel` from `base_classes`.
+
+The models, grouped by topic:
+
+- Substrates: `Substrate`, made of `SubstrateLayer`s.
+- Targets: `Target`, with dated `DeteriorationState`s. Each state has a
+  `TargetPhoto` and `Patch`es (pieces of material placed on the target),
+  each patch being a polygon of `Vertex`es on the photo.
+- Libraries and films: `Library` (exactly one `Film`), `LibraryFile`,
+  `FilmLayer` with its subtype `MagnetronSputtering` or
+  `TriodeSputtering`, and `TargetUse` (which targets made which layer).
+- Film modifications: `FilmModification`, with subtype `Annealing`
+  (made of `AnnealingStep`s) or `Etching`. An etching is in turn an
+  `IonBeamEtching` (with `PlasmaConstituent`s), a `WetEtching` (with
+  `EtchingSolvent`s) or a `LiftOffEtching`. `Pattern` and `Recipe` are
+  uploaded files used by etchings.
+- Characterizations: `Charac`, its EDX subtype `Edx` (with one
+  `ChemicalElementEdx` per element), and `CharacReference` (lets a
+  library point to a charac made on another film).
+- Calibration files: `MokeCoilFactor`, `EsrfPoni`.
+- Compositions: `StoichioElement`, one element of a chemical formula,
+  owned by a substrate layer, patch, film layer, annealing step or
+  plasma constituent.
+- Uploaded files: `UserUploadedFile` and its subclasses keep metadata in
+  the DB and the bytes in `user_data/`.
+- App bookkeeping: `AppMetadata` (single row: backup and problem-check
+  schedule, app version) and `AppLog` (event log).
+
+A "subtype" is a separate table with a unique foreign key to the general
+row; an enum column on the general row says which subtype applies.
+
+`dahu_2_models`, at the bottom, collects every model of this module; it
+is used by table creation, the integrity checks and the XLSX export. So
+new models must be defined in this file.
+
+Physical quantities are stored in SI base units (see `logic.units`).
+"""
 import inspect
 import sys
 from dataclasses import dataclass
@@ -2492,6 +2533,30 @@ class EtchingSolvent(_BaseModel):
 
 
 class DeteriorationState(_BaseModel):
+    """The state of a `Target` at a given date: photo and patches.
+
+    A target wears out and gets new patches over time, so it has a list
+    of dated states (`Target.states`). The patch polygons are given in
+    pixel coordinates on the state's photo.
+
+    Attributes:
+        date: Date of the photo / state. Not NULL.
+        made_by_email: Email of the person who recorded the state. Not
+            NULL.
+        length_per_px: Length of one photo pixel, in m per pixel (the
+            form asks for a length in mm and the matching number of
+            pixels). Can be NULL.
+        calibration_factor_comment: Free text about the calibration
+            factor (`CalibrationFactorField`). Can be NULL.
+        comment: Free text. Can be NULL.
+        pixel_coordinate_system: Convention of the pixel coordinates of
+            the vertices (`PixelCoordinateSystem`). Can be NULL.
+        target: Foreign key to the `Target`. Not NULL.
+        patches: Backref to the `Patch`es on the target in this state.
+        photos: Backref to the `TargetPhoto` (list of length 1).
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     date = DateField()
     made_by_email = CharField()
     length_per_px = FloatField(null=True)
@@ -2518,16 +2583,44 @@ class DeteriorationState(_BaseModel):
                  target: Target | None = None,
                  made_by_email: str | None = None,
                  **kwargs):
+        """Create an unsaved deterioration state.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            date: See the class docstring.
+            length_per_px: See the class docstring.
+            calibration_factor_comment: See the class docstring.
+            comment: See the class docstring.
+            pixel_coordinate_system: See the class docstring.
+            target: See the class docstring.
+            made_by_email: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the patches and the photo (and its file), recursively.
+
+        See `_BaseModel.delete_parts`.
+        """
         for p in self.patches:
             p.delete_with_parts()
         for p in self.photos:
             p.delete_with_parts()
 
     def libraries(self) -> set[Library]:
+        """Find the libraries with a film layer made with this target.
+
+        Note: this looks at all uses of the target, not only those made
+        while the target was in this state.
+
+        Returns:
+            The libraries (empty set if none).
+        """
+        # TODO Fix the note above.
         uses = (
             TargetUse
             .select()
@@ -2542,6 +2635,15 @@ class DeteriorationState(_BaseModel):
 
     @staticmethod
     def empty_figure():
+        """Build an empty Plotly figure set up for photo pixel coordinates.
+
+        The x axis is on top and the y axis points down, with equal
+        scales, so that the origin is the top-left corner of the photo
+        (see `PixelCoordinateSystem.PLOTLY`).
+
+        Returns:
+            The figure, with one empty trace.
+        """
         return go.Figure(
             [Scatter()],
             layout=go.Layout(
@@ -2551,6 +2653,13 @@ class DeteriorationState(_BaseModel):
         )
 
     def to_figure(self):
+        """Draw the patches of this state as filled polygons.
+
+        Shown next to the photo on the target inspection page.
+
+        Returns:
+            A Plotly figure, in pixel coordinates.
+        """
         fig = self.empty_figure()
         for patch in self.patches:
             scatter = patch.to_scatter()
@@ -2559,6 +2668,18 @@ class DeteriorationState(_BaseModel):
 
 
 class TargetPhoto(UserUploadedFile):
+    """The uploaded photo of a target in a given `DeteriorationState`.
+
+    Patch vertices are pixel coordinates on this photo.
+
+    Attributes:
+        target_state: Foreign key to the `DeteriorationState`. Unique
+            (one photo per state). Not NULL.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+
+    Other columns: see `UserUploadedFile`.
+    """
     target_state: DeteriorationState = cast(Any, ForeignKeyField(
         DeteriorationState, backref='photos', on_delete='RESTRICT', unique=True))
 
@@ -2569,11 +2690,39 @@ class TargetPhoto(UserUploadedFile):
                  original_file_name: str | None = None,
                  upload_date: datetime | None = None,
                  target_state: DeteriorationState | None = None, **kwargs):
+        """Create an unsaved target photo row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See `UserUploadedFile`.
+            internal_file_name: See `UserUploadedFile`.
+            original_file_name: See `UserUploadedFile`.
+            upload_date: See `UserUploadedFile`.
+            target_state: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class Patch(_BaseModel):
+    """A piece of material placed on a target, to tune its composition.
+
+    Its shape is a polygon on the state's photo (a disc is stored as a
+    polygon with many vertices). Patches can overlap; the first one
+    (`stack_idx` 0) is the "base patch", i.e. the target itself.
+
+    Attributes:
+        stack_idx: Position in the stack of patches, starting at 0 for
+            the bottom (base) patch. Not NULL.
+        deterioration_state: Foreign key to the `DeteriorationState`.
+            Not NULL.
+        stoichio: Backref to the `StoichioElement`s of the patch
+            composition.
+        vertices: Backref to the polygon `Vertex`es.
+    """
     stack_idx = IntegerField()
 
     deterioration_state: DeteriorationState = cast(Any, ForeignKeyField(
@@ -2585,13 +2734,32 @@ class Patch(_BaseModel):
     def __init__(self, *args, stack_idx: int | None = None,
                  deterioration_state: DeteriorationState | None = None,
                  **kwargs):
+        """Create an unsaved patch.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            stack_idx: See the class docstring.
+            deterioration_state: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def __str__(self):
+        """Describe the patch by its stoichiometry.
+
+        Returns:
+            The description.
+        """
         return f'Patch of stoichiometry {self.stoichio}'
 
     def delete_parts(self):
+        """Delete the stoichiometry elements and the vertices.
+
+        See `_BaseModel.delete_parts`.
+        """
         for se in self.stoichio:
             se.delete_with_parts()
         for v in self.vertices:
@@ -2603,6 +2771,20 @@ class Patch(_BaseModel):
                      stack_idx: int,
                      deterioration_state: DeteriorationState) \
             -> Patch:
+        """Build an unsaved patch, with its composition and vertices.
+
+        Called by `PatchForm.to_patch` in the target forms.
+
+        Args:
+            stoichio_str: Chemical formula, e.g. `'Fe2O3'`.
+            vertices: Polygon vertices in pixel coordinates, in
+                clockwise order.
+            stack_idx: See the class docstring.
+            deterioration_state: See the class docstring.
+
+        Returns:
+            The patch, with its `stoichio` and `vertices` parts set.
+        """
         patch = cls(stack_idx=stack_idx,
                     deterioration_state=deterioration_state)
         fk_field: ForeignKeyField = cast(Any, StoichioElement.patch)
@@ -2619,6 +2801,18 @@ class Patch(_BaseModel):
 
     @staticmethod
     def is_valid_formula(stoichio_str: str) -> tuple[bool, str]:
+        """Check that a string is a valid chemical formula.
+
+        Used by every stoichiometry form field (substrates, targets,
+        libraries, film modifications), not only by patches.
+
+        Args:
+            stoichio_str: The formula typed by the user.
+
+        Returns:
+            `(ok, msg)`: whether the formula is valid, and an error
+            message (empty if valid).
+        """
         from logic.utils import letter_count
         for char in stoichio_str:
             if char not in alphanums + '.':
@@ -2627,6 +2821,7 @@ class Patch(_BaseModel):
         for element in stoichio_dict:
             if element not in ChemicalElement.all_short_str():
                 return False, f"Unknown chemical element '{element}'."
+        # If chemparse silently skipped some letters, the counts differ:
         if letter_count(str(stoichio_dict)) != letter_count(stoichio_str):
             return False, f"Invalid syntax."
         if letter_count(str(stoichio_str)) == 0:
@@ -2634,17 +2829,41 @@ class Patch(_BaseModel):
         return True, ''
 
     def stoichio_str(self):
+        """Give the chemical formula of this patch.
+
+        Returns:
+            The formula, e.g. `'Fe2O3'`.
+        """
         return StoichioElement.to_str(self.stoichio)
 
     @staticmethod
     def rgb_color(stoichio_str: str) -> tuple[int, int, int]:
+        """Pick a pseudo-random color that depends only on the formula.
+
+        Args:
+            stoichio_str: Chemical formula.
+
+        Returns:
+            `(r, g, b)`, each from 0 to 254.
+        """
+        # Seeding with the formula gives the same color for the same
+        # composition, on every page and every run.
         rng = Random(stoichio_str)
+        # TODO put 256 instead:
         r = rng.randrange(0, 255)
         g = rng.randrange(0, 255)
         b = rng.randrange(0, 255)
         return r, g, b
 
     def plotly_color(self, stoichio_str: str | None = None):
+        """Give the patch color (see `rgb_color`) as a Plotly string.
+
+        Args:
+            stoichio_str: Formula to use; if None, this patch's one.
+
+        Returns:
+            A color string like `'rgba(12,34,56,1)'`.
+        """
         if stoichio_str is None:
             stoichio_str = StoichioElement.to_str(self.stoichio)
         r, g, b = Patch.rgb_color(stoichio_str)
@@ -2652,11 +2871,32 @@ class Patch(_BaseModel):
 
     @staticmethod
     def colored_rectangle_html(stoichio_str: str):
+        """Build a small HTML rectangle in the color of a formula.
+
+        Args:
+            stoichio_str: Chemical formula.
+
+        Returns:
+            An HTML `<span>` string.
+        """
         r, g, b = Patch.rgb_color(stoichio_str)
         return f'<span style="color:rgb({r},{g},{b})">▮</span>'
 
     def ordered_vertices(self) -> list[Vertex]:
+        """Sort the vertices by `clockwise_rank`.
+
+        Returns:
+            The vertices, in clockwise order.
+        """
         def get_rank(v: Vertex):
+            """Give the sort key of a vertex.
+
+            Args:
+                v: The vertex.
+
+            Returns:
+                Its clockwise rank.
+            """
             return int(v.clockwise_rank)  # noqa I don't understand the warning.
 
         return sorted(self.vertices, key=get_rank)
@@ -2670,11 +2910,17 @@ class Patch(_BaseModel):
     #                                     name_=stoichio)
 
     def to_scatter(self):
-        vertices = list(self.vertices)
+        """Draw the patch as a filled polygon, in its formula's color.
+
+        Returns:
+            A Plotly `Scatter` trace, in pixel coordinates.
+        """
+        vertices = list(self.vertices)  # TODO use ordered instead?
         # Closing the polygon:
         vertices.append(vertices[0])
         stoichio_str = StoichioElement.to_str(self.stoichio)
 
+        # Works because `Vertex.__iter__` yields (pixel_x, pixel_y):
         x_coords, y_coords = zip(*vertices)
         return Scatter(
             x=x_coords, y=y_coords,
@@ -2689,6 +2935,16 @@ class Patch(_BaseModel):
 
 
 class Vertex(_BaseModel):
+    """One corner of a `Patch` polygon, in photo pixel coordinates.
+
+    Attributes:
+        pixel_x: Horizontal coordinate, in pixels (see
+            `DeteriorationState.pixel_coordinate_system`). Not NULL.
+        pixel_y: Vertical coordinate, in pixels. Not NULL.
+        clockwise_rank: Position of the vertex along the polygon,
+            starting at 0. Not NULL.
+        patch: Foreign key to the `Patch`. Not NULL.
+    """
     pixel_x: float = cast(Any, FloatField())
     pixel_y: float = cast(Any, FloatField())
     clockwise_rank = IntegerField()
@@ -2700,20 +2956,52 @@ class Vertex(_BaseModel):
                  pixel_y: float | None = None,
                  clockwise_rank: int | None = None,
                  patch: Patch | None = None, **kwargs):
+        """Create an unsaved vertex.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            pixel_x: See the class docstring.
+            pixel_y: See the class docstring.
+            clockwise_rank: See the class docstring.
+            patch: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     def __str__(self):
+        """Format the vertex as `(x, y)`.
+
+        Returns:
+            The string.
+        """
         return f'({self.pixel_x:g}, {self.pixel_y:g})'
 
     def __iter__(self):
+        """Iterate over `(pixel_x, pixel_y)`, so `x, y = vertex` works.
+
+        Returns:
+            An iterator over the two coordinates.
+        """
         return iter([self.pixel_x, self.pixel_y])
 
 
 class TargetUse(_BaseModel):
+    """Link saying that a `FilmLayer` was deposited with a `Target`.
+
+    Attributes:
+        target: Foreign key to the `Target`. Not NULL.
+        film_layer: Foreign key to the `FilmLayer`. Not NULL.
+    """
     target: Target = cast(Any, ForeignKeyField(Target, backref='uses'))
     film_layer: FilmLayer = cast(Any, ForeignKeyField(
         FilmLayer, on_delete='RESTRICT', backref='target_uses'))
@@ -2721,15 +3009,49 @@ class TargetUse(_BaseModel):
     def __init__(self, *args, target: Target | None = None,
                  film_layer: FilmLayer | None = None,
                  **kwargs):
+        """Create an unsaved target use.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            target: See the class docstring.
+            film_layer: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
 class StoichioElement(_BaseModel):
-    """Can be the stoichiometry of either of these foreign keys."""
+    """One element of a chemical formula, e.g. `Fe2` in `Fe2O3`.
+
+    Can be the stoichiometry of either of these foreign keys. Exactly
+    one of them is expected to be set (not enforced by the DB); the
+    others are NULL.
+
+    Attributes:
+        quantity: Number of atoms of the element in the formula (can be
+            fractional). Not NULL.
+        position_in_str: Position of the element in the formula string,
+            starting at 0, so the formula can be rebuilt in order. Not
+            NULL.
+        element: Chemical element symbol (`ChemicalElement`). Not NULL.
+        substrate_layer: Owner `SubstrateLayer`. Can be NULL.
+        patch: Owner `Patch`. Can be NULL.
+        film_layer: Owner `FilmLayer` (nominal composition). Can be
+            NULL.
+        annealing_step: Owner `AnnealingStep` (atmosphere before the
+            step). Can be NULL.
+        plasma_constituent: Owner `PlasmaConstituent`. Can be NULL.
+    """
     quantity: float = cast(Any, FloatField())
     position_in_str = IntegerField()
     element: ChemicalElement = cast(Any, CharField())
@@ -2759,22 +3081,57 @@ class StoichioElement(_BaseModel):
                  film_layer: FilmLayer | None = None,
                  annealing: Annealing | None = None,
                  **kwargs):
+        # TODO Missmatch with columns.
+        """Create an unsaved stoichiometry element.
+
+        Each keyword sets the column of the same name. `annealing_step`
+        and `plasma_constituent` are not keywords here; they can still
+        be passed through `**kwargs`, as `from_str` does.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            quantity: See the class docstring.
+            position_in_str: See the class docstring.
+            element: See the class docstring.
+            substrate_layer: See the class docstring.
+            patch: See the class docstring.
+            film_layer: See the class docstring.
+            annealing: Not a column of this model (see DOC_NOTES.md).
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     @classmethod
     def from_str(cls, formula: str, fk_field: ForeignKeyField,
                  parent: _BaseModel
                  ) -> list[StoichioElement]:
+        """Parse a chemical formula into unsaved elements.
+
+        Args:
+            formula: Chemical formula, e.g. `'Fe2O3'`. Should have been
+                checked with `Patch.is_valid_formula`.
+            fk_field: The foreign key column that points to the owner,
+                e.g. `StoichioElement.patch`.
+            parent: The owner row (unsaved is fine).
+
+        Returns:
+            One element per chemical element, in formula order.
+        """
         parsed = chemparse.parse_formula(formula)
         elements = [
             StoichioElement(
                 quantity=quantity,
                 position_in_str=i,
                 element=ChemicalElement(short_name),
+                # Sets whichever owner column `fk_field` is:
                 **{fk_field.name: parent}
             )
             for i, (short_name, quantity) in enumerate(parsed.items())
@@ -2782,6 +3139,11 @@ class StoichioElement(_BaseModel):
         return elements
 
     def __str__(self):
+        """Format the element as in a formula, e.g. `Fe2` or `O`.
+
+        Returns:
+            The symbol, followed by the quantity if it is above 1.
+        """
         if self.quantity > 1:  # noqa
             return f'{self.element}{self.quantity:g}'
         else:
@@ -2789,7 +3151,23 @@ class StoichioElement(_BaseModel):
 
     @staticmethod
     def to_str(elements: list[StoichioElement]) -> str:
+        """Rebuild a chemical formula from its elements.
+
+        Args:
+            elements: The elements, in any order.
+
+        Returns:
+            The formula, elements sorted by `position_in_str`.
+        """
         def key(element: StoichioElement):
+            """Give the sort key of an element.
+
+            Args:
+                element: The element.
+
+            Returns:
+                Its position in the formula.
+            """
             return int(element.position_in_str)  # noqa
 
         sorted_elements = sorted(elements, key=key)
@@ -2797,6 +3175,25 @@ class StoichioElement(_BaseModel):
 
 
 class Charac(_BaseModel):
+    """A characterization (measurement) made on a `Film`.
+
+    Its kind is given by `type_`; only EDX has a subtype table (`Edx`).
+    The EDX feature is still in development.
+
+    Attributes:
+        made_on: Date of the measurement. Not NULL.
+        made_by_email: Email of the person who made it. Not NULL.
+        comment: Free text. Can be NULL.
+        type_: Kind of characterization (`CharacType`). Not NULL.
+        film: Foreign key to the measured `Film`. Not NULL.
+        last_modif: Foreign key to the last `FilmModification` made on
+            the film before the measurement. NULL if none.
+        file: Foreign key to the data `LibraryFile`. Not NULL.
+        refs: Backref to the `CharacReference`s (other libraries that
+            reuse this measurement).
+        edxs: Backref to the `Edx` subtype (list of length 1 for EDX).
+        log_db_write: False, so saves are not logged in `AppLog`.
+    """
     made_on = DateField()
     made_by_email = CharField()
     comment = TextField(null=True)
@@ -2822,10 +3219,30 @@ class Charac(_BaseModel):
                  film: Film | None = None,
                  last_modif: FilmModification | None = None,
                  **kwargs):
+        # TODO Missmatch with columns.
+        """Create an unsaved characterization.
+
+        Each keyword sets the column of the same name. `file` is not a
+        keyword here; it can be passed through `**kwargs`.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            made_on: See the class docstring.
+            made_by_email: See the class docstring.
+            comment: See the class docstring.
+            type_: See the class docstring.
+            film: See the class docstring.
+            last_modif: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the references and the EDX subtype, recursively.
+
+        See `_BaseModel.delete_parts`.
+        """
         for r in self.refs:
             r.delete_with_parts()
         for e in self.edxs:
@@ -2833,10 +3250,21 @@ class Charac(_BaseModel):
 
     @property
     def edx(self):
+        """The `Edx` subtype row (a property: read as `charac.edx`).
+
+        Raises:
+            IndexError: This charac has no EDX row.
+        """
         return list(self.edxs)[0]
 
 
 class CharacReference(_BaseModel):
+    """Link letting a `Library` reuse a `Charac` made on another film.
+
+    Attributes:
+        charac: Foreign key to the `Charac`. Not NULL.
+        lib: Foreign key to the `Library` that reuses it. Not NULL.
+    """
     charac: Charac = cast(Any, ForeignKeyField(
         Charac, on_delete='RESTRICT', backref='refs'))
     lib: Library = cast(Any, ForeignKeyField(
@@ -2846,14 +3274,44 @@ class CharacReference(_BaseModel):
                  charac: Charac | None = None,
                  lib: Library | None = None,
                  **kwargs):
+        """Create an unsaved characterization reference.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            charac: See the class docstring.
+            lib: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
 class Edx(_BaseModel):
+    """EDX subtype of a `Charac` (energy-dispersive X-ray spectroscopy).
+
+    In development: the values are meant to be read from the library's
+    high-throughput HDF5 file by `from_hdf5`.
+
+    Attributes:
+        electron_energy: Primary electron beam energy, in J (read in
+            keV from the HDF5 file). Not NULL.
+        working_distance: Working distance, in m (read in mm). Not
+            NULL.
+        magnification: Microscope magnification, no unit. Not NULL.
+        acquisition_duration: Acquisition real time, in s (read in
+            ms). Not NULL.
+        charac: Foreign key to the general `Charac` row. Not NULL.
+        elements: Backref to one `ChemicalElementEdx` per element.
+    """
     electron_energy = FloatField()
     working_distance = FloatField()
     magnification = FloatField()
@@ -2872,31 +3330,72 @@ class Edx(_BaseModel):
                  acquisition_duration: float | None = None,
                  charac: Charac | None = None,
                  **kwargs):
+        """Create an unsaved EDX row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            electron_energy: See the class docstring.
+            working_distance: See the class docstring.
+            magnification: See the class docstring.
+            acquisition_duration: See the class docstring.
+            charac: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the per-element results.
+
+        See `_BaseModel.delete_parts`.
+        """
         for e in self.elements:
             e.delete_with_parts()
 
+    # TODO Fix these 3 properties:
+
     @property
     def electron_energy_quantity(self) -> Quantity:
+        """`electron_energy` as a Pint quantity, labelled in keV.
+
+        See DOC_NOTES.md: the DB value is in J, not keV.
+        """
         return self.electron_energy * ur.keV
 
     @property
     def working_distance_quantity(self) -> Quantity:
+        """`working_distance` as a Pint quantity, labelled in mm.
+
+        See DOC_NOTES.md: the DB value is in m, not mm.
+        """
         return self.working_distance * ur.mm
 
     @property
     def acquisition_duration_quantity(self) -> Quantity:
+        """`acquisition_duration` as a Pint quantity, labelled in ms.
+
+        See DOC_NOTES.md: the DB value is in s, not ms.
+        """
         return self.acquisition_duration * ur.ms
 
     @staticmethod
     def get_hdf5_datasets(hdf5_file, dataset_type):
-        """
-        :param hdf5_file: Root group from a library high-throughput HDF5 file
-        :param dataset_type:
-        :return:
+        """List the datasets of an HDF5 file, optionally of one type.
+
+        An HDF5 file is a tree of "groups" (like folders) holding data;
+        each top-level group here is one dataset, whose `HT_type`
+        attribute says what measurement it holds.
+
+        Args:
+            hdf5_file: Root group from a library high-throughput HDF5
+                file.
+            dataset_type: `'all'`, or a type to look for in each
+                group's `HT_type` attribute (e.g. `'edx'`).
+
+        Returns:
+            The names of the matching top-level groups.
         """
         if dataset_type == "all":
             return list(hdf5_file.keys())
@@ -2912,12 +3411,30 @@ class Edx(_BaseModel):
 
     @classmethod
     def from_hdf5(cls, hdf5_path: Path):
+        """Build an unsaved EDX row from a high-throughput HDF5 file.
+
+        In development and not called anywhere yet (see DOC_NOTES.md).
+        Reads the instrument settings of the first position of the
+        first EDX dataset, and, for each element, the min, max and mean
+        atomic percent over all positions.
+
+        Args:
+            hdf5_path: Path of the HDF5 file.
+
+        Returns:
+            The unsaved `Edx`, meant to carry its `ChemicalElementEdx`
+            parts.
+        """
         with h5py.File(hdf5_path, "r") as hdf5_file:
+            # TODO the instrument paths start
+            #   with `/`, so h5py resolves them from the file root, not from the
+            #   instrument group; an element first seen without "AtomPercent" and
+            #   later with it is never updated.
             dataset_list = cls.get_hdf5_datasets(hdf5_file, dataset_type="edx")
             edx_group = hdf5_file[dataset_list[0]]
             positions_group = edx_group['positions']
             ref_instrument_group = positions_group[
-                f"{positions_group.keys[0]}/instrument"]
+                f"{positions_group.keys[0]}/instrument"]  # TODO missing `()`?
 
             prim_energy_path = "/ESMAHeader/PrimaryEnergy"
             primary_energy_float = ref_instrument_group[prim_energy_path][()]
@@ -2934,9 +3451,15 @@ class Edx(_BaseModel):
             acquisition_time_float = ref_instrument_group[hardware_path][()]
             acquisition_time = to_db_magnitude(acquisition_time_float * ur.ms)
 
+            # Element symbol → running min / max / sum / count of the
+            # atomic percent over positions, to get the mean at the end.
+            # Elements without "AtomPercent" were detected but not
+            # quantified.
             results_dict = dict()
+            # TODO missing `()` for items?:
             for position, position_group in edx_group["positions"].items:
                 for element, element_group in position_group["results"].items():
+                    # Group names look like "<something> <symbol>":
                     element_symbol = element.split(" ")[1].strip()
 
                     if ("AtomPercent" in element_group
@@ -2981,6 +3504,7 @@ class Edx(_BaseModel):
             working_distance=working_distance,
             magnification=magnification,
             acquisition_duration=acquisition_time,
+            # TODO not in init:  (verify others)
             chemical_element_edx_list=element_classes,
         )
 
@@ -2988,6 +3512,21 @@ class Edx(_BaseModel):
 
 
 class ChemicalElementEdx(_BaseModel):
+    """EDX result for one chemical element, over all measured positions.
+
+    Attributes:
+        element: Chemical element symbol (`ChemicalElement`). Not NULL.
+        min_atom_percent: Lowest atomic percent over the positions, in
+            %. NULL if not quantified.
+        max_atom_percent: Highest atomic percent, in %. NULL if not
+            quantified.
+        mean_atom_percent: Mean atomic percent, in %. NULL if not
+            quantified.
+        quantified: Whether the software gave an atomic percent for
+            this element (False: detected only). Not NULL.
+        x_line: X-ray line family used (`XLine`). Not NULL.
+        edx: Foreign key to the `Edx`. Not NULL.
+    """
     element: ChemicalElement = cast(Any, CharField())
     min_atom_percent = FloatField(null=True)
     max_atom_percent = FloatField(null=True)
@@ -3007,19 +3546,48 @@ class ChemicalElementEdx(_BaseModel):
                  x_line: XLine | None = None,
                  edx: Edx | None = None,
                  **kwargs):
+        """Create an unsaved EDX element result.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            element: See the class docstring.
+            min_atom_percent: See the class docstring.
+            max_atom_percent: See the class docstring.
+            mean_atom_percent: See the class docstring.
+            quantified: See the class docstring.
+            x_line: See the class docstring.
+            edx: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     @classmethod
     def from_dict(cls, elements: dict) -> list[Self]:
+        """Build unsaved element results from `Edx.from_hdf5`'s dict.
+
+        Args:
+            elements: Element symbol → dict with keys `min`, `max`,
+                `sum`, `count`, `Xline` and `quantified`.
+
+        Returns:
+            One unsaved row per element, without `edx` set.
+        """
         element_list = [
             cls(
                 element=element,
                 min_atom_percent=data["min"],
                 max_atom_percent=data["max"],
+                # TODO fix None case:
                 mean_atom_percent=data["sum"] / data["count"],
                 quantified=data["quantified"],
                 x_line=data["Xline"],
@@ -3031,7 +3599,22 @@ class ChemicalElementEdx(_BaseModel):
 
 class AppMetadata(_BaseModel):
     """Table with only one row (class with only one instance), also called
-    'a singleton'."""
+    'a singleton'.
+
+    Loaded at import time by `logic.meta_data_init`. Holds the schedule
+    of backups and problem checks used by `init_page`.
+
+    Attributes:
+        is_the_only_row: Always True. Being unique, this column stops
+            the DB from ever holding a second row. Not NULL.
+        db_units_description: Text explaining the DB units, for people
+            reading the DB file directly. Not NULL.
+        next_backup_at: When the next Restic backup is due. Not NULL.
+        next_problem_check_at: When the next integrity check is due.
+            Not NULL.
+        current_app_version: `APP_VERSION` of the app that last saved
+            this row. Not NULL.
+    """
     is_the_only_row = BooleanField(
         unique=True, constraints=[Check('is_the_only_row = TRUE')])
     db_units_description = TextField()
@@ -3046,11 +3629,32 @@ class AppMetadata(_BaseModel):
                  next_problem_check_at: datetime | None = None,
                  current_app_version: int | None = None,
                  **kwargs):
+        """Create an unsaved metadata row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            is_the_only_row: See the class docstring.
+            db_units_description: See the class docstring.
+            next_backup_at: See the class docstring.
+            next_problem_check_at: See the class docstring.
+            current_app_version: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     @classmethod
     def get_or_new(cls):
+        """Load the metadata row, or build a new one if there is none.
+
+        A new row is not saved here. It asks for a backup now and a
+        problem check after `PROBLEM_CHECK_INTERVAL`.
+
+        Returns:
+            The metadata row.
+        """
         try:
             return cls.get()
         except DoesNotExist:
@@ -3062,12 +3666,42 @@ class AppMetadata(_BaseModel):
 
     def save(self, force_insert: bool = False, only: list | None = None,
              *args, **kwargs):
+        """Save the row, stamping it with the running `APP_VERSION`.
+
+        Args:
+            force_insert: See Peewee's `Model.save`.
+            only: See Peewee's `Model.save`.
+            *args: Passed on to Peewee's `Model.save`.
+            **kwargs: Passed on to Peewee's `Model.save`.
+        """
         self.current_app_version = APP_VERSION
         super().save(force_insert=force_insert, only=only, *args, **kwargs)
 
 
 class AppLog(_BaseModel):
-    """Table with logs about various app event."""
+    """Table with logs about various app event.
+
+    Rows come from DB writes of models with `log_db_write`, from the
+    periodic problem check and from other app events. Shown on the logs page;
+    unread warnings and unsolved critical events are counted on the
+    home page.
+
+    Attributes:
+        timestamp: When the event last happened. Not NULL.
+        ip_address: IP address of the browser that caused it. Can be
+            NULL.
+        email_in_cookies: Last email used in that browser (from the
+            cookies, small values stored by the browser). Can be NULL.
+        notify: Whether the event should be counted in the home page
+            notifications. Not NULL.
+        marked_read: Whether a user marked it as read. Not NULL.
+        marked_solved: Whether a user marked it as solved. Not NULL.
+        severity: `LogSeverity`. Not NULL.
+        event_type: `EventType`. Not NULL.
+        event_description: Text of the event. Unique, so the same event
+            is stored once and its row is refreshed (see `save`). Not
+            NULL.
+    """
     timestamp = DateTimeField()
     ip_address = cast(Any, CharField(null=True))
     email_in_cookies = cast(Any, CharField(null=True))
@@ -3086,6 +3720,23 @@ class AppLog(_BaseModel):
                  severity: LogSeverity | None = None,
                  event_type: str | None = None,
                  event_description: str | None = None, **kwargs):
+        """Create an unsaved log row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            timestamp: See the class docstring.
+            ip_address: See the class docstring.
+            email_in_cookies: See the class docstring.
+            notify: See the class docstring.
+            marked_read: See the class docstring.
+            marked_solved: See the class docstring.
+            severity: See the class docstring.
+            event_type: See the class docstring.
+            event_description: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
@@ -3095,6 +3746,20 @@ class AppLog(_BaseModel):
                  marked_read: bool = False,
                  marked_solved: bool = False,
                  timestamp: datetime | None = None):
+        """Log an event, with the current browser's IP and email.
+
+        Needs a live Streamlit session: reads `st.context` and the
+        browser cookies. Also prints the description to the console.
+        Writes (or refreshes, see `save`) an `AppLog` row.
+
+        Args:
+            event: The event to log.
+            marked_read: Initial value of `marked_read`.
+            marked_solved: Initial value of `marked_solved`.
+            timestamp: Event time; now if None.
+        """
+        # Imported here, not at the top: importing `cookie_init`
+        # creates the cookie controller, which needs Streamlit running.
         from logic.cookie_init import cookies
         new_log = cls(
             timestamp=timestamp or datetime.now(),
@@ -3113,6 +3778,16 @@ class AppLog(_BaseModel):
     @classmethod
     def filtered_query(cls, severities: list[LogSeverity] | None = None,
                        show_read=True, show_solved=True):
+        """Build the query of logs shown on the logs page.
+
+        Args:
+            severities: Severities to keep; all if None.
+            show_read: Whether to keep logs marked read.
+            show_solved: Whether to keep logs marked solved.
+
+        Returns:
+            A Peewee query (not yet run), newest first.
+        """
         if severities is None:
             severities = list(LogSeverity)
         query = (AppLog.select()
@@ -3128,9 +3803,19 @@ class AppLog(_BaseModel):
 
     def save(self, force_insert: bool = False, only: list | None = None,
              *args, **kwargs):
-        """If the current app_log has the same description as an existing
+        """Save the log, or refresh the existing log with the same text.
+
+        If the current app_log has the same description as an existing
         app_log, we skip the save process. However, we update some fields
-        of the existing log, especially in order to display it as recent."""
+        of the existing log, especially in order to display it as recent.
+        `marked_read` and `marked_solved` of the existing log are kept.
+
+        Args:
+            force_insert: See Peewee's `Model.save`.
+            only: See Peewee's `Model.save`.
+            *args: Passed on to Peewee's `Model.save`.
+            **kwargs: Passed on to Peewee's `Model.save`.
+        """
         # Check for existing:
         similar_log_query = (
             AppLog.select()
@@ -3145,6 +3830,8 @@ class AppLog(_BaseModel):
             same_log.notify = self.notify
             same_log.severity = self.severity
             same_log.event_type = self.event_type
+            # Call Peewee's save directly, skipping this override, so
+            # the existing row is updated without a new duplicate check.
             super(AppLog, same_log).save()
             return
         else:
@@ -3152,6 +3839,11 @@ class AppLog(_BaseModel):
 
     @classmethod
     def unread_warning_notif_count(cls) -> int:
+        """Count unread warnings that should notify, for the home page.
+
+        Returns:
+            The count.
+        """
         return (AppLog.select()
                 .where(AppLog.severity == LogSeverity.WARNING)
                 .where(AppLog.marked_read == False)
@@ -3160,6 +3852,13 @@ class AppLog(_BaseModel):
 
     @classmethod
     def unsolved_critical_notif_count(cls) -> int:
+        """Count unsolved critical events that should notify.
+
+        Shown on the home page.
+
+        Returns:
+            The count.
+        """
         return (AppLog.select()
                 .where(AppLog.severity == LogSeverity.CRITICAL)
                 .where(AppLog.marked_solved == False)
@@ -3170,12 +3869,37 @@ class AppLog(_BaseModel):
 # Don't move to another file because it looks for classes in the same file:
 @dataclass
 class ModelCollection:
+    """The list of all models of this module (see `dahu_2_models`).
+
+    A dataclass: Python writes its `__init__` from the annotated
+    attributes below.
+
+    Attributes:
+        models: Every model class, sorted by name.
+        name_to_model: Class name → model class.
+    """
     models: list[type[_BaseModel]]
     name_to_model: dict[str, type[_BaseModel]]
 
     @classmethod
     def from_current_module(cls):
+        """Collect the `_BaseModel` subclasses defined or imported here.
+
+        Names starting with an underscore (like `_BaseModel`) are left
+        out.
+
+        Returns:
+            The collection.
+        """
         def is_a_model(class_):
+            """Tell whether an object of this module is a model class.
+
+            Args:
+                class_: Any object found in the module.
+
+            Returns:
+                True if it is a public `_BaseModel` subclass.
+            """
             return (
                     inspect.isclass(class_)
                     and issubclass(class_, _BaseModel)
@@ -3189,6 +3913,11 @@ class ModelCollection:
         )
 
     def __iter__(self):
+        """Iterate over the models, so `for m in dahu_2_models` works.
+
+        Returns:
+            An iterator over `models`.
+        """
         return iter(self.models)
 
 
