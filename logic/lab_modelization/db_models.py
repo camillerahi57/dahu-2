@@ -44,6 +44,24 @@ from logic.units import ur, db_units, db_units_explanation, to_db_magnitude
 # The 'foreign_keys': 1 is required to enforce foreign key constraints.
 
 class Substrate(_BaseModel):
+    """A substrate type on which films are deposited (one DB row).
+
+    Each class in this module is a Peewee "model": an ORM class (Object
+    Relational Mapping, a class whose instances are rows of a DB table).
+
+    A substrate is a stack of `SubstrateLayer`s (its "parts"). Several
+    films can share the same substrate type, through `Film.substrate`.
+
+    Attributes:
+        label: Unique human-readable name. Not NULL.
+        comment: Free text. Can be NULL.
+        layers: Backref to the `SubstrateLayer`s of this substrate. A
+            backref is the reverse side of a foreign key (a column
+            holding the id of a row in another table): here, every
+            layer row whose `substrate` column points to this row.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     label = CharField(unique=True)
     comment = CharField(null=True)
 
@@ -54,20 +72,46 @@ class Substrate(_BaseModel):
 
     def __init__(self, *args, label: str | None = None,
                  comment: str | None = None, **kwargs):
+        """Create an unsaved substrate.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See the class docstring.
+            comment: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete all the layers of this substrate, recursively.
+
+        See `_BaseModel.delete_parts`.
+        """
         for l in self.layers:
             l.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
+        """List the labels of all substrates in the DB.
+
+        Used by forms to refuse a label that already exists.
+
+        Returns:
+            The labels, sorted alphabetically.
+        """
         names = sorted({s.label for s in Substrate.select()},
                        key=lambda label: label)
         return names
 
     def libraries(self) -> set[Library]:
+        """Find the libraries whose film was deposited on this substrate.
+
+        Returns:
+            The libraries (empty set if none).
+        """
         libraries = (Library
                      .select()
                      .join(Film, on=(Film.library == Library.id))
@@ -75,19 +119,59 @@ class Substrate(_BaseModel):
         return set(libraries)
 
     def can_be_deleted(self):
+        """Tell whether no library uses this substrate.
+
+        Returns:
+            True if no film was deposited on this substrate.
+        """
         return len(self.libraries()) == 0
 
     def url(self):
+        """Build the absolute URL of this substrate's inspection page.
+
+        Returns:
+            The URL, with the substrate id as a query parameter (a
+            `name=value` pair after the `?` of a URL).
+        """
         page_name = pages.inspect_substrate.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{IdType.SUB}={self.id}"
 
     @classmethod
     def from_label(cls, label: str) -> Substrate:
+        """Load the substrate with the given label from the DB.
+
+        Args:
+            label: Label of the substrate.
+
+        Returns:
+            The substrate.
+
+        Raises:
+            DoesNotExist: No substrate has this label (raised by Peewee).
+        """
         return Substrate.get(Substrate.label == label)
 
 
 class SubstrateLayer(_BaseModel):
+    """One layer of a `Substrate`, with its composition and orientation.
+
+    Attributes:
+        thickness: Layer thickness, in m (UI unit: µm, see
+            `ThicknessField`). Can be NULL.
+        h: First Miller index of the crystal orientation. NULL when the
+            layer has no given orientation (then `k` and `l` are NULL
+            too).
+        k: Second Miller index. Can be NULL.
+        l: Third Miller index. Can be NULL.
+        position_from_back: Index of the layer in the stack, starting at
+            0 for the layer at the back of the substrate. Not NULL.
+        substrate: Foreign key to the substrate this layer belongs to.
+            `RESTRICT` means the DB refuses to delete a substrate that
+            still has layers. Not NULL.
+        stoichio: Backref to the `StoichioElement`s giving the layer's
+            chemical composition.
+    """
     thickness = FloatField(null=True)
     h: IntegerField|None = IntegerField(null=True)
     k: IntegerField|None = IntegerField(null=True)
@@ -108,10 +192,28 @@ class SubstrateLayer(_BaseModel):
                  substrate: Substrate | None = None,
                  position_from_back: int | None = None,
                  **kwargs):
+        """Create an unsaved substrate layer.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            thickness: See the class docstring.
+            h: See the class docstring.
+            k: See the class docstring.
+            l: See the class docstring.
+            substrate: See the class docstring.
+            position_from_back: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the composition elements of this layer.
+
+        See `_BaseModel.delete_parts`.
+        """
         for s in self.stoichio:
             s.delete_with_parts()
 
@@ -120,6 +222,25 @@ class SubstrateLayer(_BaseModel):
                       h: int | None, k: int | None,
                       l: int | None, substrate: Substrate | None,
                       position_from_back: int | None):
+        """Create an unsaved layer together with its composition.
+
+        Called by the new-substrate form when it builds the object
+        graph. Nothing is saved: use `save_with_dependent()`.
+
+        Args:
+            stoichio: Chemical formula, parsed by
+                `StoichioElement.from_str`.
+            thickness: Thickness, in m.
+            h: See the class docstring.
+            k: See the class docstring.
+            l: See the class docstring.
+            substrate: See the class docstring.
+            position_from_back: See the class docstring.
+
+        Returns:
+            The layer, with its `stoichio` list filled.
+        """
+        # `stoichio` is not a column, so `get_model_kwargs` drops it.
         init_kwargs = cls.get_model_kwargs(locals())
         layer = SubstrateLayer(**init_kwargs)
         layer.stoichio = StoichioElement.from_str(
@@ -128,6 +249,12 @@ class SubstrateLayer(_BaseModel):
         return layer
 
     def crystal_struct_str(self) -> str | None:
+        """Format the Miller indices for display, e.g. `(1 0 0)`.
+
+        Returns:
+            The formatted indices, or None if the layer has no
+            orientation.
+        """
         if self.h is None:
             return None
         else:
@@ -135,6 +262,28 @@ class SubstrateLayer(_BaseModel):
 
 
 class Target(_BaseModel):
+    """A sputtering target, followed through its dated states.
+
+    Attributes:
+        made_on: Date the target was made. Not NULL.
+        made_by_email: Email address of the person who made it. Not
+            NULL.
+        label: Unique human-readable name. Not NULL.
+        previous_version: Foreign key to the target this one is a new
+            version of (a "self-referencing" foreign key: it points to
+            the same table). NULL if it is not a new version. Set to
+            NULL if the previous version is deleted.
+        is_archived: True when the target is archived. Archived targets
+            are hidden in the browse page by default. Not NULL.
+        states: Backref to the target's `DeteriorationState`s, one per
+            date. Its parts.
+        uses: Backref to the `TargetUse`s linking this target to the
+            film layers deposited with it.
+        next_versions: Backref to the targets whose `previous_version`
+            is this one.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     made_on = DateField()
     made_by_email = CharField()
     label = CharField(unique=True)
@@ -154,50 +303,138 @@ class Target(_BaseModel):
                  label: str | None = None,
                  previous_version: Target | None = None,
                  **kwargs):
+        """Create an unsaved target.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            made_on: See the class docstring.
+            made_by_email: See the class docstring.
+            is_archived: See the class docstring.
+            label: See the class docstring.
+            previous_version: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the target's states, recursively.
+
+        `uses` are not deleted: a target still used by a film layer
+        can't be deleted (see `can_be_deleted`).
+
+        See `_BaseModel.delete_parts`.
+        """
         for s in self.states:
             s.delete_with_parts()
 
     @classmethod
     def already_taken_names(cls):
+        """List the labels of all targets in the DB.
+
+        Used by forms to refuse a label that already exists.
+
+        Returns:
+            The labels, sorted alphabetically.
+        """
         names = sorted({t.label for t in Target.select()},
                        key=lambda name: name)
         return names
 
     @property
     def last_state(self) -> DeteriorationState:
+        """The most recent state of the target (one DB query).
+
+        Raises:
+            IndexError: The target has no state.
+        """
         return self.old_to_recent_states()[-1]
 
     def old_to_recent_states(self) -> list[DeteriorationState]:
+        """Load the target's states from the DB, oldest first.
+
+        Returns:
+            The states, sorted by date.
+        """
         return list(DeteriorationState.select()
                     .where(DeteriorationState.target == self)
                     .order_by(DeteriorationState.date.asc()))
 
     @classmethod
     def from_label(cls, label: str) -> Target:
+        """Load the target with the given label from the DB.
+
+        Args:
+            label: Label of the target.
+
+        Returns:
+            The target.
+
+        Raises:
+            DoesNotExist: No target has this label (raised by Peewee).
+        """
         return Target.get(Target.label == label)
 
     def libraries(self) -> set[Library]:
+        """Find the libraries made with any state of this target.
+
+        Returns:
+            The union of the libraries of every state.
+
+        Raises:
+            TypeError: The target has no state (`set.union` then gets
+                no argument).
+        """
         return set.union(*(state.libraries() for state in self.states))
+        # TODO Add `if state` in case state is None.
 
     def url(self):
+        """Build the absolute URL of this target's inspection page.
+
+        Returns:
+            The URL, with the target id as a query parameter.
+        """
         page_name = pages.inspect_target.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{IdType.TARGET}={self.id}"
 
     def can_be_deleted(self):
+        """Tell whether no film layer was deposited with this target.
+
+        Returns:
+            True if the target has no `TargetUse`.
+        """
         return len(self.uses) == 0
 
     def comments(self) -> list[tuple[datetime, str]]:
+        """Collect the non-empty comments of the target's states.
+
+        Returns:
+            `(state date, comment)` pairs, in the order of `states`
+            (not sorted by date).
+        """
         return [(state.date, state.comment)  # noqa Wrong warning.
                 for state in self.states
                 if state.comment]
 
 
 class MokeCoilFactor(_BaseModel):
+    """A calibration factor of the MOKE coil, valid over a date range.
+
+    MOKE is the magneto-optic Kerr effect setup. This model is not used
+    anywhere else in the code yet.
+
+    Attributes:
+        validity_start: First date the factor applies. Not NULL.
+        validity_end: Last date the factor applies. Not NULL.
+        factor: The calibration factor (unit not given in the code).
+            Not NULL.
+        comment: Free text. Can be NULL.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     validity_start = DateField()
     validity_end = DateField()
     factor = FloatField()
@@ -209,14 +446,52 @@ class MokeCoilFactor(_BaseModel):
                  validity_end: datetime | None = None,
                  factor: float | None = None, comment: str | None = None,
                  **kwargs):
+        """Create an unsaved coil factor.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            validity_start: See the class docstring.
+            validity_end: See the class docstring.
+            factor: See the class docstring.
+            comment: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
 class EsrfPoni(_BaseModel):
+    """ESRF detector geometry (a pyFAI "PONI" file), valid over dates.
+
+    PONI ("point of normal incidence") files describe where an X-ray
+    detector sits relative to the sample, for diffraction measurements
+    at the ESRF synchrotron. The columns are the parameters of a PONI
+    file. This model is not used anywhere else in the code yet, and the
+    code does not say in which units the values are stored.
+
+    Attributes:
+        validity_start: First date the geometry applies. Not NULL.
+        validity_end: Last date the geometry applies. Not NULL.
+        distance: Sample-to-detector distance. Not NULL.
+        poni1: First coordinate of the PONI on the detector. Not NULL.
+        poni2: Second coordinate of the PONI on the detector. Not NULL.
+        rot1: First detector rotation. Not NULL.
+        rot2: Second detector rotation. Not NULL.
+        rot3: Third detector rotation. Not NULL.
+        wavelength: X-ray wavelength. Not NULL.
+        comment: Free text. Can be NULL.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     validity_start = DateField()
     validity_end = DateField()
     distance = FloatField()
@@ -238,14 +513,56 @@ class EsrfPoni(_BaseModel):
                  rot3: float | None = None,
                  wavelength: float | None = None, comment: str | None = None,
                  **kwargs):
+        """Create an unsaved PONI geometry.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            validity_start: See the class docstring.
+            validity_end: See the class docstring.
+            distance: See the class docstring.
+            poni1: See the class docstring.
+            poni2: See the class docstring.
+            rot1: See the class docstring.
+            rot2: See the class docstring.
+            rot3: See the class docstring.
+            wavelength: See the class docstring.
+            comment: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
 
 class Library(_BaseModel):
+    """A library: the measurements made on one film.
+
+    It also covers measurements made on other films that would give the
+    same results on this one, through `refs`.
+
+    Attributes:
+        label: Unique human-readable name. Not NULL.
+        last_inspected_at: Date and time the library's page was last
+            opened (updated at most every 5 minutes by the inspect
+            page). Used to sort the browse page. Not NULL.
+        comment: Free text. Can be NULL.
+        is_archived: True when the library is archived. Not NULL.
+        films: Backref to the library's film. Always a list of exactly
+            one `Film`.
+        general_files: Backref to the files uploaded for the library.
+        refs: Backref to the `CharacReference`s pointing to
+            characterizations made on other films.
+        log_db_write: True, so every save and delete writes an
+            `AppLog` row (needs a live Streamlit session).
+    """
     label = CharField(unique=True)
     last_inspected_at = DateTimeField()
     comment = CharField(null=True)
@@ -261,10 +578,26 @@ class Library(_BaseModel):
                  last_inspected_at: datetime | None = None,
                  comment: str | None = None, is_archived: bool | None = None,
                  **kwargs):
+        """Create an unsaved library.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See the class docstring.
+            last_inspected_at: See the class docstring.
+            comment: See the class docstring.
+            is_archived: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the film, uploaded files and references, recursively.
+
+        See `_BaseModel.delete_parts`.
+        """
         for f in self.films:
             f.delete_with_parts()
         for gf in self.general_files:
@@ -273,22 +606,53 @@ class Library(_BaseModel):
             r.delete_with_parts()
 
     def ordered_characs(self) -> list[Charac]:
+        """Load the characterizations made on this library's own film.
+
+        Returns:
+            The characterizations of the film.
+        """
         film = list(self.films)[0]
         characs = (Charac.select()
                    .where(Charac.film == film)
-                   .order_by(film.made_on))
+                   .order_by(film.made_on))  # TODO Missing capital letter?
         return [char for char in characs]
 
     def ordered_charac_refs(self) -> list[Charac]:
+        """List the characterizations referenced from other films.
+
+        Returns:
+            The referenced characterizations, oldest first.
+        """
         characs = [ref.charac for ref in self.refs]
 
         def charac_made_on(charac: Charac):
+            """Sort key: the characterization date as a timestamp.
+
+            Args:
+                charac: The characterization.
+
+            Returns:
+                Its `made_on` date, as a timestamp.
+            """
             return charac.made_on.to_timestamp()
 
         return sorted(characs, key=charac_made_on)
 
     def all_characs(self) -> list[Charac]:
+        """List own and referenced characterizations together.
+
+        Returns:
+            Both lists merged, oldest first.
+        """
         def charac_made_on(charac: Charac):
+            """Sort key: the characterization date as a timestamp.
+
+            Args:
+                charac: The characterization.
+
+            Returns:
+                Its `made_on` date, as a timestamp.
+            """
             return charac.made_on.to_timestamp()
 
         return sorted(self.ordered_characs() + self.ordered_charac_refs(),
@@ -296,25 +660,68 @@ class Library(_BaseModel):
 
     @classmethod
     def already_taken_names(cls):
+        """List the labels of all libraries in the DB.
+
+        Used by forms to refuse a label that already exists.
+
+        Returns:
+            The labels, sorted alphabetically.
+        """
         names = sorted({l.label for l in Library.select()},
                        key=lambda label: label)
         return names
 
     @property
     def url(self):
+        """Absolute URL of this library's inspection page.
+
+        The library id is passed as a query parameter (a `name=value`
+        pair after the `?` of a URL). Unlike `Substrate.url` and
+        `Target.url`, this is a property, not a method.
+        """
         page_name = pages.inspect_lib.url_path
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{IdType.LIB}={self.id}"
 
     @staticmethod
     def dependent_libraries():
+        """List the libraries that depend on this one. Not implemented.
+
+        Returns:
+            Always an empty list for now.
+        """
         return []  # TODO Implement this.
 
     def can_be_deleted(self):
+        """Tell whether no other library depends on this one.
+
+        Returns:
+            Always True for now, see `dependent_libraries`.
+        """
         return len(self.dependent_libraries()) == 0
 
 
 class Film(_BaseModel):
+    """A deposited film: a stack of layers on a substrate.
+
+    Each film belongs to exactly one `Library`. It is the film that
+    gets modified (annealing, etching) and characterized.
+
+    Attributes:
+        label: Unique human-readable name. Not NULL.
+        made_on: Deposition date. Not NULL.
+        made_by_email: Email address of the person who made it. Not
+            NULL.
+        substrate: Foreign key to the substrate type used. "Deferred"
+            means SQLite checks that the substrate exists only when the
+            transaction (a group of DB writes applied all at once, or
+            not at all) is committed, not at each write. Not NULL.
+        library: Foreign key to the library this film belongs to.
+            `RESTRICT` means the DB refuses to delete a library that
+            still has a film. Not NULL.
+        layers: Backref to the film's `FilmLayer`s. Its parts.
+        modifs: Backref to the film's `FilmModification`s. Its parts.
+    """
     label = CharField(unique=True)
     made_on = DateField()
     made_by_email = CharField()
@@ -334,10 +741,27 @@ class Film(_BaseModel):
                  substrate: Substrate | None = None,
                  library: Library | None = None,
                  **kwargs):
+        """Create an unsaved film.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See the class docstring.
+            made_on: See the class docstring.
+            made_by_email: See the class docstring.
+            substrate: See the class docstring.
+            library: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete the film's layers and modifications, recursively.
+
+        See `_BaseModel.delete_parts`.
+        """
         for l in self.layers:
             l.delete_with_parts()
         for m in self.modifs:
@@ -345,30 +769,66 @@ class Film(_BaseModel):
 
     @classmethod
     def already_taken_names(cls):
+        """List the labels of all films in the DB.
+
+        Used by forms to refuse a label that already exists.
+
+        Returns:
+            The labels, sorted alphabetically.
+        """
         names = sorted({f.label for f in Film.select()},
                        key=lambda label: label)
         return names
 
     def ordered_modifs(self) -> list[FilmModification]:
+        """Load the film's modifications from the DB, in order.
+
+        Returns:
+            The modifications, sorted by `modif_number`.
+        """
         modifs = FilmModification.select().where(
             FilmModification.film == self)
 
         def get_modif_count(fm: FilmModification):
+            """Sort key: the modification's number.
+
+            Args:
+                fm: The modification.
+
+            Returns:
+                Its `modif_number`.
+            """
             return int(fm.modif_number)  # noqa
 
         return sorted(list(modifs), key=get_modif_count)
 
     @property
     def ordered_layers(self) -> list[FilmLayer]:
+        """The film's layers, from the buffer side upwards.
+
+        Sorted by `FilmLayer.position_from_buffer`.
+        """
         layers = [l for l in self.layers]
 
         def position(layer: FilmLayer):
+            """Sort key: the layer's position from the buffer.
+
+            Args:
+                layer: The layer.
+
+            Returns:
+                Its `position_from_buffer`.
+            """
             return int(layer.position_from_buffer)
 
         return sorted(layers, key=position)
 
     @property
     def target_labels(self) -> list[str]:
+        """Labels of the targets used for any layer, without duplicates.
+
+        In no particular order.
+        """
         labels: set[str] = set()
         for l in self.layers:
             for use in l.target_uses:
@@ -377,6 +837,10 @@ class Film(_BaseModel):
 
     @property
     def targets(self) -> list[Target]:
+        """Targets used for any layer, without duplicates.
+
+        In no particular order. Makes one DB query per target.
+        """
         targets: set[Target] = set()
         for l in self.target_labels:
             target = Target.from_label(l)
@@ -385,6 +849,36 @@ class Film(_BaseModel):
 
 
 class FilmLayer(_BaseModel):
+    """One deposited layer of a `Film`.
+
+    How the layer was sputtered is stored in a subtype: a separate
+    table whose row points back to this one. `sputtering_system` says
+    which one applies, `MagnetronSputtering` or `TriodeSputtering`.
+
+    Attributes:
+        position_from_buffer: Index of the layer in the film, starting
+            at 0. Not NULL.
+        deposit_temp: Deposition temperature, in K (UI unit: °C, see
+            `DepositTempField`). Can be NULL.
+        nominal_thickness: Intended thickness, in m (UI unit: nm, see
+            `NominalThicknessField`). Can be NULL.
+        shadow_mask_description: Free text on the shadow mask used. Can
+            be NULL.
+        function: Role of the layer, a `FilmLayerFunction` value. Not
+            NULL.
+        sputtering_system: Which sputtering subtype applies, a
+            `SputteringSystem` value. Can be NULL.
+        film: Foreign key to the film. `RESTRICT` means the DB refuses
+            to delete a film that still has layers. Not NULL.
+        nominal_stoichio: Backref to the `StoichioElement`s giving the
+            intended composition.
+        target_uses: Backref to the `TargetUse`s: the targets used to
+            deposit this layer.
+        magnetron_sputterings: Backref to the magnetron subtype. A list
+            of 1 if the layer was magnetron-sputtered, else empty.
+        triode_sputterings: Backref to the triode subtype. A list of 1
+            if the layer was triode-sputtered, else empty.
+    """
     position_from_buffer: IntegerField = IntegerField()
     deposit_temp = FloatField(null=True)
     nominal_thickness = FloatField(null=True)
@@ -409,10 +903,29 @@ class FilmLayer(_BaseModel):
                  sputtering_system: SputteringSystem | None = None,
                  film: Film | None = None,
                  **kwargs):
+        """Create an unsaved film layer.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            position_from_buffer: See the class docstring.
+            deposit_temp: See the class docstring.
+            nominal_thickness: See the class docstring.
+            shadow_mask_description: See the class docstring.
+            function: See the class docstring.
+            sputtering_system: See the class docstring.
+            film: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Delete composition, target uses and sputtering subtype.
+
+        See `_BaseModel.delete_parts`.
+        """
         for ns in self.nominal_stoichio:
             ns.delete_with_parts()
         for tu in self.target_uses:
@@ -424,19 +937,36 @@ class FilmLayer(_BaseModel):
 
     @property
     def element_str(self) -> str:
+        """The nominal composition string with its digits removed."""
         from logic.utils import remove_digits
         return remove_digits(self.nominal_stoichio_str)
 
     @property
     def nominal_stoichio_str(self) -> str:
+        """The nominal composition as a formula string.
+
+        Raises:
+            AssertionError: The layer has no composition.
+        """
         str_ = StoichioElement.to_str(self.nominal_stoichio)
         assert len(str_) > 0
         return str_
 
     @property
     def sputtering(self) -> MagnetronSputtering | TriodeSputtering:
+        """The layer's sputtering subtype row.
+
+        If the layer doesn't have exactly one subtype, a CRITICAL
+        `AppLog` row is written (needs a live Streamlit session), then
+        the magnetron one is returned if there is one, else the triode
+        one.
+
+        Raises:
+            IndexError: The layer has no subtype at all.
+        """
         mag_sputters = self.magnetron_sputterings
         triode_sputters = self.triode_sputterings
+        # TODO enters this if branch event with no sputtering. Fix this:
         if len(mag_sputters) + len(triode_sputters) != 1:
             event = Event(
                 EventType.MULTIPLICITY_ERROR,
@@ -453,17 +983,25 @@ class FilmLayer(_BaseModel):
 
     @property
     def target_labels(self) -> list[str]:
+        """Labels of the targets used to deposit this layer."""
         return [u.target.label for u in self.target_uses]
 
     @property
     def title_db_value_input_fields(self) \
             -> list[tuple[str, float | str, type[Any]]]:
+        """`(title, DB value, field class)` for each displayed column.
+
+        The field class converts the DB value to UI units for display
+        (see `data_string()`). Imported here, not at the top of the
+        module, to avoid a circular import.
+        """
         from components.forms.new_library.fields import (
             DepositTempField, ArgonFlowField, ShadowMaskField,
             FilmLayerFunctionField, NominalStoichioField,
         )
         return [  # noqa Type warning.
             ('Deposit temp.', self.deposit_temp, DepositTempField),
+            # TODO It's not ArgonFlowField here:
             ('Nominal thickness', self.nominal_thickness, ArgonFlowField),
             ('Shadow mask', self.shadow_mask_description, ShadowMaskField),
             ('Function', self.function, FilmLayerFunctionField),
@@ -473,6 +1011,21 @@ class FilmLayer(_BaseModel):
 
 
 class MagnetronSputtering(_BaseModel):
+    """Magnetron sputtering parameters of one `FilmLayer` (a subtype).
+
+    Attributes:
+        deposit_distance: Target-to-substrate distance, in m (UI unit:
+            mm, see `DepositDistanceField`). Can be NULL.
+        deposit_angle: Deposition angle, in rad (UI unit: degree, see
+            `DepositAngleField`). Can be NULL.
+        deposit_power: Generator power, in W. Can be NULL.
+        deposit_duration: Deposition duration, in s. Can be NULL.
+        generator: Generator used, an `MSGenerator` value. Can be NULL.
+        machine_model: Sputtering machine, an `MMModel` value. Can be
+            NULL.
+        film_layer: Foreign key to the layer. Unique, so a layer has at
+            most one magnetron row. Not NULL.
+    """
     deposit_distance = FloatField(null=True)
     deposit_angle = FloatField(null=True)
     deposit_power = FloatField(null=True)
@@ -493,14 +1046,37 @@ class MagnetronSputtering(_BaseModel):
                  machine_model: MMModel | None = None,
                  film_layer: FilmLayer | None = None
                  , **kwargs):
+        """Create an unsaved magnetron sputtering row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            deposit_distance: See the class docstring.
+            deposit_angle: See the class docstring.
+            deposit_power: See the class docstring.
+            deposit_duration: See the class docstring.
+            generator: See the class docstring.
+            machine_model: See the class docstring.
+            film_layer: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     @property
     def title_db_value_input_fields(self):
+        """`(title, DB value, field class)` for each displayed column.
+
+        See `FilmLayer.title_db_value_input_fields`.
+        """
         from components.forms.new_library.fields import DepositDistanceField, \
             DepositAngleField, DepositPowerField, DepositDurationField, \
             MagnetronGeneratorField, MagnetronModelField
@@ -515,6 +1091,37 @@ class MagnetronSputtering(_BaseModel):
 
 
 class TriodeSputtering(_BaseModel):
+    """Triode sputtering parameters of one `FilmLayer` (a subtype).
+
+    UI units are those of the field class of the same name in
+    `components.forms.new_library.fields`.
+
+    Attributes:
+        has_active_cooling: Whether the substrate was actively cooled.
+            Can be NULL.
+        rotation_speed: Substrate rotation speed, in rad/s (UI unit:
+            rpm). Can be NULL.
+        filament_current_start: Filament current at the start, in A.
+            Can be NULL.
+        filament_current_end: Filament current at the end, in A. Can be
+            NULL.
+        anode_current: Anode current, in A. Can be NULL.
+        anode_voltage: Anode voltage, in V. Can be NULL.
+        cathode_current: Cathode current, in A. Can be NULL.
+        cathode_voltage: Cathode voltage, in V. Can be NULL.
+        deposit_rate: Deposition rate, in m/s (UI unit: nm/s). Can be
+            NULL.
+        argon_flow: Argon flow, in m³/s (UI unit: m³/s too). Can be
+            NULL.
+        nitrogen_flow: Nitrogen flow, in m³/s (the form's label says
+            SCCM, but its unit is m³/s). Can be NULL.
+        pressure: Pressure, in Pa. Can be NULL.
+        deposit_duration: Deposition duration, in s. Can be NULL.
+        presputtering_thickness: Thickness removed by presputtering, in
+            m (UI unit: nm). Can be NULL.
+        film_layer: Foreign key to the layer. Unique, so a layer has at
+            most one triode row. Not NULL.
+    """
     has_active_cooling = BooleanField(null=True)
     rotation_speed = FloatField(null=True)
     filament_current_start = FloatField(null=True)
@@ -553,18 +1160,54 @@ class TriodeSputtering(_BaseModel):
                  film_layer: FilmLayer | None = None,
                  **kwargs
                  ):
+        """Create an unsaved triode sputtering row.
+
+        Each keyword sets the column of the same name.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            has_active_cooling: See the class docstring.
+            rotation_speed: See the class docstring.
+            filament_current_start: See the class docstring.
+            filament_current_end: See the class docstring.
+            anode_current: See the class docstring.
+            anode_voltage: See the class docstring.
+            cathode_current: See the class docstring.
+            cathode_voltage: See the class docstring.
+            deposit_rate: See the class docstring.
+            argon_flow: See the class docstring.
+            nitrogen_flow: See the class docstring.
+            pressure: See the class docstring.
+            deposit_duration: See the class docstring.
+            presputtering_thickness: See the class docstring.
+            film_layer: See the class docstring.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
+        """Do nothing: this model has no parts.
+
+        See `_BaseModel.delete_parts`.
+        """
         pass
 
     @property
     def deposit_power(self) -> float:
+        """Always None: no power is recorded for triode sputtering.
+
+        Exists so that `FilmLayer.sputtering.deposit_power` works for
+        both subtypes (used by the inspect-library page).
+        """
         return None  # noqa TODO Can we define a power for triode?
 
     @property
     def title_db_value_input_fields(self):
+        """`(title, DB value, field class)` for each displayed column.
+
+        See `FilmLayer.title_db_value_input_fields`.
+        """
         from components.forms.new_library.fields import (
             HasActiveCoolingField, RotationSpeedField,
             FilamentCurrentStartField, FilamentCurrentEndField,

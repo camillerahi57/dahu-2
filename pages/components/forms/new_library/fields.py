@@ -473,6 +473,7 @@ class DepositRateField(UnitField):
 
 class ArgonFlowField(UnitField):
     type = Ft.ADVISED
+    # TODO Should it be like NitrogenFlowField? Instead of:
     ui_unit = ur.m**3 / ur.s
 
     def _streamlit_input(self, prefill: float, key):
@@ -487,6 +488,7 @@ class ArgonFlowField(UnitField):
 
 class NitrogenFlowField(UnitField):
     type = Ft.ADVISED
+    # TODO It's cm, not m:
     ui_unit = ur.m**3 / ur.s
     ui_unit_alias = 'SCCM'
 
