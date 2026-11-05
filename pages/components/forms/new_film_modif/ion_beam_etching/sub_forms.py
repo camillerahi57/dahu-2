@@ -1,3 +1,11 @@
+"""Ion beam etching part of the film modification form.
+
+`IonEtchingForm` is used by `RootForm` in `new_film_modif/sub_forms.py`.
+Its `default_beam_etch` argument prefills the form from an existing
+etching; no page passes one yet, since there is no page to edit a film
+modification.
+"""
+
 import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
@@ -13,7 +21,40 @@ from logic.lab_modelization.db_models import IonBeamEtching, \
 
 
 class IonEtchingForm(Form):
+    """Machine settings, recipe/pattern and plasma of an ion beam
+    etching.
+
+    The physical values are stored in SI base units; the UI unit of
+    each one is that of its field class (see `IonBeamEtching`).
+
+    Attributes:
+        pre_etching_duration: Pre-etching duration, in s, or None.
+        duration: Etching duration, in s, or None.
+        flow: Gas flow, in m³/s (typed in SCCM, i.e. cm³/min), or None.
+        incidence_angle: Beam incidence angle, in rad (typed in
+            degrees), or None.
+        rotation: Sample rotation speed, in rad/s (typed in rpm), or
+            None.
+        power: RF power, in W, or None.
+        start_pressure: Pressure at the start, in Pa (typed in mbar),
+            or None.
+        target_pressure: Aimed pressure, in Pa (typed in mbar), or None.
+        dc_grid_current: DC grid current, in A, or None.
+        machine: The chosen `IbeMachine`, or None.
+        base_info_form: The `EtchingForm` (recipe and pattern).
+        constituent_form: The `ConstituentListForm` of the plasma.
+    """
+
     def __init__(self, default_beam_etch: IonBeamEtching|None):
+        """Draw the settings, then the recipe/pattern, then the plasma.
+
+        Args:
+            default_beam_etch: Existing etching to prefill from, or
+                None.
+
+        Raises:
+            PausePageRun: See `EtchingForm.__init__`.
+        """
 
         with st.container(horizontal=True):
             pre_etch_duration_fld = PreEtchDurationField(
@@ -97,12 +138,29 @@ class IonEtchingForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field rule. See `Form._is_coherent`."""
         # User can indicate that there is a pattern without providing it.
         return True, ''
 
     def to_ion_etching(self, film_modif: FilmModification) \
             -> Etching:
-        """Return an ion etching object with pattern image bytes."""
+        """Build the unsaved `Etching` row with its ion beam subtype.
+
+        No image bytes are involved: the pattern is picked among
+        existing `Pattern` files.
+
+        Args:
+            film_modif: The (unsaved) modification it belongs to.
+
+        Returns:
+            The `Etching`, with `ion_etchings` set to a list holding the
+            `IonBeamEtching`, itself with its plasma `constituents`.
+
+        Raises:
+            PausePageRun: If the form is not valid.
+        """
+        # The docstring used to promise "pattern image bytes", from
+        # when patterns were uploaded here; fixed.
         if not self.is_valid:
             raise PausePageRun
 

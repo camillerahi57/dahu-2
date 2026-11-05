@@ -1,3 +1,12 @@
+"""Root form of the "new deterioration state" page
+(`pages/new_deterioration_state.py`).
+
+A deterioration state is a dated photo of a target with its patches
+(see `DeteriorationState`). This form first makes sure the change is
+really wear, then reuses `DeteriorationStateForm` from the "new target"
+forms.
+"""
+
 import streamlit as st
 
 from components.forms.base_classes import Form, PausePageRun
@@ -10,7 +19,31 @@ from logic.lab_modelization.db_models import Target, DeteriorationState
 
 
 class RootForm(Form):
+    """The whole "new deterioration state" form.
+
+    Attributes:
+        state: The unsaved `DeteriorationState`, with its patches and
+            photo, ready for `save_with_dependent()`.
+        target_img: The cropped target photo.
+    """
+
     def __init__(self, target: Target, default_state: DeteriorationState|None):
+        """Draw the title, the wear question, the author and the state.
+
+        Reads the "last email used" cookie (a small value the browser
+        stores for the app between visits) to prefill the author.
+
+        Args:
+            target: The target that gets a new state.
+            default_state: State to prefill from, or None. The page
+                always passes None.
+
+        Raises:
+            PausePageRun: While the wear question is not answered, if
+                the answer is "human intervention" (the user is told to
+                create a new target instead), and from
+                `DeteriorationStateForm` while the state is incomplete.
+        """
         st.title(f'{target.label}: New Deterioration State')
 
         st.write("Is this new state the result of an unwanted change, like "
@@ -48,4 +81,5 @@ class RootForm(Form):
         )
 
     def _is_coherent(self) -> tuple[bool, str]:
+        """No cross-field rule. See `Form._is_coherent`."""
         return True, ''

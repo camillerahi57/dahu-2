@@ -22,6 +22,8 @@ try:
     form_is_valid = update_layers_form.is_valid
 
     if st.button("Submit", disabled=not form_is_valid, type='primary'):
+        # TODO The old layers are deleted before, and
+        #   outside, the `with db.atomic():`
         for old_layer in film.layers:
             old_layer.delete_with_parts()
 
