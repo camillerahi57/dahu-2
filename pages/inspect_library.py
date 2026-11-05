@@ -1,3 +1,20 @@
+"""Page showing one library: its film, files, modifications and
+characterizations.
+
+The library is chosen by the `lib_id` query parameter (a `name=value`
+pair after the `?` of the URL, see `IdType.LIB`). The page shows:
+
+- the comment, and Archive / Delete / Edit buttons;
+- the film modifications (annealing, etchings) in order, each opening
+  a dialog (a pop-up window) with its details;
+- the characterizations, own and referenced (see `CharacReference`);
+- the uploaded files;
+- the film's info and its layer table, bottom (buffer side) layer
+  first.
+
+Opening the page updates `Library.last_inspected_at`, used to sort the
+browse page.
+"""
 from datetime import datetime, timedelta
 
 import streamlit as st
@@ -31,21 +48,41 @@ layers = film.ordered_layers
 target_link_htmls = [link_html(target.label, target.url())
                      for target in film.targets]
 
+# Read from the session state (data Streamlit keeps between reruns of
+# the page for this browser tab) by the film modification form fields.
+# `new_film_modif.py` sets it too.
 sess[Sk.CURRENT_FILM] = film
 
 st.set_page_config(layout="wide", page_title=lib.label)
 
 
 def dependent_lib_error(lib_: Library):
+    """Explain why the library can't be deleted, with library links.
+
+    Never shown for now: `Library.dependent_libraries` always returns
+    an empty list, so `can_be_deleted` is always True.
+
+    Args:
+        lib_: The library the user tried to delete.
+    """
     libs = lib_.dependent_libraries()
     markdown = (f"The library cannot be deleted because {len(libs)} "
                 f"other librarie(s) refer to some of its characterizations:")
     for lib_ in libs:
+        # TODO `lib_.url()` calls `Library.url`, which
+        #   is a property (a string), so this would raise `TypeError`. Not
+        #   reachable today because `Library.dependent_libraries` always returns
+        #   `[]`. `inspect_substrate.py` and `inspect_target.py` use `lib_.url`.
         markdown += f"\n- [{lib_.label}]({lib_.url()})"
     st.error(markdown)
 
 
 def etching_base_info(etching: Etching):
+    """Draw what all etchings share: the pattern image and the recipe.
+
+    Args:
+        etching: The general etching row of the modification.
+    """
     with st.container(horizontal=True, vertical_alignment='center'):
         has_pattern_str = 'Yes' if etching.has_a_pattern else 'No'
         st.write(f"**Has a pattern**: {has_pattern_str}.")
@@ -64,9 +101,18 @@ def etching_base_info(etching: Etching):
 
 
 def ion_beam_etch_info(process: IonBeamEtching):
+    """Draw the ion beam etching settings and its plasma composition.
+
+    Args:
+        process: The ion beam etching to describe.
+    """
     st.header(f"**Ion Beam Etching**")
+    # Two newlines make a paragraph break in Markdown, so each value is
+    # on its own line.
     st.write(process.data_string(separator='\n\n'))
 
+    # Proportions are fractions that the form already normalized to sum
+    # to 1, so dividing by their sum changes (almost) nothing.
     constituents = process.constituents
     proportion_sum = sum(const.proportion for const in constituents)
     constituents_str = ''
@@ -77,22 +123,52 @@ def ion_beam_etch_info(process: IonBeamEtching):
 
 
 def wet_etch_info(process: WetEtching):
+    """Draw the wet etching settings.
+
+    Args:
+        process: The wet etching to describe.
+    """
     st.header(f"**Wet Etching**")
     st.write(process.data_string(separator='\n\n'))
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(lib_: Library):
+    """Ask for confirmation, then delete the library and all its data.
+
+    Opens as a dialog. On confirmation, deletes the library with its
+    film (layers and modifications), uploaded files (rows and files)
+    and references to other characterizations, writing `AppLog` rows,
+    then goes to the "submission successful" page. The film's own
+    characterizations are not deleted, despite the message (see
+    `DOC_NOTES.md`).
+
+    Args:
+        lib_: The library to delete.
+    """
     st.error(f"Are you sure you want to **permanently** delete the "
              f"library **\"{lib_.label}\"**?\n\n**This will also delete:**\n"
              f"- Film data\n- Film characterizations\n- Film modifications\n"
              f"- Uploaded files for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
+            # TODO `Film.delete_parts` deletes layers and
+            #   modifications but not the film's own `Charac` rows, and `Charac.film`
+            #   is `on_delete='RESTRICT'`. Deleting a library whose film has a
+            #   characterization should raise an `IntegrityError`, although the
+            #   dialog says characterizations are deleted. The deletion is not in
+            #   `with db.atomic():`, so rows deleted before the error (uploaded files,
+            #   layers...) stay deleted, and their files are already removed.
             lib_.delete_with_parts()
             switch_to_submit_successful(pages.browse_libs)
 
 
 def on_delete():
+    """Handle a click on "Delete Library" (see `inspect_page_header`).
+
+    Opens the confirmation dialog, or shows an error if other libraries
+    depend on this one (never the case for now, see
+    `dependent_lib_error`).
+    """
     if lib.can_be_deleted():
         confirm_deletion_dialog(lib)
     else:
@@ -100,6 +176,11 @@ def on_delete():
 
 
 def annealing_info(process: Annealing):
+    """Draw the annealing settings, atmosphere and temperature profile.
+
+    Args:
+        process: The annealing to describe.
+    """
     st.header('Annealing')
     st.write(process.data_string(separator='\n\n'))
 
@@ -112,11 +193,26 @@ def annealing_info(process: Annealing):
 
 
 def lift_off_info(process: LiftOffEtching):
+    """Draw the lift-off settings (ultrasound use and configuration).
+
+    Args:
+        process: The lift-off to describe.
+    """
     st.write(f"**Used ultrasound**: {process.used_ultrasound}\n\n"
              f"**Ultrasound config**: {process.ultrasound_config}\n\n")
 
 
 def edx_info(edx: Edx):
+    """Draw the EDX instrument settings and the result per element.
+
+    Atomic percents (min, max, mean over the measured positions) are
+    shown only for quantified elements. The EDX feature is still in
+    development; the units shown for the settings are known to be wrong
+    (see the `*_quantity` properties of `Edx`).
+
+    Args:
+        edx: The EDX subtype row of the characterization.
+    """
     st.write(f"**Electron energy**: {edx.electron_energy_quantity}\n\n"
              f"**Working distance**: {edx.working_distance_quantity}\n\n"
              f"**Magnification**: {edx.magnification}\n\n"
@@ -137,6 +233,21 @@ def edx_info(edx: Edx):
 
 @st.dialog(title="Characterisation")
 def charac_dialog(charac: Charac):
+    """Show a characterization's details, with a Delete button.
+
+    Opens as a dialog. Deleting removes the `Charac` row and its
+    subtype in a transaction (a group of DB writes applied all at once,
+    or not at all), then reruns the page. Its data file is kept. If
+    other libraries reference it, a warning dialog asks first (see
+    `charac_ref_delete`).
+
+    Args:
+        charac: The characterization, own or referenced.
+
+    Raises:
+        RuntimeError: For a `type_` with no display code yet (anything
+            but EDX).
+    """
     last_modif = charac.last_modif
     if last_modif is None:
         last_modif_str = "_Deposition (no film modification)_"
@@ -156,6 +267,7 @@ def charac_dialog(charac: Charac):
     st.divider()
     if st.button("Delete characterisation ❌"):
         if charac.refs:
+            # TODO Cannot call a dialog inside another one.
             charac_ref_delete(charac)
         else:
             with db.atomic():
@@ -166,6 +278,16 @@ def charac_dialog(charac: Charac):
 
 @st.dialog(title="Warning")
 def charac_ref_delete(charac: Charac):
+    """Warn that other libraries use a characterization, then delete it.
+
+    Called from `charac_dialog`, i.e. a dialog opened from inside
+    another dialog (see `DOC_NOTES.md`). On confirmation, deletes the
+    characterization and the references to it, in a transaction, then
+    reruns the page.
+
+    Args:
+        charac: The characterization to delete.
+    """
     warning_str = "⚠️ Other libraries reference to this characterisation:"
     for ref in charac.refs:
         warning_str += f"\n- {ref.lib.label}"
@@ -179,11 +301,26 @@ def charac_ref_delete(charac: Charac):
 
 @st.dialog('Modification Process')
 def film_modif_info(modif_: FilmModification):
+    """Show a film modification's details, with a Delete button.
+
+    Opens as a dialog. Draws the common info, then the part specific to
+    `modif_type`. Deleting removes the modification and its subtype rows
+    in a transaction (writes `AppLog` rows; `FilmModification`
+    renumbers the later modifications) and reruns the page.
+
+    Args:
+        modif_: The modification to show.
+
+    Raises:
+        RuntimeError: For an unknown `modif_type`.
+    """
     st.write(f"**Made on**&ensp;{modif_.made_on}&ensp;**by**&ensp;"
              f"{modif_.made_by_email}.\n\n"
              f"**Comment**: _{modif_.comment}_")
     process = modif_.modification_process()
 
+    # The `process: X` lines below do nothing when run: they only tell
+    # the IDE which subtype `process` is in each branch.
     if modif_.modif_type == FilmModifType.ANNEALING:
         process: Annealing
         annealing_info(process)
@@ -209,11 +346,21 @@ def film_modif_info(modif_: FilmModification):
     st.divider()
     if st.button("Delete film modification ❌"):
         with db.atomic():
+            # TODO `Charac.last_modif` is
+            #   `on_delete='RESTRICT'`, so deleting a modification that a
+            #   characterization points to should fail with an `IntegrityError`.
             modif_.delete_with_parts()
         st.rerun()
 
 
 def charac_card(label_: str):
+    """Draw a bordered box with a centred title.
+
+    Not called anywhere at the moment.
+
+    Args:
+        label_: Title written in the box.
+    """
     with st.container(border=True, horizontal_alignment='center'):
         st.space()
         st.subheader(label_, text_alignment='center')
@@ -222,6 +369,11 @@ def charac_card(label_: str):
 
 @st.dialog(title='Archive?')
 def archive_dialog():
+    """Ask for confirmation, then mark the library as archived.
+
+    Opens as a dialog. Saving writes an `AppLog` row; the page is then
+    rerun to show the "Archived" banner.
+    """
     st.write("This will not delete the library, no data will be lost.")
     st.write("The library will simply be marked as 'Archived'.")
     if st.button("Confim"):
@@ -231,6 +383,11 @@ def archive_dialog():
 
 
 def film_modif_section():
+    """Draw the row of film modification buttons, in order, and "Add".
+
+    Each button opens `film_modif_info`. "Add" goes to the new film
+    modification page for this film.
+    """
     with (st.container(horizontal=True, vertical_alignment='center',
                       horizontal_alignment='left', border=True)):
         st.write("**Film modifications:**")
@@ -247,6 +404,7 @@ def film_modif_section():
                 st.write("->")
             if st.button(f'{modif_names[modif.modif_type]}', key=f'btn_{i}'):
                 film_modif_info(modif)
+        # Empty container: a 300-pixel gap before the "Add" link.
         st.container(width=300)
         switch_page_bttn(
             pages.new_film_modif,
@@ -258,6 +416,12 @@ def film_modif_section():
 
 
 def charac_section():
+    """Draw the row of characterization buttons, oldest first, and "Add".
+
+    Own characterizations are in bold; referenced ones (made on another
+    film, see `CharacReference`) end with `*`. Each button opens
+    `charac_dialog`.
+    """
     with (st.container(horizontal=True, vertical_alignment='center',
                       horizontal_alignment='left', border=True)):
         st.write("**Characterisations:**")
@@ -277,6 +441,7 @@ def charac_section():
                 bttn_label = f'{charac_names[charac.type_]}*'
             if st.button(bttn_label, key=f'char_btn_{i}'):
                 charac_dialog(charac)
+        # Empty container: a 300-pixel gap before the "Add" link.
         st.container(width=300)
         switch_page_bttn(
             # Temporary. Should be "new charac" page/dialog:
@@ -290,9 +455,18 @@ def charac_section():
 
 
 def page_body():
+    """Draw the whole page.
+
+    Side effects: may save the library (see below), and the Unarchive
+    button saves it (writes an `AppLog` row) and reruns the page.
+    """
     if lib.is_archived:
+        # A huge width makes the banner as wide as the page.
         st.warning("📦 Archived", width=10_000)
 
+    # Each save writes an `AppLog` row, and Streamlit reruns the page at
+    # every click; saving at most every 5 minutes avoids filling the
+    # logs.
     if datetime.now() - lib.last_inspected_at > timedelta(minutes=5):
         lib.last_inspected_at = datetime.now()
         lib.save()
@@ -348,6 +522,9 @@ def page_body():
             st.write(f"**Layers**:")
 
             col_conf = st.column_config
+            # A click on "Details" stores the clicked row under the
+            # widget key `INSPECT_BUTTON_KEY`, then calls
+            # `show_film_layer(layers)`, which reads that row.
             column_config = {
                 ColName.function: col_conf.TextColumn(width='small'),
                 ColName.nominal_stoichio: col_conf.TextColumn(width='small'),
@@ -359,6 +536,9 @@ def page_body():
                 ColName.deposit_power: col_conf.NumberColumn(width='small'),
             }
 
+            # Column titles give the UI units. The temperature is
+            # converted from K to °C; duration (s) and power (W) are
+            # shown as stored, since their UI units are the SI ones.
             table_rows = [
                 {
                     ColName.function: lay.function,

@@ -1,3 +1,11 @@
+"""Page showing one sputtering target and its deterioration history.
+
+The target is chosen by the `target_id` query parameter (a
+`name=value` pair after the `?` of the URL, see `IdType.TARGET`). The
+page shows the base info, then each `DeteriorationState` (photo and
+patches), most recent first. From here the user can edit, archive,
+delete the target, and add, edit or delete states.
+"""
 import streamlit as st
 from PIL import Image
 
@@ -13,6 +21,12 @@ init_page(pages.inspect_target)
 
 
 def main_page():
+    """Draw the whole page.
+
+    Side effects: the Archive / Unarchive buttons save the target
+    (writes an `AppLog` row) and rerun the script (Streamlit runs the
+    page script again from the top to redraw it).
+    """
     from components.general import current_params
     target_id = current_params()[IdType.TARGET]
     target: Target = Target.get_by_id(target_id)
@@ -44,6 +58,9 @@ def main_page():
                          label='Add New State', icon_=icon('add_2'),
                          q_params={IdType.TARGET: target_id})
 
+    # A target always gets a first state when it is created, and the
+    # last state can't be deleted (see `show_state`), so `states` is
+    # never empty.
     states = target.old_to_recent_states()
     last_state = states[-1]
     show_state(last_state, len(states))
@@ -56,6 +73,14 @@ def main_page():
 
 
 def show_base_info(target: Target):
+    """Draw the box with who made the target, when, and its comments.
+
+    Also links to the previous version of the target, if any, and to
+    the targets made from this one (`next_versions`).
+
+    Args:
+        target: The target shown on the page.
+    """
     with st.container(border=True):
         email = email_html(target.made_by_email)
         date_str = extensive_date_str(target.made_on)
@@ -79,6 +104,8 @@ def show_base_info(target: Target):
         with st.container(horizontal=True, vertical_alignment="center"):
             if target.next_versions:
                 st.write(f"**Targets base on the current one:**")
+            # This page always has a query parameter, so
+            # `switch_page_bttn` draws HTML links and ignores `key`.
             for t in target.next_versions:
                 switch_page_bttn(
                     pages.inspect_target, label=t.label,
@@ -87,6 +114,14 @@ def show_base_info(target: Target):
 
 
 def display_target_state(state: DeteriorationState):
+    """Draw the state's photo next to a plot of its patches.
+
+    The photo is shrunk to fit in 450 × 450 pixels. If its file is
+    missing from `user_data/`, a message replaces it.
+
+    Args:
+        state: The deterioration state to draw.
+    """
     photo = state.photos[0].get_path()
     with st.container(horizontal=True, vertical_alignment="center",
                       width='content'):
@@ -96,11 +131,20 @@ def display_target_state(state: DeteriorationState):
             st.image(photo, width=w, clamp=True)
         except FileNotFoundError:
             st.write("_Photo file missing_")
+        # Each state has its own plot, so each needs its own widget key
+        # (the name Streamlit uses to tell widgets apart).
         st.plotly_chart(state.to_figure(), width=300,
                         key=f'state_plot_{state.id}')
 
 
 def show_state(state: DeteriorationState, state_count: int):
+    """Draw one state: its info, Edit / Delete buttons, photo and plot.
+
+    Args:
+        state: The deterioration state to draw.
+        state_count: Number of states of the target. The Delete button
+            is hidden when it is 1, so a target always keeps a state.
+    """
     with st.container(horizontal=True, vertical_alignment="center",
                       horizontal_alignment='center', border=True,
                       width='content'):
@@ -119,6 +163,11 @@ def show_state(state: DeteriorationState, state_count: int):
 
 
 def show_state_info(state: DeteriorationState):
+    """Draw the state's date, author, calibration factor and comment.
+
+    Args:
+        state: The deterioration state to describe.
+    """
     email = email_html(state.made_by_email)
     date_str = extensive_date_str(state.date)
     comment = state.comment if state.comment else "_empty_"
@@ -135,6 +184,14 @@ def show_state_info(state: DeteriorationState):
 
 
 def dependent_lib_error(target_: Target):
+    """Explain why the target can't be deleted, with library links.
+
+    Shown instead of the confirmation dialog when film layers were
+    deposited with the target.
+
+    Args:
+        target_: The target the user tried to delete.
+    """
     libs = target_.libraries()
     markdown = (f"The target cannot be deleted because {len(libs)} "
                 f"librarie(s) depend on it:")
@@ -145,6 +202,18 @@ def dependent_lib_error(target_: Target):
 
 @st.dialog(title="Confirm")
 def confirm_deletion_dialog(target_: Target):
+    """Ask for confirmation, then delete the target and its states.
+
+    Opens as a dialog (a pop-up window drawn over the page). If other
+    targets were made from this one, warns that they are kept but lose
+    their link to it: the DB sets their `previous_version` to NULL
+    (`on_delete='SET NULL'`). On confirmation, deletes the target, its
+    states, patches and photos (rows and files, writes `AppLog` rows)
+    and goes to the "submission successful" page.
+
+    Args:
+        target_: The target to delete.
+    """
     if target_.next_versions:
         next_versions = target_.next_versions
         st.error(
@@ -171,7 +240,22 @@ def confirm_deletion_dialog(target_: Target):
 
 
 def get_on_delete_callback(target: Target):
+    """Build the function called when "Delete Target" is clicked.
+
+    `inspect_page_header` calls its `on_delete` with no argument, so the
+    target is captured in a closure (a function defined inside another
+    one, which remembers the outer function's variables).
+
+    Args:
+        target: The target shown on the page.
+
+    Returns:
+        A function with no argument that opens the confirmation dialog,
+        or shows an error if the target is used by some library.
+    """
     def on_delete():
+        """Open the deletion dialog, or explain why deletion is refused.
+        """
         if target.can_be_deleted():
             confirm_deletion_dialog(target)
         else:
@@ -182,6 +266,15 @@ def get_on_delete_callback(target: Target):
 
 @st.dialog(title="Confirm")
 def confirm_state_deletion_dialog(state: DeteriorationState):
+    """Ask for confirmation, then delete one deterioration state.
+
+    Opens as a dialog. On confirmation, deletes the state with its
+    patches and photo (rows and file, writes `AppLog` rows) and reruns
+    the page.
+
+    Args:
+        state: The state to delete.
+    """
     st.error(f"Are you sure you want to **permanently** delete the "
              f"the **{extensive_date_str(state.date)}** state?")
     with st.container(horizontal=True, vertical_alignment="center"):
@@ -192,6 +285,14 @@ def confirm_state_deletion_dialog(state: DeteriorationState):
 
 @st.dialog(title='Archive?')
 def archive_dialog(target: Target):
+    """Ask for confirmation, then mark the target as archived.
+
+    Opens as a dialog. Archived targets are hidden on the browse page
+    unless "Show archived" is checked. Saving writes an `AppLog` row.
+
+    Args:
+        target: The target to archive.
+    """
     st.write("This will not delete the target, no data will be lost.")
     st.write("The target will simply be marked as 'Archived'.")
     if st.button("Confim"):
