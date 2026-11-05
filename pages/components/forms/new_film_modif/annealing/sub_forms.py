@@ -62,6 +62,9 @@ class RampPhaseForm(Form):
                 key=key,
                 form_default=default_is_room_temp,
             )
+            # TODO passes DB values (K) to `ReachedTempField` as
+            #   `form_default`, which is not converted (only `db_default` is), so an
+            #   edit page would show kelvins labelled °C.
             if is_room_temp_fld.value is not True:
                 reached_temp_fld = ReachedTempField(
                     key=key,
