@@ -1,3 +1,15 @@
+"""Home page: the table of all libraries, most recently inspected first.
+
+It is the default page (served at the site root). Each row has an
+"Inspect" button that opens the library's page. Archived libraries are
+hidden unless "Show archived" is checked. When `SHOW_PROBLEM_BANNER` is
+True, a banner above the table counts the unread warnings and unsolved
+critical errors of the logs.
+
+The experimenter filter in the sidebar is saved in a cookie (a small
+piece of text stored by the browser), so it is restored on the next
+visit.
+"""
 import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
@@ -11,6 +23,17 @@ from logic.utils import get_email_user_name
 
 
 def body():
+    """Draw the page: banner, table, sidebar and filters.
+
+    When an "Inspect" button was clicked, switches to the inspect page
+    of that library instead of finishing the drawing.
+
+    Side effects: reads and writes the `CookieKeys.LIB_FILTERS` cookie
+    and the `Sk.LIB_FILTERS` session state entry (Streamlit's per-tab
+    dictionary that survives reruns).
+    """
+    # Why these imports are inside the function, unlike in the other
+    # browsing pages, is not known (see DOC_NOTES.md).
     from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
         on_inspect_click
     from components.general import init_page, switch_page_bttn, icon
@@ -30,7 +53,11 @@ def body():
         show_archived = st.checkbox('Show archived 📦')
 
     rows = []
+    # Ids in the same order as `rows`: the "Inspect" callback finds the
+    # library from the index of the clicked row.
     lib_id_list = []
+    # Selecting both models with the join loads each film's library in
+    # the same SQL query, instead of one extra query per row.
     for film in (Film.select(Film, Library)
                  .join(Library)
                  .order_by(Library.last_inspected_at.desc())):
@@ -63,6 +90,9 @@ def body():
     }
 
     # If we clicked on an inspect button:
+    # (`on_inspect_click` set the key before this rerun. `init_page` of
+    # the inspect page deletes it, so coming back here does not switch
+    # again.)
     if Sk.INSPECT_OBJ_ID in sess:
         lib_id = sess[Sk.INSPECT_OBJ_ID]
         st.switch_page(pages.inspect_lib,
@@ -73,6 +103,9 @@ def body():
 
     df = pd.DataFrame(rows, columns=col_order)
 
+    # `DynamicFilters` keeps the selected filter values in the session
+    # state under `filters_name`. Pre-filling that entry from the cookie
+    # restores the last filters; the cookie is updated at the end.
     filters_in_cookies = cookies.get(CookieKeys.LIB_FILTERS)
     if filters_in_cookies:
         sess[Sk.LIB_FILTERS] = filters_in_cookies
@@ -88,6 +121,11 @@ def body():
 
 
 def problem_banner():
+    """Warn about unread warnings and unsolved critical errors.
+
+    Draws nothing when there are none. Otherwise shows the two counts
+    (only logs flagged `notify`) and a button to the logs page.
+    """
     from components.general import switch_page_bttn
 
     warning_count = AppLog.unread_warning_notif_count()

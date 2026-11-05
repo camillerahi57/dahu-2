@@ -1,3 +1,10 @@
+"""Page listing all substrates in a table.
+
+Each row has an "Inspect" button that opens the substrate's page. The
+label filter in the sidebar is saved in a cookie (a small piece of text
+stored by the browser), so it is restored on the next visit. See
+`browse_libs.py` for the same mechanisms, explained.
+"""
 import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
@@ -19,6 +26,7 @@ st.set_page_config(layout="wide")
 switch_page_bttn(pages.new_substrate, label="Add a new substrate",
                  icon_=icon('add_2'))
 
+# One dictionary per row, keyed by the column names of the table shown.
 query = Substrate.select(
     Substrate.label.alias(ColName.label),
     Substrate.comment.alias(ColName.comment),
@@ -26,6 +34,8 @@ query = Substrate.select(
 ).dicts()
 
 rows = list(query)
+# Iterating `query` again reuses Peewee's cached rows (no second SQL
+# query). Ids are in the same order as `rows`, for `on_inspect_click`.
 sub_id_list = [row[IdType.SUB] for row in query]
 
 for row in rows:
@@ -40,6 +50,8 @@ column_config = {
 }
 
 # If we clicked on an inspect button:
+# (Set by `on_inspect_click` before this rerun; deleted by `init_page`
+# of the inspect page.)
 if Sk.INSPECT_OBJ_ID in sess:
     sub_id = sess[Sk.INSPECT_OBJ_ID]
     st.switch_page(pages.inspect_substrate,
@@ -50,6 +62,8 @@ col_order = column_config.keys()  # Same order as in the column config
 
 df = pd.DataFrame(rows, columns=list(col_order))
 
+# Restore the last filters from the cookie into the session state entry
+# that `DynamicFilters` reads; the cookie is updated at the end.
 filters_in_cookies = cookies.get(CookieKeys.SUBSTRATE_FILTERS)
 if filters_in_cookies:
     sess[Sk.SUBSTRATE_FILTERS] = filters_in_cookies

@@ -1,3 +1,15 @@
+"""Logs page: lists the `AppLog` rows, newest first, with filters and
+pagination (`LOG_PAGE_LENGTH` rows per page).
+
+Warnings and critical errors can be marked read; critical errors can
+also be marked solved. Until then they are coloured (orange or red) and
+counted in the banner of the home page. The whole table can be
+downloaded as CSV.
+
+The index of the page of logs shown is kept in the session state
+(Streamlit's per-tab dictionary that survives reruns) under
+`Sk.LOG_PAGE`, counted from 0.
+"""
 from datetime import datetime
 
 import streamlit as st
@@ -13,11 +25,14 @@ from logic.page_list import pages
 init_page(pages.view_logs)
 st.set_page_config(layout='wide')
 
+# After `init_page`, which deletes `Sk.LOG_PAGE` when the user comes
+# from another page: the list then starts again at the first page.
 if Sk.LOG_PAGE not in sess:
     sess[Sk.LOG_PAGE] = 0
 
 
 def body():
+    """Draw the page: CSV download, filters, page selector and logs."""
     st.header("Internal Logs")
 
     file_name = f'dahu_2_logs_{compact_datetime_str(datetime.now())}.csv'
@@ -31,7 +46,7 @@ def body():
     log_query = AppLog.filtered_query(severities=filters.checked_severities,
             show_read=filters.marked_read, show_solved=filters.marked_solved)
 
-    log_count = log_query.count()  # noqa Wring warning.
+    log_count = log_query.count()  # noqa Wrong warning.
 
     page_selector(log_count)
 
@@ -45,6 +60,20 @@ def body():
 
 
 def page_selector(log_count: int):
+    """Draw the first / previous / next / last buttons and the page number.
+
+    Each button changes `Sk.LOG_PAGE` in the session state and reruns
+    the page so that the new page of logs is drawn.
+
+    Args:
+        log_count: Number of logs that pass the filters.
+    """
+    # TODO With 0 logs, `page_count` is 0 and
+    #   `last_page_idx` is -1, so the "next" and "last" buttons stay enabled
+    #   and lead to page indexes -1 or 1. Also, `is_last_page` (line 75) uses
+    #   `==`: after a filter reduces the number of pages, the current page can
+    #   be beyond the last one, showing an empty list with "next" enabled.
+    # Ceiling division: a partial last page counts as a page.
     page_count = (log_count - 1) // LOG_PAGE_LENGTH + 1
     last_page_idx = page_count - 1
     is_first_page = sess[Sk.LOG_PAGE] == 0
@@ -71,6 +100,20 @@ def page_selector(log_count: int):
 
 
 def log_row(log: AppLog):
+    """Draw one log on one line, with its buttons.
+
+    Buttons: "Mark solved" (critical errors only), "Mark as read"
+    (warnings and critical errors), and "..." which opens the details
+    dialog. The text is orange for an unread warning, red for an
+    unsolved critical error, grey otherwise. The description is cut to
+    100 characters, with its line breaks replaced by " · ".
+
+    Side effect: the mark buttons save the row (no new `AppLog` row: the
+    `AppLog` model does not log its own saves).
+
+    Args:
+        log: The log to show.
+    """
     with (st.container(horizontal=True, vertical_alignment='center',
                       height='content')):
         is_critical = log.severity == LogSeverity.CRITICAL
@@ -114,7 +157,19 @@ def log_row(log: AppLog):
 
 
 class FilterSelector:
+    """The row of filter checkboxes above the logs, and their values.
+
+    Unchecking "Read" (or "Solved") hides the logs marked read (or
+    solved); all logs are shown when every box is checked.
+
+    Attributes:
+        checked_severities: Severities to show. Every severity when no
+            severity box is checked.
+        marked_read: Whether to show logs marked read.
+        marked_solved: Whether to show logs marked solved.
+    """
     def __init__(self):
+        """Draw the checkboxes (all checked at first) and read them."""
         with st.container(horizontal=True, vertical_alignment='center'):
             st.write('**Show:** ')
             severity_boxes = {
@@ -139,6 +194,14 @@ class FilterSelector:
 
 @st.dialog('Log details', width='large')
 def log_dialog(log: AppLog):
+    """Show every column of a log in a pop-up window (a dialog).
+
+    `st.write` displays the row's `__str__` (see `_BaseModel.__str__`):
+    one "- column: value" line per column, so the full description.
+
+    Args:
+        log: The log to show.
+    """
     st.write(log)
 
 body()

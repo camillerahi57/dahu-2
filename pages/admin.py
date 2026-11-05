@@ -1,3 +1,16 @@
+"""Admin page: link to the logs, XLSX export of the whole database, and
+restoration of the app state from a Restic snapshot.
+
+A snapshot is a saved copy of the whole `user_data/` folder (database
+and uploaded files) taken by Restic, the backup program. Restoring one
+brings every user's data back to that moment and deletes the later
+snapshots (see `Snapshot.restore`). It is protected by the password in
+the `dahu_admin_password` environment variable.
+
+A dialog is a pop-up window drawn by a function decorated with
+`@st.dialog`; it opens when the function is called and closes on the
+next rerun (Streamlit re-executing the page script).
+"""
 import os
 from datetime import datetime
 from time import sleep
@@ -19,6 +32,19 @@ st.set_page_config(layout='centered')
 
 @st.dialog('ARE YOU SURE YOU WANT TO RESET ALL DATA TO THIS POINT?')
 def restore_warning_dialog(snap: Snapshot):
+    """Ask for the admin password before restoring a snapshot.
+
+    The Confirm button stays disabled until the password is right. On
+    confirm, the snapshot is stored in the session state (Streamlit's
+    per-tab dictionary that survives reruns) and the page reruns, which
+    closes this dialog; `body` then opens `restore_process_dialog`
+    (Streamlit allows only one open dialog at a time).
+
+    Side effect: writes `Sk.SNAP_TO_RESTORE` in the session state.
+
+    Args:
+        snap: The snapshot chosen on the page.
+    """
     time_str = datetime_sentence(snap.time)
     msg = f"""The state of Dahu DB will be reset to:\n\n**{time_str}**."""
     st.error(msg)
@@ -32,14 +58,44 @@ def restore_warning_dialog(snap: Snapshot):
 
 @st.dialog('Please wait')
 def restore_process_dialog(snap: Snapshot):
+    """Restore a snapshot while showing a progress bar, then rerun.
+
+    Opened by `body` on the rerun that follows the confirmation in
+    `restore_warning_dialog`.
+
+    Side effects: replaces `user_data/` (DB and files) with the
+    snapshot's content and deletes the later snapshots (see
+    `Snapshot.restore`, which also writes `AppMetadata` and, on error,
+    `AppLog`); removes `Sk.SNAP_TO_RESTORE` from the session state.
+
+    Args:
+        snap: The snapshot to restore.
+
+    Raises:
+        RuntimeError: If Restic fails (raised by `Snapshot.restore`).
+    """
+    # Removed first so that the next rerun does not restore again.
     del sess[Sk.SNAP_TO_RESTORE]
+    # TODO Can `restic restore --delete` overwrite
+    #   `user_data/dahu_2.db` while Peewee holds it open (Windows file locks)?
+    #   And `app_metadata` keeps its pre-restore values in memory.
     snap.restore()
     st.success(f"**Dahu DB data was restored successfully.**")
+    # Leaves the message on screen for 5 s; the rerun closes the dialog.
     sleep(5)
     st.rerun()
 
 
 def snapshot_row(snap: Snapshot):
+    """Draw one restore point: its date and a Restore button.
+
+    The button opens `restore_warning_dialog`. Its widget key (the name
+    Streamlit uses to tell widgets apart) includes the snapshot id,
+    since every row has a button with the same label.
+
+    Args:
+        snap: The snapshot to show.
+    """
     with st.container(border=True, horizontal=True,
                       horizontal_alignment='distribute',
                       vertical_alignment='center',
@@ -50,6 +106,16 @@ def snapshot_row(snap: Snapshot):
 
 
 def body():
+    """Draw the page.
+
+    Starts the pending restore if one was confirmed on the previous run,
+    then draws the logs link, the XLSX download, the warning and the
+    list of restore points (newest first) with the next backup time.
+
+    Side effects: runs `restic snapshots` on every run (see
+    `Snapshot.list_available`), and may restore a snapshot (see
+    `restore_process_dialog`).
+    """
     if Sk.SNAP_TO_RESTORE in sess and sess[Sk.SNAP_TO_RESTORE]:
         snap = sess[Sk.SNAP_TO_RESTORE]
         restore_process_dialog(snap)
@@ -59,6 +125,8 @@ def body():
 
     st.header("Explore Database")
 
+    # The file is built on every run of the page, not only on click:
+    # `st.download_button` needs the bytes before the button is drawn.
     st.download_button(
         'Download as XLSX',
         data=database_to_excel_file_bytes(),
@@ -95,8 +163,11 @@ def body():
         if not snapshots:
             st.write('_No restore point available._')
         else:
+            # Newest first, assuming Restic lists them oldest first.
             for snap in reversed(snapshots):
                 snapshot_row(snap)
+    # TODO `list_available` returns an empty list instead of raising when
+    #  Restic fails.
     except RuntimeError as e:
         st.error(f"**Unable to list available restore points. "
                  f"Error message:**\n\n{e}")

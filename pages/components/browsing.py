@@ -69,6 +69,12 @@ def on_inspect_click(object_idx_list: list[int]):
         object_idx_list: DB ids of the objects, in the same order as the
             rows of the table.
     """
+    # TODO Is the `'row'` index that the
+    #   `ButtonColumn` stores the position in the *displayed* (filtered) table,
+    #   or the pandas index of the row? `DynamicFilters.display_df` shows a
+    #   filtered copy that keeps the original index. If it is the position,
+    #   "Inspect" opens the wrong object as soon as a sidebar filter is active
+    #   (browse_libs.py:117, browse_targets.py:95, browse_substrates.py:75).
     clicked_row_idx = st.session_state[INSPECT_BUTTON_KEY]['row']
     obj_id = object_idx_list[clicked_row_idx]
     st.session_state[Sk.INSPECT_OBJ_ID] = obj_id
@@ -84,7 +90,13 @@ def file_row(file: UserUploadedFile):
     Args:
         file: A `Pattern` or a `Recipe`.
     """
-    # TODO Import from a page, which causes a page load.
+    # TODO imports
+    #   `browse_patterns`, which runs that page's top-level code (`init_page`
+    #   and `body`) inside the calling page the first time per server process.
+    #   On the recipes page, the pattern list is drawn too and `init_page`
+    #   stores the patterns page as `Sk.CURRENT_PATH`. On the patterns page
+    #   itself, the rows would be drawn twice with the same widget keys, which
+    #   Streamlit rejects. Not checked by running the app.
     from browse_patterns import (
         show_pattern, show_rename_dialog, show_delete_dialog)
     with st.container(

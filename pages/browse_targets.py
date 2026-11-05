@@ -1,3 +1,11 @@
+"""Page listing all sputtering targets in a table.
+
+Each row has an "Inspect" button that opens the target's page. Archived
+targets are hidden unless "Show archived" is checked. The "made by"
+filter in the sidebar is saved in a cookie (a small piece of text
+stored by the browser), so it is restored on the next visit. See
+`browse_libs.py` for the same mechanisms, explained.
+"""
 import pandas as pd
 import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
@@ -23,6 +31,8 @@ with st.container(horizontal=True, vertical_alignment='center'):
     show_archived = st.checkbox('Show archived 📦')
 
 
+# `.dicts()` makes the query return one dictionary per row, keyed by the
+# aliases, i.e. by the column names of the table shown on the page.
 query = Target.select(
     Target.made_on.alias(ColName.made_on),
     Target.made_by_email.alias(ColName.made_by),
@@ -32,6 +42,8 @@ query = Target.select(
 ).dicts()
 
 
+# Peewee runs the query once and caches its rows, so iterating `query`
+# again below gives these same, modified dictionaries.
 for row in query:
     row[ColName.made_by] = get_email_user_name(row[ColName.made_by])
     row[ColName.inspect_link] = 'Inspect'
@@ -42,6 +54,11 @@ rows = [row for row in query]
 if not show_archived:
     rows = [row for row in rows if not row[ColName.is_archived]]
 
+# TODO `target_id_list` holds the ids of all
+#   targets, but `rows` (line 55) drops the archived ones when "Show
+#   archived" is unchecked. Row indexes then no longer match ids, so
+#   "Inspect" can open the wrong target. `browse_libs.py` builds both
+#   lists in the same loop and has no such problem.
 target_id_list = [row[IdType.TARGET] for row in query]
 
 column_config = {
@@ -54,6 +71,8 @@ column_config = {
 }
 
 # If we clicked on an inspect button:
+# (Set by `on_inspect_click` before this rerun; deleted by `init_page`
+# of the inspect page.)
 if Sk.INSPECT_OBJ_ID in sess:
     target_id = sess[Sk.INSPECT_OBJ_ID]
     st.switch_page(pages.inspect_target,
@@ -65,6 +84,8 @@ col_order = list(
 
 df = pd.DataFrame(rows, columns=col_order)
 
+# Restore the last filters from the cookie into the session state entry
+# that `DynamicFilters` reads; the cookie is updated at the end.
 filters_in_cookies = cookies.get(CookieKeys.TARGET_FILTERS)
 if filters_in_cookies:
     sess[Sk.TARGET_FILTERS] = filters_in_cookies
