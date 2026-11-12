@@ -23,27 +23,38 @@ imports work: `python -m logic.migrations.<script name without .py>`.
 
 ### Write a migration after changing a model
 
-SQLite cannot change a column in place, so the table is rebuilt.
+The main `README.md`, section "Add a column (with its migration
+script)", has two complete, tested example scripts.
 
 1. Change the model in `logic/lab_modelization/db_models.py` (see
    `logic/lab_modelization/README.md`).
-2. Create a new script in this folder. The main `README.md` names them
-   after the date and the change, e.g. `2026_09_split_argon_flow.py`.
+2. Create a new script in this folder, named after the date and the
+   change, e.g. `2026_09_split_argon_flow.py`.
 3. Write it with raw SQL (`db.execute_sql(...)`, with `db` imported from
    `logic.lab_modelization.base_classes`), not with Peewee objects and
    `save()`: many models write an `AppLog` row on every save, which needs
    a running Streamlit page. Table names are the model names in snake_case
-   (`TriodeSputtering` → `triode_sputtering`). The steps are:
-   1. `PRAGMA foreign_keys=OFF` (a pragma is a SQLite setting). Run it
-      before opening the transaction: SQLite ignores it inside one.
-   2. Inside `with db.atomic():` (a transaction: if one step fails,
-      none of them is kept):
-      1. `CREATE TABLE <table>_new (...)` with the new columns.
-      2. `INSERT INTO <table>_new (...) SELECT ... FROM <table>` to copy
-         and convert the rows.
-      3. `DROP TABLE <table>`.
-      4. `ALTER TABLE <table>_new RENAME TO <table>`.
-   3. `PRAGMA foreign_keys=ON`.
+   (`TriodeSputtering` → `triode_sputtering`).
+   - **New column that may be NULL:** a single
+     `ALTER TABLE <table> ADD COLUMN <column> <type>` is enough (a
+     `NOT NULL` column needs a `DEFAULT`).
+   - **Any other change:** SQLite cannot change a column in place, so the
+     table is rebuilt:
+     1. `PRAGMA foreign_keys=OFF` (a pragma is a SQLite setting). Run it
+        before opening the transaction: SQLite ignores it inside one.
+     2. Inside `with db.atomic():` (a transaction: if one step fails,
+        none of them is kept):
+        1. `CREATE TABLE <table>_new (...)` with the new columns.
+        2. `INSERT INTO <table>_new (...) SELECT ... FROM <table>` to
+           copy and convert the rows.
+        3. `DROP TABLE <table>`.
+        4. `ALTER TABLE <table>_new RENAME TO <table>`.
+        5. Create the table's indexes again: `DROP TABLE` deleted them.
+           List them first with `SELECT sql FROM sqlite_master WHERE
+           type = 'index' AND tbl_name = '<table>'`.
+        6. `PRAGMA foreign_key_check`, and raise an error if it returns
+           any row (a row pointing to a missing row).
+     3. `PRAGMA foreign_keys=ON`.
 4. Test it on a dev copy of `user_data/dahu_2.db` (never on the production
    file), check the data with DataGrip (read only), then click through
    every page that shows this table.
