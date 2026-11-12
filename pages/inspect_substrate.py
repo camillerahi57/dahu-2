@@ -1,7 +1,7 @@
 """Page showing one substrate: its label, its layers, and buttons to
 edit or delete it.
 
-The substrate is chosen by the `sub_id` query parameter (a
+The substrate is chosen by the `substrate_id` query parameter (a
 `name=value` pair after the `?` of the URL, see `IdType.SUB`). A
 substrate can only be deleted when no film was deposited on it.
 """
