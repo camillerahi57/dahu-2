@@ -1,3 +1,11 @@
+"""Page for adding a new library: its film, targets and layers.
+
+The whole form is `new_library.sub_forms.RootForm`. On submit, the
+library, its film, the film's layers and their parts are saved in one
+transaction (a group of DB writes that either all succeed or are all
+cancelled), with an `AppLog` row for the library. The user is then
+sent to the new library's page.
+"""
 import streamlit as st
 
 from components.forms.base_classes import PausePageRun
@@ -14,6 +22,10 @@ st.set_page_config(layout="wide")
 
 
 try:
+    # `RootForm` raises `PausePageRun` while the library, film or
+    # layers are invalid, so the button only appears once they are
+    # valid. It stays disabled until the rest is valid too, e.g. the
+    # "layers are in the right order" box.
     root_form = RootForm()
     library = root_form.library
 

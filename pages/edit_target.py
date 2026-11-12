@@ -1,3 +1,13 @@
+"""Page for editing a target's basic info (date, author, label,
+previous version).
+
+The target is chosen by the `target_id` query parameter (a
+`name=value` pair after the `?` of the URL, see `IdType.TARGET`). Its
+deterioration states are edited on their own page. On submit, the
+target row is updated in place, keeping its id and archive status
+(writes an `AppLog` row), and the user is sent back to the target's
+page.
+"""
 import streamlit as st
 
 from components.forms.base_classes import PausePageRun
@@ -19,6 +29,9 @@ st.set_page_config(layout='centered')
 try:
     root_form = BasicInfoForm(default_target=old_target)
     # Copying the ID to keep the old one and update it:
+    # (`save()` on an object that has an id updates that row.)
+    # `to_target` raises `PausePageRun` while the form is invalid, so
+    # the button below only appears once it is valid.
     new_target = root_form.to_target(id_=old_target.id,
                                      is_archived=old_target.is_archived)
 

@@ -1,3 +1,12 @@
+"""Page for uploading a file (any format) to a library.
+
+The library is chosen by the `lib_id` query parameter (a `name=value`
+pair after the `?` of the URL, see `IdType.LIB`). On confirm, the
+`LibraryFile` row is saved (with an `AppLog` row) and the file is
+written to `user_data/`, in one transaction (a group of DB writes that
+either all succeed or are all cancelled). Unlike patterns and recipes,
+the label need not be unique.
+"""
 from time import sleep
 
 import streamlit as st
@@ -30,5 +39,8 @@ if st.button('Confirm', disabled=not form.is_valid):
     with db.atomic():
         lib_file.save()
         lib_file.save_bytes()
+    # Reason for the 0.1 s pause unknown (see DOC_NOTES.md).
     sleep(.1)
+    # No page to go back to: the next page only offers Home (see
+    # DOC_NOTES.md).
     switch_to_submit_successful()

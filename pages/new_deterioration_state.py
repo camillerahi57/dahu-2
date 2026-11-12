@@ -1,3 +1,14 @@
+"""Page for adding a deterioration state (photo and patches) to an
+existing target.
+
+The target is chosen by the `target_id` query parameter (a
+`name=value` pair after the `?` of the URL, see `IdType.TARGET`). The
+form is `new_deterioration_state.sub_forms.RootForm`. On submit, the
+state, its photo row and its patches are saved in one transaction (a
+group of DB writes that either all succeed or are all cancelled), with
+`AppLog` rows, and the photo is written to `user_data/`. The user is
+then sent back to the target's page.
+"""
 import streamlit as st
 
 from components.forms.base_classes import PausePageRun
@@ -23,6 +34,8 @@ try:
     if st.button("Submit", disabled=not root_form.is_valid, type="primary"):
         with db.atomic():
             state.save_with_dependent()
+            # `save_with_dependent` only writes DB rows; the photo's
+            # bytes are written to `user_data/` here.
             state.photos[0].save_bytes()
 
         switch_to_submit_successful(
