@@ -19,6 +19,9 @@ import keyboard
 import streamlit as st
 from peewee import DateField, IntegerField
 from streamlit.navigation.page import StreamlitPage
+from streamlit.runtime.scriptrunner import (
+    add_script_run_ctx, get_script_run_ctx
+)
 
 from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL
 from logic.constants import (
@@ -93,7 +96,11 @@ def run_routines():
     if now > app_metadata.next_backup_at:
         # In a thread so the page doesn't wait for Restic. `backup`
         # itself ignores calls made while another backup is running.
-        Thread(target=Snapshot.backup).start()
+        # The thread gets this script run's context, otherwise
+        # `AppLog.save_new` can't read `st.context` or the cookies.
+        thread = Thread(target=Snapshot.backup)
+        add_script_run_ctx(thread, get_script_run_ctx())
+        thread.start()
 
     if now > app_metadata.next_problem_check_at:
         # `get_problems` is a generator: `list` runs all the checks.

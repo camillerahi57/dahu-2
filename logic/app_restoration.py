@@ -161,10 +161,9 @@ class Snapshot:
                 event = Event.from_restic_error(result.returncode)
                 AppLog.save_new(event)
                 raise RuntimeError(result.stderr)
-            # TODO runs in a background thread
-            #   started by `init_page`, but `AppLog.save_new` reads `st.context` and
-            #   cookies, which need the Streamlit script's own thread. Logging a
-            #   backup (success or Restic error) may fail there.
+            # Runs in a background thread started by `run_routines`,
+            # which attaches the Streamlit script context to it so that
+            # `AppLog.save_new` can read `st.context` and the cookies.
             if prune_excessive_snaps:
                 delete_excessive_snapshots()
 
