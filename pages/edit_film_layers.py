@@ -33,14 +33,12 @@ try:
     form_is_valid = update_layers_form.is_valid
 
     if st.button("Submit", disabled=not form_is_valid, type='primary'):
-        # TODO The old layers are deleted before, and
-        #   outside, the `with db.atomic():` (a transaction: DB writes
-        #   that either all succeed or are all cancelled). If saving the
-        #   new layers fails, the film is left with no layers.
-        for old_layer in film.layers:
-            old_layer.delete_with_parts()
-
+        # One transaction (DB writes that either all succeed or are all
+        # cancelled): if saving the new layers fails, the old ones stay.
         with db.atomic():
+            for old_layer in film.layers:
+                old_layer.delete_with_parts()
+
             for new_layer in new_layers:
                 new_layer.save_with_dependent()
 

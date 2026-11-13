@@ -35,7 +35,7 @@ def body():
     # Why these imports are inside the function, unlike in the other
     # browsing pages, is not known (see DOC_NOTES.md).
     from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
-        on_inspect_click
+        on_inspect_click, filtered_ids
     from components.general import init_page, switch_page_bttn, icon
     from logic.global_variables import sess
     from logic.cookie_init import cookies
@@ -114,6 +114,10 @@ def body():
     dynamic_filters = DynamicFilters(df, filters=possible_filters,
                                      filters_name=Sk.LIB_FILTERS)
     browser_side_bar(dynamic_filters, pages.browse_libs)
+    # `on_inspect_click` receives this same list object: refill it in place
+    # with the displayed rows only (the clicked row is a position in the
+    # filtered table).
+    lib_id_list[:] = filtered_ids(dynamic_filters, lib_id_list)
     dynamic_filters.display_df(hide_index=True, column_config=column_config,
                                height=550)
 

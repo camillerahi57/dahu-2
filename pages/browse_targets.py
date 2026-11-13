@@ -11,7 +11,7 @@ import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
-    on_inspect_click
+    on_inspect_click, filtered_ids
 from components.general import init_page, switch_page_bttn, icon
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
 from logic.cookie_init import cookies
@@ -54,12 +54,9 @@ rows = [row for row in query]
 if not show_archived:
     rows = [row for row in rows if not row[ColName.is_archived]]
 
-# TODO `target_id_list` holds the ids of all
-#   targets, but `rows` (line 55) drops the archived ones when "Show
-#   archived" is unchecked. Row indexes then no longer match ids, so
-#   "Inspect" can open the wrong target. `browse_libs.py` builds both
-#   lists in the same loop and has no such problem.
-target_id_list = [row[IdType.TARGET] for row in query]
+# Built from `rows`, not `query`: the row indexes of the table must match
+# the indexes of this list, and `rows` may have dropped archived targets.
+target_id_list = [row[IdType.TARGET] for row in rows]
 
 column_config = {
     ColName.made_on: st.column_config.DateColumn(width='small'),
@@ -95,6 +92,10 @@ dynamic_filters = DynamicFilters(df, filters=possible_filters,
                                  filters_name=Sk.TARGET_FILTERS)
 
 browser_side_bar(dynamic_filters, pages.browse_targets)
+# `on_inspect_click` receives this same list object: refill it in place
+# with the displayed rows only (the clicked row is a position in the
+# filtered table).
+target_id_list[:] = filtered_ids(dynamic_filters, target_id_list)
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 

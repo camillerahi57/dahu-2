@@ -55,6 +55,25 @@ def browser_side_bar(dynamic_filters: DynamicFilters|None,
 INSPECT_BUTTON_KEY = 'inspect_button'
 
 
+def filtered_ids(dynamic_filters: DynamicFilters,
+                 id_list: list[int]) -> list[int]:
+    """Keep the ids of the rows that the sidebar filters let through.
+
+    `ButtonColumn` reports the position of the clicked row in the
+    displayed table, so the list given to `on_inspect_click` must only
+    hold the displayed rows.
+
+    Args:
+        dynamic_filters: Filters built on a DataFrame whose index is the
+            position of each row in `id_list` (a fresh `pd.DataFrame`).
+        id_list: DB ids of all rows, before filtering.
+
+    Returns:
+        The ids of the displayed rows, in display order.
+    """
+    return [id_list[i] for i in dynamic_filters.filter_df().index]
+
+
 def on_inspect_click(object_idx_list: list[int]):
     """Remember which object's "Inspect" button was clicked.
 
@@ -67,14 +86,12 @@ def on_inspect_click(object_idx_list: list[int]):
 
     Args:
         object_idx_list: DB ids of the objects, in the same order as the
-            rows of the table.
+            rows of the table as displayed, i.e. after filtering (see
+            `filtered_ids`).
     """
-    # TODO Is the `'row'` index that the
-    #   `ButtonColumn` stores the position in the *displayed* (filtered) table,
-    #   or the pandas index of the row? `DynamicFilters.display_df` shows a
-    #   filtered copy that keeps the original index. If it is the position,
-    #   "Inspect" opens the wrong object as soon as a sidebar filter is active
-    #   (browse_libs.py:117, browse_targets.py:95, browse_substrates.py:75).
+    # `'row'` is the position in the table as displayed (after the sidebar
+    # filters), not the pandas index. The pages therefore refill
+    # `object_idx_list` with `filtered_ids` before drawing the table.
     clicked_row_idx = st.session_state[INSPECT_BUTTON_KEY]['row']
     obj_id = object_idx_list[clicked_row_idx]
     st.session_state[Sk.INSPECT_OBJ_ID] = obj_id

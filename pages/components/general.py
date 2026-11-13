@@ -83,8 +83,8 @@ def run_routines():
         - Once `next_backup_at` has passed, starts `Snapshot.backup` in a
           background thread (Restic, `AppMetadata` and `AppLog` writes).
         - Once `next_problem_check_at` has passed, runs `get_problems`
-          (which calls Restic), sets the next check time in memory and
-          writes one `AppLog` row per problem found.
+          (which calls Restic), saves the next check time in
+          `AppMetadata` and writes one `AppLog` row per problem found.
     """
     from logic.app_restoration import Snapshot
 
@@ -101,7 +101,7 @@ def run_routines():
         # Read the time again: the checks can take a while.
         now = datetime.now()
         app_metadata.next_problem_check_at = now + PROBLEM_CHECK_INTERVAL
-        # TODO save app_metadata.
+        app_metadata.save()
         for event in problems:
             AppLog.save_new(event)
 

@@ -363,15 +363,11 @@ class LayerIntroForm(Form):
         self.target_label = target_label_fld.value
         self.target_2_label = target_2_label
 
-        # `nominal_stoichio_fld` is listed twice, while
-        # `nominal_thickness_fld` and `target_label_fld` are missing, so
-        # these two don't affect `is_valid`.
         super().__init__(
-            fields=[deposit_temp_fld, nominal_stoichio_fld, shadow_mask_fld,
-                    nominal_stoichio_fld, layer_function_fld, is_cosputter_fld,
+            fields=[deposit_temp_fld, nominal_thickness_fld,
+                    nominal_stoichio_fld, shadow_mask_fld, target_label_fld,
+                    layer_function_fld, is_cosputter_fld,
                     sputtering_system_fld, target_2_label_fld],
-            # TODO nominal_stoichio_fld is passed twice and
-            #  nominal_thickness_fld and target_label_fld are left out.
             sub_forms=[],
         )
 

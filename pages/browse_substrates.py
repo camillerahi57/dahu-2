@@ -10,7 +10,7 @@ import streamlit as st
 from streamlit_dynamic_filters import DynamicFilters
 
 from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
-    on_inspect_click
+    on_inspect_click, filtered_ids
 from components.general import init_page, switch_page_bttn, icon
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
 from logic.cookie_init import cookies
@@ -72,6 +72,10 @@ possible_filters = [ColName.label]
 dynamic_filters = DynamicFilters(df, filters=possible_filters,
                                  filters_name=Sk.SUBSTRATE_FILTERS)
 browser_side_bar(dynamic_filters, pages.browse_substrates)
+# `on_inspect_click` receives this same list object: refill it in place
+# with the displayed rows only (the clicked row is a position in the
+# filtered table).
+sub_id_list[:] = filtered_ids(dynamic_filters, sub_id_list)
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 

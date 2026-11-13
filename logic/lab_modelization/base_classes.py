@@ -484,10 +484,10 @@ class Event:
 
         # With timezone for difference between two tz-aware date-times:
         paris_now = datetime.now(tz=ZoneInfo(DAHU_2_TIMEZONE))
-        last_backup_timedelta = paris_now - Snapshot.get_latest().time
+        lastest_snap = Snapshot.get_latest()
+        last_backup_timedelta = paris_now - lastest_snap.time
         day_interval = last_backup_timedelta.days
-        # TODO Wring snapshot id:
-        descr = (f'Last backup (snapshot id {Snapshot.id}) is very old '
+        descr = (f'Last backup (snapshot id {lastest_snap.id}) is very old '
                  f'(more than {day_interval} days ago).')
         return cls(
             type=EventType.NO_RECENT_BACKUP,
