@@ -69,11 +69,7 @@ def dependent_lib_error(lib_: Library):
     markdown = (f"The library cannot be deleted because {len(libs)} "
                 f"other librarie(s) refer to some of its characterizations:")
     for lib_ in libs:
-        # TODO `lib_.url()` calls `Library.url`, which
-        #   is a property (a string), so this would raise `TypeError`. Not
-        #   reachable today because `Library.dependent_libraries` always returns
-        #   `[]`. `inspect_substrate.py` and `inspect_target.py` use `lib_.url`.
-        markdown += f"\n- [{lib_.label}]({lib_.url()})"
+        markdown += f"\n- [{lib_.label}]({lib_.url})"
     st.error(markdown)
 
 

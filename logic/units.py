@@ -30,7 +30,7 @@ to SI using Pint's `to_base_units` method, with
 
 
 def to_db_unit(*, unit: Unit)\
-        -> Unit|float|PlainUnit:  # TODO remove float.
+        -> Unit|PlainUnit:
     """Gives the database unit that goes with a unit.
 
     For example `ur.mm` gives meter and `ur.cm**3 / ur.min` gives

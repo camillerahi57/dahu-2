@@ -58,15 +58,12 @@ class Polygon:
     def to_scatter(self):
         """Builds the Plotly trace that draws this polygon.
 
-        Side effect: the first vertex is appended at the end of
-        `self.vertices` (to close the outline), so calling this twice
-        adds it twice.
-
         Returns:
             A filled `Scatter` trace with a thin black outline and no
             legend entry.
         """
-        vertices = self.vertices
+        # Copy, so that `self.vertices` is not modified.
+        vertices = list(self.vertices)
         # Closing the polygon:
         vertices.append(vertices[0])
 
@@ -81,9 +78,6 @@ class Polygon:
             showlegend=False,
             name=self.label,
         )
-    # TODO It appends the first vertex
-    #   to `self.vertices` itself, so every call grows the list (and a polygon
-    #   drawn twice gets a duplicated closing vertex). Work on a copy instead?
 
 
 @dataclass

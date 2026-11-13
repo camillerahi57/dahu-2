@@ -284,8 +284,7 @@ class TargetField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         """Require a chosen target. See `Field._validate`."""
         if not input_:
-            # TODO typo.
-            return False, 'Please enter select a target.'
+            return False, 'Please select a target.'
         return True, ''
 
 
@@ -321,8 +320,7 @@ class TargetChoiceField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         """Require a chosen target. See `Field._validate`."""
         if not input_:
-            # TODO typo.
-            return False, 'Please enter select a target.'
+            return False, 'Please select a target.'
         return True, ''
 
 

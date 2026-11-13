@@ -24,8 +24,7 @@ init_page(pages.new_film_modif)
 
 st.set_page_config(layout="centered")
 
-# TODO target_id never used.
-film_id = target_id = current_params()[IdType.FILM]
+film_id = current_params()[IdType.FILM]
 film: Film = Film.get_by_id(film_id)
 # Read by the "previous film modification" field (see
 # `get_options` in `new_film_modif/fields.py`). The library page sets it

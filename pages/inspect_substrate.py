@@ -28,14 +28,11 @@ def dependent_lib_error():
     """Explain why the substrate can't be deleted, with library links.
 
     Shown instead of the confirmation dialog when films were deposited
-    on the substrate. The message text was copied from the library
-    page and talks about "characterizations" (see `DOC_NOTES.md`).
+    on the substrate.
     """
     libs = substrate.libraries()
-    # TODO "The substrate" instead of "The library" and "libs" instead of
-    #  "characs".
-    markdown = (f"The library cannot be deleted because {len(libs)} "
-                f"other librarie(s) refer to some of its characterizations:")
+    markdown = (f"The substrate cannot be deleted because {len(libs)} "
+                f"librarie(s) were made on it:")
     for lib_ in libs:
         markdown += f"\n- [{lib_.label}]({lib_.url})"
     st.error(markdown)
