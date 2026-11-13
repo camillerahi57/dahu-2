@@ -31,7 +31,7 @@ from components.forms.new_target.fields import MadeAtField, \
     IsCorrectFigureField, HasCorrectOrientationField
 from components.pixel_helper import pixel_helper_button
 from logic.constants import SessionKeys as Sk, NEW_TARGET, CookieKeys as Ck
-from logic.cookie_init import cookies
+from logic.cookie_init import new_controller
 from logic.global_variables import sess
 from logic.lab_modelization.db_enums import PixelCoordinateSystem, ShapeType
 from logic.lab_modelization.db_models import Target, \
@@ -70,7 +70,7 @@ class BasicInfoForm(Form):
             )
         with col2:
             email_fld = MadeByField(
-                form_default=cookies.get(Ck.LAST_EMAIL_USED),
+                form_default=new_controller().get(Ck.LAST_EMAIL_USED),
                 db_default=default_target.made_by_email
                     if default_target else None,
             )

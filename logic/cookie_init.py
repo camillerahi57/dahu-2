@@ -1,13 +1,16 @@
-"""Creates the browser cookie controller when this module is imported.
+"""Gives access to the browser cookie controller of the current session.
 
 A cookie is a small piece of text that the web browser keeps for a site
 and sends back on each visit. Dahu DB uses cookies to remember, per
 browser, things like browse filters and the last email address used
 (keys in `logic.constants.CookieKeys`).
 
-Import `cookies` from here rather than building a new controller.
-Side effects on import: may wait up to about 5 s, writes to
-`st.session_state` and may write `AppLog` rows (see `new_controller`).
+Call `new_controller()` each time cookies are needed, rather than
+building a controller or keeping one in a module-level variable: Python
+imports a module once per server process, so such a variable would be
+shared by all browser sessions. The first call in a session may wait up
+to about 5 s, writes to `st.session_state` and may write `AppLog` rows
+(see `new_controller`).
 """
 from time import sleep
 
@@ -40,6 +43,10 @@ def new_controller() -> CookieController:
         return sess['cookie_controller']
 
     controller = CookieController()
+    # Stored before the wait loop: the warning below calls
+    # `AppLog.save_new`, which calls `new_controller` again and must find
+    # this controller instead of creating another one (endless recursion).
+    sess['cookie_controller'] = controller
     waited = 0
     while not controller.get('cookie_ready'):
         controller.set('cookie_ready', True)
@@ -57,16 +64,4 @@ def new_controller() -> CookieController:
             # TODO After 5 s the loop never stops, and writes an
             #   `AppLog` row every 0.1 s until the cookie is readable.
 
-    sess['cookie_controller'] = controller
     return controller
-
-
-# Module-level controller. Python runs this module only on its first
-# import in the server process, so this is the controller of the first
-# session that imported it (see DOC_NOTES.md).
-cookies = new_controller()
-
-# TODO: `cookies` is built once per server process (on
-#   first import), so every browser session shares the controller of the
-#   first session. Other sessions then store a different controller in
-#   their own `st.session_state` that is never used.

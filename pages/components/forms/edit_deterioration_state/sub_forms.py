@@ -13,7 +13,7 @@ from components.forms.base_classes import Form
 from components.forms.new_deterioration_state.fields import MadeByField
 from components.forms.new_target.sub_forms import DeteriorationStateForm
 from logic.constants import CookieKeys as Ck
-from logic.cookie_init import cookies
+from logic.cookie_init import new_controller
 from logic.lab_modelization.db_models import Target, DeteriorationState
 
 
@@ -46,7 +46,7 @@ class RootForm(Form):
                  f'{target.label}')
 
         email_fld = MadeByField(
-            form_default=cookies.get(Ck.LAST_EMAIL_USED),
+            form_default=new_controller().get(Ck.LAST_EMAIL_USED),
             db_default=default_state.made_by_email
                 if default_state else None,
         )

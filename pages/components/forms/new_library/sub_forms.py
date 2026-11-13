@@ -48,7 +48,7 @@ from components.forms.new_library.fields import (
     TargetChoiceField, ConfirmOrderField, IsCoSputteringField,
 )
 from logic.constants import SessionKeys as Sk, CookieKeys as Ck
-from logic.cookie_init import cookies
+from logic.cookie_init import new_controller
 from logic.global_variables import sess
 from logic.lab_modelization.db_enums import SputteringSystem
 from logic.lab_modelization.db_models import Library, Film, FilmLayer, \
@@ -170,7 +170,7 @@ class FilmInfoForm(Form):
                     if default_film else None,
             )
             email_fld = MadeByField(
-                form_default=cookies.get(Ck.LAST_EMAIL_USED),
+                form_default=new_controller().get(Ck.LAST_EMAIL_USED),
                 db_default=default_film.made_by_email
                     if default_film else None,
             )

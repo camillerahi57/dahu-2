@@ -3755,13 +3755,13 @@ class AppLog(_BaseModel):
             marked_solved: Initial value of `marked_solved`.
             timestamp: Event time; now if None.
         """
-        # Imported here, not at the top: importing `cookie_init`
-        # creates the cookie controller, which needs Streamlit running.
-        from logic.cookie_init import cookies
+        # Imported here, not at the top, to avoid a circular import:
+        # `cookie_init` itself imports `AppLog`.
+        from logic.cookie_init import new_controller
         new_log = cls(
             timestamp=timestamp or datetime.now(),
             ip_address=st.context.ip_address,
-            email_in_cookies=cookies.get(Ck.LAST_EMAIL_USED),
+            email_in_cookies=new_controller().get(Ck.LAST_EMAIL_USED),
             notify=event.notify,
             marked_read=marked_read,
             marked_solved=marked_solved,

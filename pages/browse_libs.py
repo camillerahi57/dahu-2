@@ -38,7 +38,7 @@ def body():
         on_inspect_click, filtered_ids
     from components.general import init_page, switch_page_bttn, icon
     from logic.global_variables import sess
-    from logic.cookie_init import cookies
+    from logic.cookie_init import new_controller
 
     init_page(pages.browse_libs, show_home_btn=False)
 
@@ -106,7 +106,7 @@ def body():
     # `DynamicFilters` keeps the selected filter values in the session
     # state under `filters_name`. Pre-filling that entry from the cookie
     # restores the last filters; the cookie is updated at the end.
-    filters_in_cookies = cookies.get(CookieKeys.LIB_FILTERS)
+    filters_in_cookies = new_controller().get(CookieKeys.LIB_FILTERS)
     if filters_in_cookies:
         sess[Sk.LIB_FILTERS] = filters_in_cookies
 
@@ -121,7 +121,7 @@ def body():
     dynamic_filters.display_df(hide_index=True, column_config=column_config,
                                height=550)
 
-    cookies.set(CookieKeys.LIB_FILTERS, sess[Sk.LIB_FILTERS])
+    new_controller().set(CookieKeys.LIB_FILTERS, sess[Sk.LIB_FILTERS])
 
 
 def problem_banner():

@@ -14,7 +14,7 @@ from components.browsing import browser_side_bar, INSPECT_BUTTON_KEY, \
     on_inspect_click, filtered_ids
 from components.general import init_page, switch_page_bttn, icon
 from logic.constants import CookieKeys, IdType, SessionKeys as Sk
-from logic.cookie_init import cookies
+from logic.cookie_init import new_controller
 from logic.global_variables import sess
 from logic.lab_modelization.db_models import Target
 from logic.page_list import pages
@@ -83,7 +83,7 @@ df = pd.DataFrame(rows, columns=col_order)
 
 # Restore the last filters from the cookie into the session state entry
 # that `DynamicFilters` reads; the cookie is updated at the end.
-filters_in_cookies = cookies.get(CookieKeys.TARGET_FILTERS)
+filters_in_cookies = new_controller().get(CookieKeys.TARGET_FILTERS)
 if filters_in_cookies:
     sess[Sk.TARGET_FILTERS] = filters_in_cookies
 
@@ -99,4 +99,4 @@ target_id_list[:] = filtered_ids(dynamic_filters, target_id_list)
 dynamic_filters.display_df(hide_index=True, column_config=column_config,
                            height=550)
 
-cookies.set(CookieKeys.TARGET_FILTERS, sess[Sk.TARGET_FILTERS])
+new_controller().set(CookieKeys.TARGET_FILTERS, sess[Sk.TARGET_FILTERS])
