@@ -1561,26 +1561,23 @@ class FilmModification(_BaseModel):
 
         This makes room for the new modification in the numbering. The
         shift saves every modification whose number is at least this
-        one's, in all films (see DOC_NOTES.md). Writes `AppLog` rows.
+        one's, in the same film. Only new rows shift the others. Writes
+        `AppLog` rows.
 
         Args:
             shift_subsequent_modifs: False to save this row only, without
                 shifting the others (used for the shifted rows
                 themselves, to avoid an endless recursion).
         """
-        # TODO POSSIBLE BUG: This method
-        #   shifts `modif_number` of every modification with a number >= this one,
-        #   in *all films*, not only `self.film`. Same in `delete_instance`
-        #   (line 1537). Inserting a modification on film A renumbers film B, and
-        #   `previous_modif` (which filters by film) can then fail.
         # TODO Other bug: takes no `*args/**kwargs`, so `save_with_dependent(force_insert=True)`
         #   (the edit pattern from CLAUDE.md) would raise `TypeError`. No edit page
         #   for modifications exists yet.
-        # TODO Third bug: also shifts when
-        #   updating an existing row, so re-saving a modification bumps its
-        #   successors (and the row itself, if it is fetched in the loop).
-        if shift_subsequent_modifs:
-            for modif in FilmModification.select():
+        # Only a new row (no id yet) makes room: re-saving an existing row
+        # must not renumber its successors.
+        if shift_subsequent_modifs and self.get_id() is None:
+            # Numbers are per film, so other films must stay untouched.
+            for modif in (FilmModification.select()
+                          .where(FilmModification.film == self.film)):
                 if modif.modif_number >= self.modif_number:
                     modif.modif_number += 1
                     modif.save(shift_subsequent_modifs=False)
@@ -1593,8 +1590,7 @@ class FilmModification(_BaseModel):
         modif_number attributes of subsequent film modifications.
 
         (This docstring used to be a copy of `save`'s.) Like `save`, the
-        shift applies to all films (see DOC_NOTES.md). Writes `AppLog`
-        rows.
+        shift applies to the same film only. Writes `AppLog` rows.
 
         Args:
             recursive: See Peewee's `Model.delete_instance`.
@@ -1602,7 +1598,8 @@ class FilmModification(_BaseModel):
             *args: Passed on to Peewee's `Model.delete_instance`.
             **kwargs: Passed on to Peewee's `Model.delete_instance`.
         """
-        for modif in FilmModification.select():
+        for modif in (FilmModification.select()
+                      .where(FilmModification.film == self.film)):
             if modif.modif_number >= self.modif_number:
                 modif.modif_number -= 1
                 modif.save(shift_subsequent_modifs=False)
