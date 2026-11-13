@@ -9,7 +9,7 @@ Call `new_controller()` each time cookies are needed, rather than
 building a controller or keeping one in a module-level variable: Python
 imports a module once per server process, so such a variable would be
 shared by all browser sessions. The first call in a session may wait up
-to about 5 s, writes to `st.session_state` and may write `AppLog` rows
+to about 5 s, writes to `st.session_state` and may write an `AppLog` row
 (see `new_controller`).
 """
 from time import sleep
@@ -32,8 +32,8 @@ def new_controller() -> CookieController:
     The controller talks to the browser through a hidden component, so
     cookies are not readable right after it is created. The loop writes a
     test cookie, `cookie_ready`, and waits until it can be read back.
-    After 5 s it writes a WARNING `AppLog` row on every further
-    iteration, but keeps waiting.
+    After 5 s it writes one WARNING `AppLog` row and gives up waiting;
+    the controller is then returned although cookies may not be readable.
 
     Returns:
         The session's cookie controller.
@@ -61,7 +61,8 @@ def new_controller() -> CookieController:
                             "properly. Cookie could not be loaded.",
             )
             AppLog.save_new(event)
-            # TODO After 5 s the loop never stops, and writes an
-            #   `AppLog` row every 0.1 s until the cookie is readable.
+            # Give up: otherwise the loop would never end and would write
+            # an `AppLog` row every 0.1 s.
+            break
 
     return controller
