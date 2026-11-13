@@ -26,6 +26,9 @@ from logic.page_list import pages
 # Don't import anything from this file, as it will load it again and re-run
 # the current page.
 
+# TODO Auto-run on Windows startup (in case there's a Windows update, which
+#  is very frequent).
+#  PowerShell: `python -m streamlit run pages/entry_point.py`.
 
 if not DB_PATH.exists():
     raise RuntimeError(f'Database connection failed. please check presence of '

@@ -45,8 +45,7 @@ the session state is a dictionary Streamlit keeps for each browser tab
 across reruns), and the layer forms read them from there.
 
 **The nitrogen flow of triode layers is stored as typed**:
-`NitrogenFlowField` is labelled in SCCM but its `ui_unit` is m³/s, so the
-number is saved unconverted (see the TODO in that class).
+`NitrogenFlowField` is labelled in SCCM..
 
 Many builder methods (`to_library`, `add_to_layer`...) raise
 `PausePageRun` while their form is invalid. Every widget is already drawn

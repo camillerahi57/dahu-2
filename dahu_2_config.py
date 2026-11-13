@@ -35,12 +35,9 @@ if ON_PRODUCTION:
     RESTIC_PASSWORD = 'no_password'  # Password of the Restic repository,
     # probably 'no_password' as suggested in the Dahu DB setup manual.
 
-    RESTIC_REPO_PATH = r'O:\DAHU2\dev\backups\restic_snapshot_repo'
+    RESTIC_REPO_PATH = r'O:\DAHU2\prod\backups\restic_snapshot_repo'
     # Path to the Restic repository (on the server where the backups
     # are stored).
-    # TODO The production `RESTIC_REPO_PATH` contains a `dev`
-    #   folder (`O:\DAHU2\dev\backups\...`). Is that really the production
-    #   repository?
 
     DAHU_2_CODE_BASE_PATH = r'C:\Users\camille.rahi\Documents\dahu-2'
     # Path to the root of this Python project.
