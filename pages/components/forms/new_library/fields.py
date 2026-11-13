@@ -853,7 +853,7 @@ class ConfirmOrderField(Field):
 
         See `Field._streamlit_input`.
         """
-        return st.checkbox("The layers are in the right order "
+        return st.checkbox("**Confirm**: the layers are in the right order "
                            "(bottom to top of the film).")
 
     def _validate(self, input_) -> tuple[bool, str]:
