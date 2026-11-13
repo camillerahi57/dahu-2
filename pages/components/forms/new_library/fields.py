@@ -754,17 +754,15 @@ class DepositRateField(UnitField):
 class ArgonFlowField(UnitField):
     """Argon flow during triode sputtering
     (`TriodeSputtering.argon_flow`).
-
-    UI unit: m³/s. DB unit: m³/s. See the TODO below.
     """
     type = Ft.ADVISED
-    # TODO Should it be like NitrogenFlowField? Instead of:
-    ui_unit = ur.m**3 / ur.s
+    ui_unit = ur.cm**3 / ur.min
+    ui_unit_alias = 'SCCM'
 
     def _streamlit_input(self, prefill: float, key):
         """Draw a number input (minimum 0). See `Field._streamlit_input`.
         """
-        return st.number_input(f"Argon flow (**{self.ui_unit}**)",
+        return st.number_input(f"Argon flow (**{self.ui_unit_alias}**)",
                                value=prefill, min_value=0., key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -777,17 +775,9 @@ class ArgonFlowField(UnitField):
 class NitrogenFlowField(UnitField):
     """Nitrogen flow during triode sputtering
     (`TriodeSputtering.nitrogen_flow`).
-
-    The label says SCCM (`ui_unit_alias`), but the conversion uses
-    `ui_unit`, m³/s, so the number typed is stored unchanged. See the
-    TODO below.
     """
     type = Ft.ADVISED
-    # TODO It's cm, not m:
-    #  (SCCM means standard cm³ per minute, so the time unit differs
-    #  too. Because the alias only changes the label, a value typed as
-    #  SCCM is stored as if it were m³/s.)
-    ui_unit = ur.m**3 / ur.s
+    ui_unit = ur.cm**3 / ur.min
     ui_unit_alias = 'SCCM'
 
     def _streamlit_input(self, prefill: float, key):
