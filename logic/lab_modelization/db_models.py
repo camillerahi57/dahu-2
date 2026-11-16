@@ -48,6 +48,7 @@ from random import Random
 from time import sleep
 from typing import Self, Iterable, Any, cast
 
+import astropy
 import chemparse
 import h5py
 import plotly.graph_objects as go
@@ -76,7 +77,8 @@ from logic.lab_modelization.db_enums import (
 from logic.lab_modelization.other_classes import MixtureConstituent
 from logic.math_tools import VertexList
 from logic.page_list import pages
-from logic.units import ur, db_units, db_units_explanation, to_db_magnitude
+from logic.units import ur, db_units, db_units_explanation, to_db_magnitude, \
+    astropy_to_pint, from_db_unit
 
 
 # FIELD TYPES:
@@ -3254,6 +3256,54 @@ class Charac(_BaseModel):
         """
         return list(self.edxs)[0]
 
+    @staticmethod
+    def read_dataset_as_quantity(
+            hdf5_dataset: h5py.Dataset) -> Quantity:
+        """
+        Read an hdf5 dataset and return an astropy quantity. Value is the
+        value of the dataset,
+        and unit is the unit specified in the attributes of the dataset.
+        If no unit is present, use default "dimensionless" from astropy.
+        :param hdf5_dataset: hdf5 dataset to be parsed
+        :return: astropy.Quantity with unit from the attributes of the hdf5
+        dataset
+        """
+        from astropy import units as u
+        if not isinstance(hdf5_dataset, h5py.Dataset):
+            raise TypeError(
+                f"Passed dataset is of type {type(hdf5_dataset)}. "
+                f"Only h5py.Dataset types are accepted")
+        if "unit" in hdf5_dataset.attrs:
+            value = hdf5_dataset[()]
+            unit = u.Unit(hdf5_dataset.attrs["unit"])
+        elif "units" in hdf5_dataset.attrs:
+            value = hdf5_dataset[()]
+            unit = u.Unit(hdf5_dataset.attrs["units"])
+        else:
+            value = hdf5_dataset[()]
+            unit = u.Unit("")
+
+        return astropy_to_pint(value * unit)
+
+    @staticmethod
+    def get_hdf5_datasets(hdf5_file, dataset_type):
+        """
+        :param hdf5_file: Root group from a library high-throughput HDF5 file
+        :param dataset_type:
+        :return:
+        """
+        if dataset_type == "all":
+            return list(hdf5_file.keys())
+
+        else:
+            dataset_list = []
+            for dataset, dataset_group in hdf5_file.items():
+                if "HT_type" in dataset_group.attrs:
+                    if dataset_type in dataset_group.attrs["HT_type"]:
+                        dataset_list.append(dataset)
+
+            return dataset_list
+
 
 class CharacReference(_BaseModel):
     """Link letting a `Library` reuse a `Charac` made on another film.
@@ -3309,10 +3359,10 @@ class Edx(_BaseModel):
         charac: Foreign key to the general `Charac` row. Not NULL.
         elements: Backref to one `ChemicalElementEdx` per element.
     """
-    electron_energy = FloatField()
-    working_distance = FloatField()
-    magnification = FloatField()
-    acquisition_duration = FloatField()
+    electron_energy: float = cast(Any, FloatField())
+    working_distance: float = cast(Any, FloatField())
+    magnification: float = cast(Any, FloatField())
+    acquisition_duration: float = cast(Any, FloatField())
 
     charac: Charac = cast(Any, ForeignKeyField(Charac,
                                                       on_delete='RESTRICT',
@@ -3351,31 +3401,17 @@ class Edx(_BaseModel):
         for e in self.elements:
             e.delete_with_parts()
 
-    # TODO Fix these 3 properties:
+    @property
+    def electron_energy_quantity(self) -> Quantity|None:
+        return from_db_unit(self.electron_energy, ur.keV)
 
     @property
-    def electron_energy_quantity(self) -> Quantity:
-        """`electron_energy` as a Pint quantity, labelled in keV.
-
-        See DOC_NOTES.md: the DB value is in J, not keV.
-        """
-        return self.electron_energy * ur.keV
+    def working_distance_quantity(self) -> Quantity|None:
+        return from_db_unit(self.working_distance, ur.mm)
 
     @property
-    def working_distance_quantity(self) -> Quantity:
-        """`working_distance` as a Pint quantity, labelled in mm.
-
-        See DOC_NOTES.md: the DB value is in m, not mm.
-        """
-        return self.working_distance * ur.mm
-
-    @property
-    def acquisition_duration_quantity(self) -> Quantity:
-        """`acquisition_duration` as a Pint quantity, labelled in ms.
-
-        See DOC_NOTES.md: the DB value is in s, not ms.
-        """
-        return self.acquisition_duration * ur.ms
+    def acquisition_duration_quantity(self) -> Quantity|None:
+        return from_db_unit(self.acquisition_duration, ur.ms)
 
     @staticmethod
     def get_hdf5_datasets(hdf5_file, dataset_type):
@@ -3407,7 +3443,7 @@ class Edx(_BaseModel):
             return dataset_list
 
     @classmethod
-    def from_hdf5(cls, hdf5_path: Path):
+    def from_hdf5(cls, charac: Charac, processed_h5_path: Path):
         """Build an unsaved EDX row from a high-throughput HDF5 file.
 
         In development and not called anywhere yet (see DOC_NOTES.md).
@@ -3416,61 +3452,47 @@ class Edx(_BaseModel):
         atomic percent over all positions.
 
         Args:
-            hdf5_path: Path of the HDF5 file.
+            charac: The characterization it's linked to.
+            processed_h5_path: Path of the HDF5 file.
 
         Returns:
             The unsaved `Edx`, meant to carry its `ChemicalElementEdx`
             parts.
         """
-        with h5py.File(hdf5_path, "r") as hdf5_file:
-            # TODO the instrument paths start
-            #   with `/`, so h5py resolves them from the file root, not from the
-            #   instrument group; an element first seen without "AtomPercent" and
-            #   later with it is never updated.
-            dataset_list = cls.get_hdf5_datasets(hdf5_file, dataset_type="edx")
+        with h5py.File(processed_h5_path, "r") as hdf5_file:
+            dataset_list = Charac.get_hdf5_datasets(hdf5_file,
+                                                    dataset_type="edx")
             edx_group = hdf5_file[dataset_list[0]]
             positions_group = edx_group['positions']
-            ref_instrument_group = positions_group[
-                f"{positions_group.keys[0]}/instrument"]  # TODO missing `()`?
+            reference_instrument_group = positions_group[
+                f"{list(positions_group.keys())[0]}/instrument"]
 
-            prim_energy_path = "/ESMAHeader/PrimaryEnergy"
-            primary_energy_float = ref_instrument_group[prim_energy_path][()]
-            primary_energy = to_db_magnitude(primary_energy_float * ur.keV)
+            primary_energy = Charac.read_dataset_as_quantity(
+                reference_instrument_group["ESMAHeader/PrimaryEnergy"])
+            working_distance = Charac.read_dataset_as_quantity(
+                reference_instrument_group["ESMAHeader/WorkingDistance"])
+            magnification = Charac.read_dataset_as_quantity(
+                reference_instrument_group["ESMAHeader/Magnification"])
+            acquisition_time = \
+                reference_instrument_group["SpectrumHardwareHeader/RealTime"][
+                    ()] * ur.ms
 
-            work_dist_path = "/ESMAHeader/WorkingDistance"
-            working_distance_float = ref_instrument_group[work_dist_path][()]
-            working_distance = to_db_magnitude(working_distance_float * ur.mm)
-
-            magnification_path = "/ESMAHeader/Magnification"
-            magnification = ref_instrument_group[magnification_path][()]
-
-            hardware_path = "/SpectrumHardwareHeader/RealTime"
-            acquisition_time_float = ref_instrument_group[hardware_path][()]
-            acquisition_time = to_db_magnitude(acquisition_time_float * ur.ms)
-
-            # Element symbol → running min / max / sum / count of the
-            # atomic percent over positions, to get the mean at the end.
-            # Elements without "AtomPercent" were detected but not
-            # quantified.
             results_dict = dict()
-            # TODO missing `()` for items?:
-            for position, position_group in edx_group["positions"].items:
+            for position, position_group in edx_group["positions"].items():
                 for element, element_group in position_group["results"].items():
-                    # Group names look like "<something> <symbol>":
+                    if element == "TRTResult":
+                        continue
                     element_symbol = element.split(" ")[1].strip()
-
                     if ("AtomPercent" in element_group
                             and element_symbol not in results_dict):
                         value = element_group["AtomPercent"][()]
-                        results_dict[element_symbol] = {
-                            "min": value,
-                            "max": value,
-                            "sum": value,
-                            "count": 1,
-                            "Xline": element_group["XLine"][()],
-                            "quantified": True
-                        }
-
+                        results_dict[element_symbol] = {"min": value,
+                                                        "max": value,
+                                                        "sum": value,
+                                                        "count": 1, "Xline":
+                                                            element_group[
+                                                                "XLine"][()],
+                                                        "quantified": True}
                     elif ("AtomPercent" in element_group
                           and element_symbol in results_dict):
                         value = element_group["AtomPercent"][()]
@@ -3481,31 +3503,41 @@ class Edx(_BaseModel):
 
                         results_dict[element_symbol]["sum"] += value
                         results_dict[element_symbol]["count"] += 1
-
                     elif ("AtomPercent" not in element_group
                           and element_symbol not in results_dict):
-                        results_dict[element_symbol] = {
-                            "min": None,
-                            "max": None,
-                            "sum": None,
-                            "count": None,
-                            "Xline": element_group["XLine"][()],
-                            "quantified": False
-                        }
+                        results_dict[element_symbol] = {"min": None,
+                                                        "max": None,
+                                                        "sum": None,
+                                                        "count": None, "Xline":
+                                                            element_group[
+                                                                "XLine"][()],
+                                                        "quantified": False}
 
-            hdf5_file.purge()
+            hdf5_file.close()
 
-        element_classes = ChemicalElementEdx.from_dict(results_dict)
         parsed = cls(
             electron_energy=primary_energy,
             working_distance=working_distance,
             magnification=magnification,
             acquisition_duration=acquisition_time,
-            # TODO not in init:  (verify others)
-            chemical_element_edx_list=element_classes,
+            charac=charac,
         )
-
+        parsed.elements = ChemicalElementEdx.from_dict(results_dict)
         return parsed
+
+    @staticmethod
+    def check_can_parse(file_path: Path):
+        with h5py.File(file_path, "r") as hdf5_file:
+            # Get all EDX type HDF5 datasets
+            dataset_list = Charac.get_hdf5_datasets(hdf5_file,
+                                                    dataset_type="edx")
+            # If no datasets, raise error
+            if len(dataset_list) == 0:
+                raise FileNotFoundError(f"No edx datasets found in {file_path}")
+            # If more than one dataset, raise error
+            elif len(dataset_list) > 1:
+                raise FileExistsError(
+                    f"Multiple edx datasets found in {file_path}")
 
 
 class ChemicalElementEdx(_BaseModel):
@@ -3569,7 +3601,7 @@ class ChemicalElementEdx(_BaseModel):
         pass
 
     @classmethod
-    def from_dict(cls, elements: dict) -> list[Self]:
+    def from_dict(cls, elements_dict: dict) -> list[Self]:
         """Build unsaved element results from `Edx.from_hdf5`'s dict.
 
         Args:
@@ -3579,19 +3611,20 @@ class ChemicalElementEdx(_BaseModel):
         Returns:
             One unsaved row per element, without `edx` set.
         """
-        element_list = [
-            cls(
+        return_list = []
+        for element in elements_dict:
+            element_class = cls(
                 element=element,
-                min_atom_percent=data["min"],
-                max_atom_percent=data["max"],
-                # TODO fix None case:
-                mean_atom_percent=data["sum"] / data["count"],
-                quantified=data["quantified"],
-                x_line=data["Xline"],
+                min_atom_percent=elements_dict[element]["min"],
+                max_atom_percent=elements_dict[element]["max"],
+                # TODO Fix None case:
+                mean_atom_percent=elements_dict[element]["sum"] /
+                                  elements_dict[element]["count"],
+                quantified=elements_dict[element]["quantified"],
+                x_line=elements_dict[element]["Xline"],
             )
-            for element, data in elements.items()
-        ]
-        return element_list
+            return_list.append(element_class)
+        return return_list
 
 
 class AppMetadata(_BaseModel):

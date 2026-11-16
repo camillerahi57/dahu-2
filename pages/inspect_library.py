@@ -275,9 +275,7 @@ def charac_dialog(charac: Charac):
 @st.dialog(title="Warning")
 def charac_ref_delete(charac: Charac):
     """Warn that other libraries use a characterization, then delete it.
-
-    Called from `charac_dialog`, i.e. a dialog opened from inside
-    another dialog (see `DOC_NOTES.md`). On confirmation, deletes the
+    On confirmation, deletes the
     characterization and the references to it, in a transaction, then
     reruns the page.
 
@@ -407,7 +405,7 @@ def film_modif_section():
             label='**Add**',
             type_='tertiary',
             icon_=icon('add_2'),
-            q_params={IdType.FILM: film.id}
+            q_params={IdType.FILM: film.id},
         )
 
 

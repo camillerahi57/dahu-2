@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pint import UnitRegistry
 from pint.facets.plain import PlainUnit
 from pint.registry import Unit, Quantity
+import astropy.units as u
+
 
 from logic.constants import DB_UNIT_SYSTEM
 
@@ -120,3 +122,20 @@ class _DatabaseUnits:
 
 # The single instance of `_DatabaseUnits`, imported by `db_models`.
 db_units = _DatabaseUnits()
+
+
+def astropy_to_pint(q: u.Quantity) -> Quantity:
+    """Convert an astropy Quantity (including dimensionless) to a pint
+    Quantity."""
+    q = u.Quantity(q)  # accepts plain numbers/arrays too (treated as
+    # dimensionless)
+    unit = q.unit
+
+    # Build the pint unit from the astropy unit's bases and powers
+    # (more robust than parsing unit.to_string(), which yields e.g. "m2 / s2").
+    pint_unit = ur.dimensionless
+    for base, power in zip(unit.bases, unit.powers):
+        pint_unit = pint_unit * ur.Unit(base.to_string()) ** float(power)
+
+    # Composite units like Unit("1000 m") carry a numeric scale factor.
+    return ureg.Quantity(q.value * unit.scale, pint_unit)  # noqa
