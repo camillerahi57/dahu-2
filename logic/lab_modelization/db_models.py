@@ -1037,13 +1037,13 @@ class FilmLayer(_BaseModel):
         module, to avoid a circular import.
         """
         from components.forms.new_library.fields import (
-            DepositTempField, ArgonFlowField, ShadowMaskField,
-            FilmLayerFunctionField, NominalStoichioField,
+            DepositTempField, ShadowMaskField,
+            FilmLayerFunctionField, NominalStoichioField, NominalThicknessField,
         )
         return [  # noqa Type warning.
             ('Deposit temp.', self.deposit_temp, DepositTempField),
-            # TODO It's not ArgonFlowField here:
-            ('Nominal thickness', self.nominal_thickness, ArgonFlowField),
+            ('Nominal thickness', self.nominal_thickness,
+             NominalThicknessField),
             ('Shadow mask', self.shadow_mask_description, ShadowMaskField),
             ('Function', self.function, FilmLayerFunctionField),
             ('Nominal stoichio.', StoichioElement.to_str(self.nominal_stoichio),

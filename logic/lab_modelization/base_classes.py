@@ -439,9 +439,9 @@ class Event:
             type=EventType.DELETED_ITEM,
             notify=False,
             severity=LogSeverity.INFO,
-            # TODO Write Deleted instead of Saved:
-            description=f"Saved {deleted.__class__.__name__}. Value: {deleted}"
-                        f". At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
+            description=f"Deleted {deleted.__class__.__name__}. "
+                        f"Value: {deleted}. "
+                        f"At: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}."
         )
 
     @classmethod

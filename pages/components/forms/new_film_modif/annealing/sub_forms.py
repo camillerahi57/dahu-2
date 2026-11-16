@@ -136,7 +136,8 @@ class RampPhaseForm(Form):
             if is_room_temp_fld.value is not True:
                 reached_temp_fld = ReachedTempField(
                     key=key,
-                    form_default=default_reached_temp,
+                    form_default=None,
+                    db_default=default_reached_temp,
                     disabled=is_room_temp_fld.value,
                 )
 

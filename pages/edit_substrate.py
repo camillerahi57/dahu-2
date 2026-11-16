@@ -19,8 +19,7 @@ from logic.lab_modelization.base_classes import db
 from logic.lab_modelization.db_models import Substrate
 from logic.page_list import pages
 
-# TODO Fix: pages.edit_substrate:
-init_page(pages.new_substrate)
+init_page(pages.edit_substrate)
 
 substrate_id = current_params()[IdType.SUB]
 old_substrate: Substrate = Substrate.get_by_id(substrate_id)

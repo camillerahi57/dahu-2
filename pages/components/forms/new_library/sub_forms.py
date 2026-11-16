@@ -76,8 +76,6 @@ class BaseInfoForm(Form):
             default_lib: Library whose values prefill the fields (edit
                 page), or None.
         """
-        st.title('New Library')  # TODO It should be "Edit..." on edit page.
-        st.divider()
         lib_label_fld = LibLabelField(
             form_default='',
             db_default=default_lib.label if default_lib else None

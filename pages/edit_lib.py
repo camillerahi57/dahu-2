@@ -25,6 +25,8 @@ old_lib: Library = Library.get_by_id(lib_id)
 st.set_page_config(layout='centered')
 
 try:
+    st.title('Edit Library')
+    st.divider()
     root_form = BaseInfoForm(default_lib=old_lib)
     # Copying the ID to keep the old one and update it:
     # (`save()` on an object that has an id updates that row.)

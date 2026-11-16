@@ -22,6 +22,8 @@ st.set_page_config(layout="wide")
 
 
 try:
+    st.title('New Library')
+    st.divider()
     # `RootForm` raises `PausePageRun` while the library, film or
     # layers are invalid, so the button only appears once they are
     # valid. It stays disabled until the rest is valid too, e.g. the

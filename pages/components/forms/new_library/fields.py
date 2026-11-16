@@ -255,8 +255,7 @@ class TargetCountField(Field):
     def _validate(self, input_) -> tuple[bool, str]:
         """Require at least one target. See `Field._validate`."""
         if input_ <= 0:
-            # TODO "number of layers" instead of "number of targets".
-            return False, 'The number of layers must be greater than zero.'
+            return False, 'The number of targets must be greater than zero.'
         return True, ''
 
 
