@@ -90,8 +90,8 @@ forms, ending with `RootForm`), and has its own `README.md`.
 - **`edit_film_layers/`**: change the targets and layers of a film.
 - **`new_film_modif/`**: an annealing or etching of a film, with one
   subfolder per kind.
-- **`new_charac/`**: empty; presumably for a future "new
-  characterization" form.
+- **`new_charac/`**: a characterization of a film (EDX for now), with
+  its data file.
 
 ## Common tasks
 

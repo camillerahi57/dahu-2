@@ -138,4 +138,4 @@ def astropy_to_pint(q: u.Quantity) -> Quantity:
         pint_unit = pint_unit * ur.Unit(base.to_string()) ** float(power)
 
     # Composite units like Unit("1000 m") carry a numeric scale factor.
-    return ureg.Quantity(q.value * unit.scale, pint_unit)  # noqa
+    return ur.Quantity(q.value * unit.scale, pint_unit)  # noqa

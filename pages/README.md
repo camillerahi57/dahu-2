@@ -72,12 +72,14 @@ concerned):
 ### Inspecting one object
 
 - **`inspect_library.py`**: one library: its film modifications and
-  characterizations (each opens a dialog with its details and a Delete
-  button), its uploaded files, the film and its layer table. Archive,
-  Edit and Delete buttons. Opening it updates
-  `Library.last_inspected_at`, the sort order of the home page. Key
-  functions: `page_body`, `film_modif_info`, `charac_dialog`,
-  `confirm_deletion_dialog`.
+  characterizations (each opens a dialog with its details, a download
+  button for its data file, and a Delete button, or a Remove reference
+  button for a measurement made on another film), its uploaded files,
+  the film and its layer table. Archive, Edit and Delete buttons.
+  Opening it updates `Library.last_inspected_at`, the sort order of the
+  home page. Key
+  functions: `page_body`, `film_modif_info`, `charac_section`,
+  `charac_dialog`, `add_charac_dialog`, `confirm_deletion_dialog`.
 - **`inspect_target.py`**: one target and its deterioration states (photo
   and patches), most recent first. Archive, edit, delete the target; add,
   edit, delete states. Key functions: `main_page`, `show_state`,
@@ -99,6 +101,11 @@ calls `switch_to_submit_successful`.
   example of a "new" page.
 - **`new_film_modif.py`**: an annealing or etching of a film
   (`film_id`).
+- **`new_charac.py`**: a characterization (e.g. an EDX) made on a film
+  (`film_id`), with its HDF5 data file (several GB: see the README of
+  `components/forms/new_charac/`). Reached from the "Add" button of
+  the library page's "Characterisations" banner; a measurement made on
+  *another* film is referenced from that banner's dialog instead.
 - **`new_lib_file_upload.py`**: a file of any format for a library
   (`lib_id`).
 - **`new_pattern.py`** (PNG or JPEG only), **`new_recipe.py`**: pattern
@@ -139,9 +146,9 @@ Edit pages reuse the forms of the "new" pages, prefilled from the object.
   Page"). It reads the database and prints to the console. Not part of
   the app's documentation; leave it as is.
 
-**Deleting a library does not delete its film's own characterizations**,
-although the confirmation message says so (see `confirm_deletion_dialog`
-in `inspect_library.py`).
+**Deleting a library deletes its film's own characterizations, with
+their data files** (for good). It is refused while another library uses
+one of them as a reference (see `Library.dependent_libraries`).
 
 ## Common tasks
 

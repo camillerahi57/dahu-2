@@ -60,6 +60,9 @@ A few words used below:
   or substrate). `inspect_page_header` draws the title with the Edit and
   Delete buttons; `show_film_layer` is the dialog showing one layer of the
   library page's layer table.
+- **`charac_info.py`**: draws what a characterization holds (common
+  info, then the part of its kind, e.g. `edx_info`). Used by the library
+  page's dialogs and by the preview of the new charac form.
 - **`library_files.py`**: the "Uploaded Files" box of the library page.
   `file_list_container` draws the list and its Add button;
   `delete_dialog` deletes a file (database row and file in `user_data/`)

@@ -7,7 +7,10 @@ pair after the `?` of the URL, see `IdType.LIB`). The page shows:
 - the comment, and Archive / Delete / Edit buttons;
 - the film modifications (annealing, etchings) in order, each opening
   a dialog (a pop-up window) with its details;
-- the characterizations, own and referenced (see `CharacReference`);
+- the characterizations, own (in bold) and referenced (marked `*`, see
+  `CharacReference`), each opening a dialog with its details and a
+  Delete or Remove reference button; "Add" opens a dialog to record a
+  new one or to reference one made on another film;
 - the uploaded files;
 - the film's info and its layer table, bottom (buffer side) layer
   first.
@@ -21,6 +24,8 @@ import streamlit as st
 from pandas import DataFrame
 
 from components.browsing import INSPECT_BUTTON_KEY
+from components.charac_info import charac_general_info, file_size_str
+from components.forms.new_charac.sub_forms import CHARAC_TYPES
 from components.forms.new_library.fields import DepositTempField
 from components.general import (
     init_page, current_params, switch_page_bttn,
@@ -31,10 +36,11 @@ from components.library_files import file_list_container
 from logic.constants import SessionKeys as Sk, IdType
 from logic.global_variables import sess
 from logic.lab_modelization.base_classes import db
-from logic.lab_modelization.db_enums import FilmModifType, CharacType
+from logic.lab_modelization.db_enums import FilmModifType
 from logic.lab_modelization.db_models import (
     Library, Film, Substrate, FilmModification, \
-    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching, Charac, Edx)
+    IonBeamEtching, WetEtching, Etching, Annealing, LiftOffEtching, Charac,
+    CharacReference)
 from logic.page_list import pages
 from logic.table_columns import LibInspectColumnName as ColName
 
@@ -59,15 +65,16 @@ st.set_page_config(layout="wide", page_title=lib.label)
 def dependent_lib_error(lib_: Library):
     """Explain why the library can't be deleted, with library links.
 
-    Never shown for now: `Library.dependent_libraries` always returns
-    an empty list, so `can_be_deleted` is always True.
+    Shown when other libraries reference one of this library's
+    characterizations (see `Library.dependent_libraries`).
 
     Args:
         lib_: The library the user tried to delete.
     """
     libs = lib_.dependent_libraries()
     markdown = (f"The library cannot be deleted because {len(libs)} "
-                f"other librarie(s) refer to some of its characterizations:")
+                f"other librarie(s) use some of its characterizations as "
+                f"references. Remove these references first:")
     for lib_ in libs:
         markdown += f"\n- [{lib_.label}]({lib_.url})"
     st.error(markdown)
@@ -131,30 +138,25 @@ def wet_etch_info(process: WetEtching):
 def confirm_deletion_dialog(lib_: Library):
     """Ask for confirmation, then delete the library and all its data.
 
-    Opens as a dialog. On confirmation, deletes the library with its
-    film (layers and modifications), uploaded files (rows and files)
-    and references to other characterizations, writing `AppLog` rows,
-    then goes to the "submission successful" page. The film's own
-    characterizations are not deleted, despite the message (see
-    `DOC_NOTES.md`).
+    Opens as a dialog. On confirmation, deletes in a transaction the
+    library with its film (layers, modifications and characterizations
+    with their data files), uploaded files (rows and files) and
+    references to other characterizations, writing `AppLog` rows, then
+    goes to the "submission successful" page. Files are removed from
+    `user_data/` for good, even if the transaction fails afterwards.
 
     Args:
         lib_: The library to delete.
     """
     st.error(f"Are you sure you want to **permanently** delete the "
              f"library **\"{lib_.label}\"**?\n\n**This will also delete:**\n"
-             f"- Film data\n- Film characterizations\n- Film modifications\n"
+             f"- Film data\n- Film modifications\n"
+             f"- Film characterizations, **with their data files**\n"
              f"- Uploaded files for this library")
     with st.container(horizontal=True, vertical_alignment="center"):
         if st.button('I confirm'):
-            # TODO `Film.delete_parts` deletes layers and
-            #   modifications but not the film's own `Charac` rows, and `Charac.film`
-            #   is `on_delete='RESTRICT'`. Deleting a library whose film has a
-            #   characterization should raise an `IntegrityError`, although the
-            #   dialog says characterizations are deleted. The deletion is not in
-            #   `with db.atomic():`, so rows deleted before the error (uploaded files,
-            #   layers...) stay deleted, and their files are already removed.
-            lib_.delete_with_parts()
+            with db.atomic():
+                lib_.delete_with_parts()
             switch_to_submit_successful(pages.browse_libs)
 
 
@@ -162,8 +164,7 @@ def on_delete():
     """Handle a click on "Delete Library" (see `inspect_page_header`).
 
     Opens the confirmation dialog, or shows an error if other libraries
-    depend on this one (never the case for now, see
-    `dependent_lib_error`).
+    depend on this one (see `dependent_lib_error`).
     """
     if lib.can_be_deleted():
         confirm_deletion_dialog(lib)
@@ -198,99 +199,284 @@ def lift_off_info(process: LiftOffEtching):
              f"**Ultrasound config**: {process.ultrasound_config}\n\n")
 
 
-def edx_info(edx: Edx):
-    """Draw the EDX instrument settings and the result per element.
+def charac_details(charac: Charac, is_own: bool):
+    """Draw everything the DB knows about a characterization.
 
-    Atomic percents (min, max, mean over the measured positions) are
-    shown only for quantified elements. The EDX feature is still in
-    development; the units shown for the settings are known to be wrong
-    (see the `*_quantity` properties of `Edx`).
-
-    Args:
-        edx: The EDX subtype row of the characterization.
-    """
-    st.write(f"**Electron energy**: {edx.electron_energy_quantity}\n\n"
-             f"**Working distance**: {edx.working_distance_quantity}\n\n"
-             f"**Magnification**: {edx.magnification}\n\n"
-             f"**Acquisition duration**: {edx.acquisition_duration_quantity}")
-    st.subheader("Elements")
-    for element in edx.elements:
-        if element.quantified:
-            st.write(f"**{element.element}**\n"
-                     f"- Minimum: {element.min_atom_percent} %\n"
-                     f"- Maximum: {element.max_atom_percent} %\n"
-                     f"- Mean: {element.mean_atom_percent} %\n"
-                     f"- Xline: {element.x_line}")
-        else:
-            st.write(f"**{element.element}**\n"
-                     f"- Quantified: {element.quantified}\n"
-                     f"- Xline: {element.x_line}")
-
-
-@st.dialog(title="Characterisation")
-def charac_dialog(charac: Charac):
-    """Show a characterization's details, with a Delete button.
-
-    Opens as a dialog. Deleting removes the `Charac` row and its
-    subtype in a transaction (a group of DB writes applied all at once,
-    or not at all), then reruns the page. Its data file is kept. If
-    other libraries reference it, a warning dialog asks first (see
-    `charac_ref_delete`).
+    Common info, then what is specific to its type (see
+    `CHARAC_TYPES`).
 
     Args:
         charac: The characterization, own or referenced.
-
-    Raises:
-        RuntimeError: For a `type_` with no display code yet (anything
-            but EDX).
+        is_own: True if it was made on this library's film; False if it
+            was made on another film (a link to that film's library is
+            then shown).
     """
-    last_modif = charac.last_modif
-    if last_modif is None:
-        last_modif_str = "_Deposition (no film modification)_"
-    else:
-        last_modif_str = f"{last_modif.modif_number}. {last_modif.modif_type}"
-    st.write(f"**Made on**: {charac.made_on}\n\n"
-             f"**Made by**: {charac.made_by_email}\n\n"
-             f"**Comment**: _{charac.comment}_\n\n"
-             f"**Made after**: {last_modif_str}")
-    st.subheader(charac.type_)
-    match charac.type_:
-        case CharacType.EDX:
-            edx_info(charac.edx)
-        case _:
-            raise RuntimeError(f"Unknown charac type: {charac.type_}")
-
+    spec = CHARAC_TYPES[charac.type_]
+    st.subheader(spec.name)
+    charac_general_info(charac, show_film_link=not is_own)
     st.divider()
-    if st.button("Delete characterisation ❌"):
-        if charac.refs:
-            # TODO Cannot call a dialog inside another one.
-            charac_ref_delete(charac)
-        else:
-            with db.atomic():
-                charac.delete_with_parts()
-            st.rerun()
-    st.write("(files will not be deleted)")
+    spec.draw_info(charac)
 
 
-@st.dialog(title="Warning")
-def charac_ref_delete(charac: Charac):
-    """Warn that other libraries use a characterization, then delete it.
-    On confirmation, deletes the
-    characterization and the references to it, in a transaction, then
+def charac_download_button(charac: Charac):
+    """Draw the button that downloads the characterization's data file.
+
+    Shows a warning instead if the file is missing from `user_data/`.
+
+    The file can be several GB, and the dialog is redrawn at every
+    click. So the file is neither read nor given to Streamlit here:
+    `data` is a function (`Path.read_bytes`) that Streamlit only calls
+    when the user clicks the button (it then holds the file in memory
+    to send it, so the download starts after a few seconds per GB).
+
+    Args:
+        charac: The characterization.
+    """
+    file = charac.file
+    path = file.get_path()
+    if not path.is_file():
+        st.warning('The data file is missing from the server.')
+        return
+    size = file_size_str(path.stat().st_size)
+    # `on_click='ignore'`: a click must not rerun the dialog.
+    st.download_button(
+        f'Download data file ({file.original_file_name}, {size})',
+        data=path.read_bytes,
+        file_name=file.download_file_name,
+        icon=icon('download'),
+        on_click='ignore',
+        key=f'charac_download_{charac.id}',
+        help='A big file can take a while to start downloading: the '
+             'server reads it when you click.',
+    )
+
+
+def confirmation_requested(charac: Charac) -> bool:
+    """Tell whether the user already clicked the first button (Delete,
+    or Remove reference) for this characterization.
+
+    The dialog is rerun at every click, and a button is only True during
+    the run that follows its click, so the click is remembered in the
+    session state (see `SessionKeys.CONFIRM_CHARAC_ACTION`).
+
+    Args:
+        charac: The characterization shown in the dialog.
+
+    Returns:
+        True if the confirmation part must be drawn.
+    """
+    return sess.get(Sk.CONFIRM_CHARAC_ACTION) == charac.id
+
+
+def open_charac_dialog(charac: Charac):
+    """Open `charac_dialog` from a clean state.
+
+    Forgets a confirmation the user started and abandoned earlier, so
+    that a dialog never opens already asking "are you sure?".
+
+    Args:
+        charac: The characterization to show.
+    """
+    sess.pop(Sk.CONFIRM_CHARAC_ACTION, None)
+    charac_dialog(charac)
+
+
+def charac_delete_section(charac: Charac):
+    """Draw the Delete button of a characterization made on this film,
+    and, once clicked, the warnings and the confirmation button.
+
+    Confirming deletes, in a transaction, the characterization, its
+    subtype rows, the references other libraries hold to it, and its
+    data file (the row and the file in `user_data/`, for good), then
     reruns the page.
 
     Args:
-        charac: The characterization to delete.
+        charac: A characterization made on this library's film.
     """
-    warning_str = "⚠️ Other libraries reference to this characterisation:"
-    for ref in charac.refs:
-        warning_str += f"\n- {ref.lib.label}"
-    st.warning(warning_str)
-    if st.button("Confirm deletion"):
+    if st.button('Delete ❌', key=f'charac_delete_{charac.id}'):
+        sess[Sk.CONFIRM_CHARAC_ACTION] = charac.id
+    if not confirmation_requested(charac):
+        return
+
+    st.error(
+        f"⚠️ **The data file \"{charac.file.original_file_name}\" and all "
+        f"the data extracted from it will be PERMANENTLY deleted from the "
+        f"server.** This cannot be undone, except by restoring a backup "
+        f"(which would also undo everything done since).")
+    libs = charac.referencing_libs()
+    if libs:
+        # Markdown links open in a new tab, so the dialog stays open.
+        links = '\n'.join(f"- [{lib_.label}]({lib_.url})" for lib_ in libs)
+        plural = len(libs) > 1
+        st.warning(
+            f"⚠️ **{len(libs)} other librar{'ies' if plural else 'y'} "
+            f"{'use' if plural else 'uses'} this characterisation as a "
+            f"reference.** The reference will be removed from "
+            f"{'each of them' if plural else 'it'}:\n\n{links}")
+    if st.button('Yes, permanently delete this characterisation and its '
+                 'file', type='primary', key=f'charac_confirm_{charac.id}'):
         with db.atomic():
             charac.delete_with_parts()
+        sess.pop(Sk.CONFIRM_CHARAC_ACTION, None)
         st.rerun()
 
+
+def charac_unreference_section(charac: Charac):
+    """Draw the "Remove reference" button of a characterization made on
+    another film, and, once clicked, the explanation and the
+    confirmation button.
+
+    Confirming deletes this library's `CharacReference` to the
+    characterization, in a transaction, then reruns the page. The
+    characterization itself and its file are kept.
+
+    Args:
+        charac: A characterization made on another film, referenced by
+            this library.
+    """
+    if st.button('Remove reference', key=f'charac_unref_{charac.id}'):
+        sess[Sk.CONFIRM_CHARAC_ACTION] = charac.id
+    if not confirmation_requested(charac):
+        return
+
+    other_lib = charac.film.library
+    st.info(
+        "This only removes the link between this library and the "
+        "characterisation. The characterisation and its file are kept in "
+        "the library it was made on.")
+    st.write(f"Library it was made on: "
+             f"{link_html(other_lib.label, other_lib.url)}",
+             unsafe_allow_html=True)
+    if st.button('Confirm: remove reference', type='primary',
+                 key=f'charac_unref_confirm_{charac.id}'):
+        with db.atomic():
+            for ref in (CharacReference.select()
+                        .where(CharacReference.charac == charac,
+                               CharacReference.lib == lib)):
+                ref.delete_with_parts()
+        sess.pop(Sk.CONFIRM_CHARAC_ACTION, None)
+        st.rerun()
+
+
+@st.dialog(title='Characterisation', width='large')
+def charac_dialog(charac: Charac):
+    """Show a characterization's details, with its Delete or Remove
+    reference button.
+
+    Opens as a dialog (a pop-up window), through `open_charac_dialog`.
+    Draws the details, the download button for the data file, then:
+
+    - if the characterization was made on this film: Delete, see
+      `charac_delete_section`;
+    - if it was made on another film: Remove reference, see
+      `charac_unreference_section`. The details then link to the
+      library of that film.
+
+    A dialog cannot open another dialog, which is why the confirmation
+    is drawn in this one.
+
+    Args:
+        charac: The characterization, own or referenced.
+    """
+    is_own = charac.film.id == film.id
+    charac_details(charac, is_own)
+    charac_download_button(charac)
+    st.divider()
+    if is_own:
+        charac_delete_section(charac)
+    else:
+        charac_unreference_section(charac)
+
+
+def characs_available_for_reference(other_film: Film) -> list[Charac]:
+    """List the characterizations of another film that this library
+    could reference.
+
+    Args:
+        other_film: The film the characterizations were made on.
+
+    Returns:
+        Its own characterizations (not the ones it references), minus
+        those this library already references, oldest first.
+    """
+    already_referenced = [ref.charac_id for ref in lib.refs]
+    return list(
+        Charac.select()
+        .where(Charac.film == other_film,
+               Charac.id.not_in(already_referenced))
+        .order_by(Charac.made_on, Charac.id))
+
+
+def reference_picker():
+    """Draw the steps to reference a characterization of another film:
+    choose the film, then the characterization, then confirm.
+
+    Only the films made with exactly the same targets are offered (see
+    `Film.films_with_same_targets`). Confirming saves a
+    `CharacReference` for this library, then reruns the page. Meant to
+    be called inside `add_charac_dialog`.
+    """
+    same_target_films = film.films_with_same_targets()
+    if not same_target_films:
+        st.info("No other film was made with exactly the same targets "
+                f"({', '.join(film.target_labels) or 'none'}).")
+        return
+    film_labels = {f.id: f"{f.label} (library: {f.library.label})"
+                   for f in same_target_films}
+    other_film_id = st.selectbox(
+        "Films made with the same targets:", options=list(film_labels),
+        index=None, format_func=lambda id_: film_labels[id_],
+        key='ref_film_select')
+    if other_film_id is None:
+        return
+
+    # Only the types the app can display are offered.
+    characs = [c for c in characs_available_for_reference(
+        Film.get_by_id(other_film_id)) if c.type_ in CHARAC_TYPES]
+    if not characs:
+        st.info("This film has no characterisation of its own that this "
+                "library does not already reference.")
+        return
+    charac_labels = {
+        c.id: f"{CHARAC_TYPES[c.type_].name} · {c.made_on} · "
+              f"{c.made_by_email}" + (f" · {c.comment}" if c.comment else "")
+        for c in characs}
+    charac_id = st.selectbox(
+        "Characterisation:", options=list(charac_labels), index=None,
+        format_func=lambda id_: charac_labels[id_], key='ref_charac_select')
+    if charac_id is None:
+        return
+
+    charac = Charac.get_by_id(charac_id)
+    with st.expander("Details", expanded=False):
+        charac_details(charac, is_own=False)
+    if st.button('Confirm', type='primary', key='ref_confirm'):
+        CharacReference(charac=charac, lib=lib).save()
+        st.rerun()
+
+
+@st.dialog(title='Add a characterisation')
+def add_charac_dialog():
+    """Ask where the new characterization was made, then go on.
+
+    Opens as a dialog (a pop-up window).
+
+    - "On this film": a link to the new characterization page (see
+      `pages/new_charac.py`), where the data is entered.
+    - "On another film": the choice is made right here, see
+      `reference_picker`.
+    """
+    this_film = 'On this film'
+    other_film = 'On another film (reuse its measurement)'
+    origin = st.radio("Where was the characterisation made?",
+                      [this_film, other_film], index=None,
+                      key='add_charac_origin')
+    if origin == this_film:
+        switch_page_bttn(
+            pages.new_charac, label='Continue',
+            q_params={IdType.FILM: film.id}, icon_=icon('arrow_forward'))
+    elif origin == other_film:
+        reference_picker()
 
 
 @st.dialog('Modification Process')
@@ -338,11 +524,16 @@ def film_modif_info(modif_: FilmModification):
         raise RuntimeError(f'Unknown modification type: {modif_.modif_type}')
 
     st.divider()
-    if st.button("Delete film modification ❌"):
+    # `Charac.last_modif` is `on_delete='RESTRICT'`: the DB refuses to
+    # delete a modification that a characterization points to.
+    characs = list(modif_.characs)
+    if characs:
+        st.warning(
+            f"This modification cannot be deleted: {len(characs)} "
+            f"characterisation(s) were made after it (it is their last "
+            f"film modification). Delete them first.")
+    elif st.button("Delete film modification ❌"):
         with db.atomic():
-            # TODO `Charac.last_modif` is
-            #   `on_delete='RESTRICT'`, so deleting a modification that a
-            #   characterization points to should fail with an `IntegrityError`.
             modif_.delete_with_parts()
         st.rerun()
 
@@ -376,6 +567,16 @@ def archive_dialog():
         st.rerun()
 
 
+# Button label of each modification type: the emoji, a space, the name.
+# `charac_section` reuses the emoji (the part before the first space).
+MODIF_NAMES = {
+    FilmModifType.LIFT_OFF: '🔦 Lift off',
+    FilmModifType.ANNEALING: '♨️ Annealing',
+    FilmModifType.WET_ETCHING: '🧪 Wet etching',
+    FilmModifType.ION_BEAM_ETCHING: '☄️ Ion beam etching',
+}
+
+
 def film_modif_section():
     """Draw the row of film modification buttons, in order, and "Add".
 
@@ -386,12 +587,7 @@ def film_modif_section():
                       horizontal_alignment='left', border=True)):
         st.write("**Film modifications:**")
 
-        modif_names = {
-            FilmModifType.LIFT_OFF: '🔦 Lift off',
-            FilmModifType.ANNEALING: '♨️ Annealing',
-            FilmModifType.WET_ETCHING: '🧪 Wet etching',
-            FilmModifType.ION_BEAM_ETCHING: '☄️ Ion beam etching',
-        }
+        modif_names = MODIF_NAMES
         modifs = film.ordered_modifs()
         for i, modif in enumerate(modifs):
             if i != 0:
@@ -412,40 +608,37 @@ def film_modif_section():
 def charac_section():
     """Draw the row of characterization buttons, oldest first, and "Add".
 
-    Own characterizations are in bold; referenced ones (made on another
-    film, see `CharacReference`) end with `*`. Each button opens
-    `charac_dialog`.
+    Characterizations made on this film are in bold; referenced ones
+    (made on another film, see `CharacReference`) end with `*`. Each
+    button opens `charac_dialog`; "Add" opens `add_charac_dialog`.
+    A button is prefixed with the emoji of the last film modification
+    made before the measurement (none if measured as deposited).
     """
+    characs = [c for c in lib.all_characs() if c.type_ in CHARAC_TYPES]
     with (st.container(horizontal=True, vertical_alignment='center',
                       horizontal_alignment='left', border=True)):
         st.write("**Characterisations:**")
 
-        charac_names = {
-            CharacType.EDX: 'EDX',
-            CharacType.PROFILO: 'PROFILO',
-        }
-        characs = lib.all_characs()
-
-        for i, charac in enumerate(characs):
-            # "direct charac" means not a reference charac.
-            is_direct_charac = charac.film.id == film.id
-            if is_direct_charac:
-                bttn_label = f'**{charac_names[charac.type_]}**'
-            else:
-                bttn_label = f'{charac_names[charac.type_]}*'
-            if st.button(bttn_label, key=f'char_btn_{i}'):
-                charac_dialog(charac)
-        # Empty container: a 300-pixel gap before the "Add" link.
+        for charac in characs:
+            # "own" means made on this library's film, not a reference.
+            is_own = charac.film_id == film.id
+            name = CHARAC_TYPES[charac.type_].name
+            # Emoji of the last modification before the measurement;
+            # nothing if the film was measured as deposited.
+            if charac.last_modif is not None:
+                modif_name = MODIF_NAMES[charac.last_modif.modif_type]
+                name = f'{modif_name.split()[0]}{name}'
+            bttn_label = f'**{name}**' if is_own else f'{name}*'
+            if st.button(bttn_label, key=f'charac_btn_{charac.id}',
+                         help=f'{charac.made_on} · {charac.made_by_email}'):
+                open_charac_dialog(charac)
+        # Empty container: a gap before the "Add" button.
         st.container(width=300)
-        switch_page_bttn(
-            # Temporary. Should be "new charac" page/dialog:
-            pages.browse_libs,
-            label='**Add**',
-            type_='tertiary',
-            icon_=icon('add_2'),
-            q_params={}
-        )
-    st.write("_* reference characterisation_")
+        if st.button('**Add**', type='tertiary', icon=icon('add_2'),
+                     key='charac_add_btn'):
+            add_charac_dialog()
+    if any(charac.film_id != film.id for charac in characs):
+        st.write("_* reference characterisation (made on another film)_")
 
 
 def page_body():
@@ -486,6 +679,7 @@ def page_body():
     )
 
     film_modif_section()
+    charac_section()
 
     col1, col2 = st.columns([40, 60])
 

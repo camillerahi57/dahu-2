@@ -48,8 +48,8 @@ A few words used below:
   - `Library`, `Film`, `FilmLayer`, `Target`, `Substrate`: the main lab
     objects.
   - `UserUploadedFile`: parent of every uploaded file (`Pattern`, `Recipe`,
-    `LibraryFile`, `TargetPhoto`). The row holds the metadata, the bytes
-    are in `user_data/<internal_file_name>`.
+    `LibraryFile`, `CharacFile`, `TargetPhoto`). The row holds the
+    metadata, the bytes are in `user_data/<internal_file_name>`.
   - `AppMetadata`: a **singleton** table (it only ever holds one row) with
     the backup and problem-check schedule and the app version.
   - `AppLog`: the event log shown on the logs page and the home page banner.

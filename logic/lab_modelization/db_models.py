@@ -18,9 +18,10 @@ The models, grouped by topic:
   `IonBeamEtching` (with `PlasmaConstituent`s), a `WetEtching` (with
   `EtchingSolvent`s) or a `LiftOffEtching`. `Pattern` and `Recipe` are
   uploaded files used by etchings.
-- Characterizations: `Charac`, its EDX subtype `Edx` (with one
-  `ChemicalElementEdx` per element), and `CharacReference` (lets a
-  library point to a charac made on another film).
+- Characterizations: `Charac` (with its data file, a `CharacFile`), its
+  EDX subtype `Edx` (with one `ChemicalElementEdx` per element), and
+  `CharacReference` (lets a library point to a charac made on another
+  film).
 - Calibration files: `MokeCoilFactor`, `EsrfPoni`.
 - Compositions: `StoichioElement`, one element of a chemical formula,
   owned by a substrate layer, patch, film layer, annealing step or
@@ -40,17 +41,19 @@ new models must be defined in this file.
 Physical quantities are stored in SI base units (see `logic.units`).
 """
 import inspect
+import shutil
 import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from random import Random
 from time import sleep
-from typing import Self, Iterable, Any, cast
+from typing import Self, Iterable, Any, cast, BinaryIO, Callable
 
 import astropy
 import chemparse
 import h5py
+import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 from pandas import DataFrame
@@ -652,13 +655,13 @@ class Library(_BaseModel):
         """Load the characterizations made on this library's own film.
 
         Returns:
-            The characterizations of the film.
+            The characterizations of the film, oldest first.
         """
         film = list(self.films)[0]
         characs = (Charac.select()
                    .where(Charac.film == film)
-                   .order_by(film.made_on))  # TODO Missing capital letter?
-        return [char for char in characs]
+                   .order_by(Charac.made_on, Charac.id))
+        return list(characs)
 
     def ordered_charac_refs(self) -> list[Charac]:
         """List the characterizations referenced from other films.
@@ -667,19 +670,7 @@ class Library(_BaseModel):
             The referenced characterizations, oldest first.
         """
         characs = [ref.charac for ref in self.refs]
-
-        def charac_made_on(charac: Charac):
-            """Sort key: the characterization date as a timestamp.
-
-            Args:
-                charac: The characterization.
-
-            Returns:
-                Its `made_on` date, as a timestamp.
-            """
-            return charac.made_on.to_timestamp()
-
-        return sorted(characs, key=charac_made_on)
+        return sorted(characs, key=lambda charac: (charac.made_on, charac.id))
 
     def all_characs(self) -> list[Charac]:
         """List own and referenced characterizations together.
@@ -687,19 +678,8 @@ class Library(_BaseModel):
         Returns:
             Both lists merged, oldest first.
         """
-        def charac_made_on(charac: Charac):
-            """Sort key: the characterization date as a timestamp.
-
-            Args:
-                charac: The characterization.
-
-            Returns:
-                Its `made_on` date, as a timestamp.
-            """
-            return charac.made_on.to_timestamp()
-
-        return sorted(self.ordered_characs() + self.ordered_charac_refs(),
-                      key=charac_made_on)
+        characs = self.ordered_characs() + self.ordered_charac_refs()
+        return sorted(characs, key=lambda charac: (charac.made_on, charac.id))
 
     @classmethod
     def already_taken_names(cls):
@@ -726,20 +706,27 @@ class Library(_BaseModel):
         # noinspection HttpUrlsUsage
         return f"http://{DOMAIN}/{page_name}?{IdType.LIB}={self.id}"
 
-    @staticmethod
-    def dependent_libraries():
-        """List the libraries that depend on this one. Not implemented.
+    def dependent_libraries(self) -> list[Library]:
+        """List the libraries that reference a charac made on this one.
+
+        Those libraries lose a measurement if this library is deleted.
 
         Returns:
-            Always an empty list for now.
+            The libraries (without duplicates), sorted by label.
         """
-        return []  # TODO Implement this.
+        film = list(self.films)[0]
+        libs: dict[int, Library] = {}
+        for charac in film.characs:
+            for ref in charac.refs:
+                libs[ref.lib.id] = ref.lib
+        return sorted(libs.values(), key=lambda lib: lib.label)
 
     def can_be_deleted(self):
         """Tell whether no other library depends on this one.
 
         Returns:
-            Always True for now, see `dependent_libraries`.
+            True if no other library references a characterization
+            of this library's film (see `dependent_libraries`).
         """
         return len(self.dependent_libraries()) == 0
 
@@ -764,6 +751,9 @@ class Film(_BaseModel):
             still has a film. Not NULL.
         layers: Backref to the film's `FilmLayer`s. Its parts.
         modifs: Backref to the film's `FilmModification`s. Its parts.
+        characs: Backref to the `Charac`s made on this film (not the
+            ones other films made that this film's library merely
+            references). Its parts.
     """
     label = CharField(unique=True)
     made_on = DateField()
@@ -775,8 +765,7 @@ class Film(_BaseModel):
 
     layers: DependentBackref[FilmLayer]
     modifs: DependentBackref[FilmModification]
-
-    # Will add characterization.
+    characs: DependentBackref[Charac]
 
     def __init__(self, *args, label: str | None = None,
                  made_on: datetime | None = None,
@@ -801,10 +790,16 @@ class Film(_BaseModel):
         super().__init__(*args, **model_kwargs, **kwargs)
 
     def delete_parts(self):
-        """Delete the film's layers and modifications, recursively.
+        """Delete the film's characs, layers and modifications.
 
-        See `_BaseModel.delete_parts`.
+        The characterizations go first: they point to the film and to
+        its modifications (`on_delete='RESTRICT'`). Deleting a charac
+        also deletes its data file (stored file included) and the
+        references other libraries hold to it. See
+        `_BaseModel.delete_parts`.
         """
+        for c in self.characs:
+            c.delete_with_parts()
         for l in self.layers:
             l.delete_with_parts()
         for m in self.modifs:
@@ -889,6 +884,36 @@ class Film(_BaseModel):
             target = Target.from_label(l)
             targets.add(target)
         return list(targets)
+
+    def films_with_same_targets(self) -> list[Film]:
+        """Find the other films made with exactly the same targets.
+
+        "Same targets" means the set of targets used over all layers
+        is equal (which layer used which target, and how many times, is
+        ignored). Used to propose which film a characterization could
+        be borrowed from (see `CharacReference`).
+
+        Returns:
+            The other films (not this one), sorted by label. Empty if
+            this film has no target use.
+        """
+        # One query for all films: (film id, target id) pairs.
+        pairs = (TargetUse
+                 .select(FilmLayer.film, TargetUse.target)
+                 .join(FilmLayer)
+                 .tuples())
+        targets_by_film: dict[int, set[int]] = {}
+        for film_id, target_id in pairs:
+            targets_by_film.setdefault(film_id, set()).add(target_id)
+
+        own_targets = targets_by_film.get(self.id, set())
+        if not own_targets:
+            return []
+        same_ids = [film_id for film_id, target_ids
+                    in targets_by_film.items()
+                    if target_ids == own_targets and film_id != self.id]
+        films = Film.select().where(Film.id.in_(same_ids))
+        return sorted(films, key=lambda film: film.label)
 
 
 class FilmLayer(_BaseModel):
@@ -1286,8 +1311,9 @@ class UserUploadedFile(_BaseModel):
 
     The DB row holds the metadata; the file bytes live in
     `user_data/<internal_file_name>`. Subclasses (`Pattern`, `Recipe`,
-    `LibraryFile`, `TargetPhoto`) each get their own table with copies
-    of these columns (Peewee inheritance, no shared parent table).
+    `LibraryFile`, `CharacFile`, `TargetPhoto`) each get their own table
+    with copies of these columns (Peewee inheritance, no shared parent
+    table).
 
     Attributes:
         label: Name chosen by the user, shown on download buttons. Not
@@ -1457,6 +1483,32 @@ class UserUploadedFile(_BaseModel):
                 file.write(file_bytes)
             else:
                 raise ValueError("File cannot be empty.")
+
+    def save_stream(self, stream: BinaryIO, chunk_size: int = 16 * 2**20):
+        """Write the content of an open file to `user_data/`, in chunks.
+
+        Meant for big files (several GB): unlike `save_bytes`, the
+        content is never all in memory at once, nor copied. Overwrites
+        any file of the same name. If it fails, the partly written file
+        is deleted.
+
+        Args:
+            stream: An open binary file, e.g. Streamlit's `UploadedFile`.
+                It is read from its start.
+            chunk_size: Number of bytes read and written at a time.
+
+        Raises:
+            ValueError: If `stream` is empty.
+        """
+        stream.seek(0)
+        try:
+            with open(self.get_path(), 'wb') as file:
+                shutil.copyfileobj(stream, file, chunk_size)
+                if file.tell() == 0:
+                    raise ValueError("File cannot be empty.")
+        except BaseException:
+            self.get_path().unlink(missing_ok=True)
+            raise
 
     def download_bttn(self):
         """Draw a Streamlit download button for this file.
@@ -2085,17 +2137,15 @@ class Etching(_BaseModel):
 
 
 class LibraryFile(UserUploadedFile):
-    """A file uploaded for a `Library`.
+    """A general file uploaded for a `Library`.
 
-    It can be a general file, or the data file of a `Charac` (see
-    `charac`). Columns: see `UserUploadedFile`, plus `library`.
+    The data file of a characterization is not a `LibraryFile`: see
+    `CharacFile`. Columns: see `UserUploadedFile`, plus `library`.
 
     Attributes:
         library: Foreign key to the `Library`. Not NULL.
     """
     library = ForeignKeyField(Library, backref='general_files')
-
-    characs: DependentBackref[Charac]
 
     log_db_write = True
 
@@ -2121,16 +2171,43 @@ class LibraryFile(UserUploadedFile):
         model_kwargs = self.get_model_kwargs(locals())
         super().__init__(*args, **model_kwargs, **kwargs)
 
-    @property
-    def charac(self):
-        """The `Charac` whose data is this file, or None."""
-        characs = list(self.characs)
-        return characs[0] if characs else None
 
-    @property
-    def is_a_charac_file(self):
-        """Whether this file holds the data of a `Charac`."""
-        return self.charac is not None
+class CharacFile(UserUploadedFile):
+    """The data file of a `Charac` (e.g. the HDF5 file of an EDX).
+
+    Each `CharacFile` belongs to exactly one `Charac`, which points to
+    it (`Charac.file`) and deletes it with itself. It has no column of
+    its own, only those of `UserUploadedFile`. It is not listed among
+    the library's general files (see `LibraryFile`).
+
+    Attributes:
+        characs: Backref to the `Charac` using this file (a list of
+            length 1 once the charac is saved). It is not a part: the
+            charac owns the file, not the other way round (see
+            `Charac.delete_related_files`).
+    """
+    log_db_write = True
+
+    def __init__(self, *args, label: str | None = None,
+                 internal_file_name: str | None = None,
+                 original_file_name: str | None = None,
+                 upload_date: datetime | None = None,
+                 **kwargs):
+        """Create an unsaved charac file row.
+
+        Each keyword sets the column of the same name. The file bytes
+        are not written: set `file_bytes`, then call `save_bytes`.
+
+        Args:
+            *args: Passed on to Peewee's `Model.__init__`.
+            label: See `UserUploadedFile`.
+            internal_file_name: See `UserUploadedFile`.
+            original_file_name: See `UserUploadedFile`.
+            upload_date: See `UserUploadedFile`.
+            **kwargs: Passed on to Peewee's `Model.__init__`.
+        """
+        model_kwargs = self.get_model_kwargs(locals())
+        super().__init__(*args, **model_kwargs, **kwargs)
 
 
 class IonBeamEtching(_BaseModel):
@@ -3179,6 +3256,11 @@ class Charac(_BaseModel):
     Its kind is given by `type_`; only EDX has a subtype table (`Edx`).
     The EDX feature is still in development.
 
+    To add a new kind of characterization: add its subtype model (with
+    a unique foreign key to `Charac`) and a `DependentBackref` list
+    for it here, delete it in `delete_parts`, then register it in
+    `CHARAC_TYPES` (`components/forms/new_charac/sub_forms.py`).
+
     Attributes:
         made_on: Date of the measurement. Not NULL.
         made_by_email: Email of the person who made it. Not NULL.
@@ -3186,8 +3268,11 @@ class Charac(_BaseModel):
         type_: Kind of characterization (`CharacType`). Not NULL.
         film: Foreign key to the measured `Film`. Not NULL.
         last_modif: Foreign key to the last `FilmModification` made on
-            the film before the measurement. NULL if none.
-        file: Foreign key to the data `LibraryFile`. Not NULL.
+            the film before the measurement. NULL if the film was
+            measured as deposited.
+        file: Foreign key to the data `CharacFile`. Unique: the file
+            belongs to this charac alone and is deleted with it. Not
+            NULL.
         refs: Backref to the `CharacReference`s (other libraries that
             reuse this measurement).
         edxs: Backref to the `Edx` subtype (list of length 1 for EDX).
@@ -3202,8 +3287,8 @@ class Charac(_BaseModel):
         Film, on_delete='RESTRICT', backref='characs'))
     last_modif: FilmModification | None = cast(Any, ForeignKeyField(
         FilmModification, null=True, on_delete='RESTRICT', backref='characs'))
-    file: LibraryFile = cast(Any, ForeignKeyField(
-        LibraryFile, on_delete='RESTRICT', backref='characs'))
+    file: CharacFile = cast(Any, ForeignKeyField(
+        CharacFile, on_delete='RESTRICT', backref='characs', unique=True))
 
     refs: DependentBackref[CharacReference]
     edxs: DependentBackref[Edx]
@@ -3217,12 +3302,11 @@ class Charac(_BaseModel):
                  type_: CharacType | None = None,
                  film: Film | None = None,
                  last_modif: FilmModification | None = None,
+                 file: CharacFile | None = None,
                  **kwargs):
-        # TODO Missmatch with columns.
         """Create an unsaved characterization.
 
-        Each keyword sets the column of the same name. `file` is not a
-        keyword here; it can be passed through `**kwargs`.
+        Each keyword sets the column of the same name.
 
         Args:
             *args: Passed on to Peewee's `Model.__init__`.
@@ -3232,6 +3316,8 @@ class Charac(_BaseModel):
             type_: See the class docstring.
             film: See the class docstring.
             last_modif: See the class docstring.
+            file: See the class docstring. It must be saved before this
+                charac is.
             **kwargs: Passed on to Peewee's `Model.__init__`.
         """
         model_kwargs = self.get_model_kwargs(locals())
@@ -3246,6 +3332,27 @@ class Charac(_BaseModel):
             r.delete_with_parts()
         for e in self.edxs:
             e.delete_with_parts()
+
+    def delete_related_files(self):
+        """Delete the data file (row and stored file) of this charac.
+
+        Called by `delete_with_parts` once the charac row is deleted,
+        which is when the `RESTRICT` foreign key `file` stops
+        protecting the file row. The file is deleted for good: no other
+        charac uses it. See `_BaseModel.delete_related_files`.
+        """
+        self.file.delete_with_parts()
+
+    def referencing_libs(self) -> list[Library]:
+        """List the libraries that reference this charac.
+
+        Returns:
+            The libraries of the `CharacReference`s, sorted by label.
+            The library of the charac's own film is not included: it
+            owns the charac, it does not reference it.
+        """
+        libs = {ref.lib.id: ref.lib for ref in self.refs}
+        return sorted(libs.values(), key=lambda lib: lib.label)
 
     @property
     def edx(self):
@@ -3345,8 +3452,8 @@ class CharacReference(_BaseModel):
 class Edx(_BaseModel):
     """EDX subtype of a `Charac` (energy-dispersive X-ray spectroscopy).
 
-    In development: the values are meant to be read from the library's
-    high-throughput HDF5 file by `from_hdf5`.
+    In development: the values are read from the characterization's
+    high-throughput HDF5 file (the `CharacFile`) by `from_hdf5`.
 
     Attributes:
         electron_energy: Primary electron beam energy, in J (read in
@@ -3403,14 +3510,17 @@ class Edx(_BaseModel):
 
     @property
     def electron_energy_quantity(self) -> Quantity|None:
+        """`electron_energy` as a quantity in keV (the unit shown)."""
         return from_db_unit(self.electron_energy, ur.keV)
 
     @property
     def working_distance_quantity(self) -> Quantity|None:
+        """`working_distance` as a quantity in mm (the unit shown)."""
         return from_db_unit(self.working_distance, ur.mm)
 
     @property
     def acquisition_duration_quantity(self) -> Quantity|None:
+        """`acquisition_duration` as a quantity in ms (the unit shown)."""
         return from_db_unit(self.acquisition_duration, ur.ms)
 
     @staticmethod
@@ -3443,25 +3553,50 @@ class Edx(_BaseModel):
             return dataset_list
 
     @classmethod
-    def from_hdf5(cls, charac: Charac, processed_h5_path: Path):
-        """Build an unsaved EDX row from a high-throughput HDF5 file.
+    def read_hdf5(cls, source: Path | BinaryIO,
+                  progress: Callable[[int, int], None] | None = None) -> dict:
+        """Read the EDX data of a high-throughput HDF5 file.
 
-        In development and not called anywhere yet (see DOC_NOTES.md).
         Reads the instrument settings of the first position of the
-        first EDX dataset, and, for each element, the min, max and mean
-        atomic percent over all positions.
+        EDX dataset, and, for each element, the min, max and mean
+        atomic percent over all positions. Nothing is written to the DB.
+        The result only holds plain Python values, so it can be cached
+        (`st.cache_data`) and given to `from_parsed` later.
+
+        The files are big (several GB, mostly spectra), and there is one
+        small result per element and per position, so what costs time is
+        the number of reads, not the file size: the hot loop uses
+        h5py's low-level interface, which is about 4 times faster than
+        `dataset[()]` (tested on 3000 positions). Never copy the file
+        before calling this: pass the open file, or its path.
 
         Args:
-            charac: The characterization it's linked to.
-            processed_h5_path: Path of the HDF5 file.
+            source: Path of the HDF5 file, or an open binary file (for
+                instance the `UploadedFile` of the file picker). It is
+                read from its start.
+            progress: Called now and then as `progress(positions_read,
+                positions_total)`, e.g. to move a progress bar. About
+                100 calls in all.
 
         Returns:
-            The unsaved `Edx`, meant to carry its `ChemicalElementEdx`
-            parts.
+            A dictionary with two keys: `'settings'` (the keyword
+            arguments of `Edx`, in SI units) and `'elements'` (the
+            dictionary expected by `ChemicalElementEdx.from_dict`).
+
+        Raises:
+            OSError: `source` is not an HDF5 file.
+            FileNotFoundError: No EDX dataset in the file.
+            FileExistsError: More than one EDX dataset in the file.
+            KeyError: The expected groups are missing from the file.
+            ValueError: A setting has a unit of the wrong dimension.
         """
-        with h5py.File(processed_h5_path, "r") as hdf5_file:
-            dataset_list = Charac.get_hdf5_datasets(hdf5_file,
-                                                    dataset_type="edx")
+        cls.check_can_parse(source)
+        if not isinstance(source, Path):
+            # `check_can_parse` read the file object.
+            source.seek(0)
+        with h5py.File(source, "r") as hdf5_file:
+            dataset_list = cls.get_hdf5_datasets(hdf5_file,
+                                                 dataset_type="edx")
             edx_group = hdf5_file[dataset_list[0]]
             positions_group = edx_group['positions']
             reference_instrument_group = positions_group[
@@ -3473,71 +3608,171 @@ class Edx(_BaseModel):
                 reference_instrument_group["ESMAHeader/WorkingDistance"])
             magnification = Charac.read_dataset_as_quantity(
                 reference_instrument_group["ESMAHeader/Magnification"])
-            acquisition_time = \
-                reference_instrument_group["SpectrumHardwareHeader/RealTime"][
-                    ()] * ur.ms
+            # The file gives no unit for the real time; it is in ms.
+            acquisition_time = ur.Quantity(float(
+                reference_instrument_group[
+                    "SpectrumHardwareHeader/RealTime"][()]), ur.ms)
+
+            # Without a check, a wrong unit in the file would be stored
+            # as if it were the right one.
+            for name, quantity, dimension in [
+                ('PrimaryEnergy', primary_energy, '[energy]'),
+                ('WorkingDistance', working_distance, '[length]'),
+                ('Magnification', magnification, '[]'),
+            ]:
+                if not quantity.check(dimension):
+                    raise ValueError(
+                        f"{name} has unit '{quantity.units}', which does "
+                        f"not match the expected dimension {dimension}.")
 
             results_dict = dict()
-            for position, position_group in edx_group["positions"].items():
-                for element, element_group in position_group["results"].items():
+            position_names = list(positions_group)
+            n_positions = len(position_names)
+            step = max(1, n_positions // 100)
+            # Reused for every read: a 0-d array receives one number.
+            buffer = np.empty((), dtype='f8')
+            for i_position, position in enumerate(position_names):
+                if progress is not None and i_position % step == 0:
+                    progress(i_position, n_positions)
+                results_group = positions_group[f"{position}/results"]
+                for element in results_group:
                     if element == "TRTResult":
                         continue
                     element_symbol = element.split(" ")[1].strip()
-                    if ("AtomPercent" in element_group
-                            and element_symbol not in results_dict):
-                        value = element_group["AtomPercent"][()]
-                        results_dict[element_symbol] = {"min": value,
-                                                        "max": value,
-                                                        "sum": value,
-                                                        "count": 1, "Xline":
-                                                            element_group[
-                                                                "XLine"][()],
-                                                        "quantified": True}
-                    elif ("AtomPercent" in element_group
-                          and element_symbol in results_dict):
-                        value = element_group["AtomPercent"][()]
-                        if value < results_dict[element_symbol]["min"]:
-                            results_dict[element_symbol]["min"] = value
-                        if value > results_dict[element_symbol]["max"]:
-                            results_dict[element_symbol]["max"] = value
+                    entry = results_dict.get(element_symbol)
+                    value = cls._read_atom_percent(
+                        results_group, element, buffer)
 
-                        results_dict[element_symbol]["sum"] += value
-                        results_dict[element_symbol]["count"] += 1
-                    elif ("AtomPercent" not in element_group
-                          and element_symbol not in results_dict):
-                        results_dict[element_symbol] = {"min": None,
-                                                        "max": None,
-                                                        "sum": None,
-                                                        "count": None, "Xline":
-                                                            element_group[
-                                                                "XLine"][()],
-                                                        "quantified": False}
+                    if (value is not None and entry is not None
+                            and entry["quantified"]):
+                        entry["min"] = min(entry["min"], value)
+                        entry["max"] = max(entry["max"], value)
+                        entry["sum"] += value
+                        entry["count"] += 1
+                    elif value is None and entry is not None:
+                        continue  # Nothing new about this element.
+                    else:
+                        # First position where this element has a result
+                        # (or a first result after being only detected).
+                        x_line = results_group[element]["XLine"][()]
+                        if isinstance(x_line, bytes):  # Text read as bytes.
+                            x_line = x_line.decode()
+                        if value is None:
+                            results_dict[element_symbol] = {
+                                "min": None, "max": None, "sum": None,
+                                "count": None, "Xline": x_line,
+                                "quantified": False}
+                        else:
+                            results_dict[element_symbol] = {
+                                "min": value, "max": value, "sum": value,
+                                "count": 1, "Xline": x_line,
+                                "quantified": True}
+            if progress is not None:
+                progress(n_positions, n_positions)
 
-            hdf5_file.close()
-
-        parsed = cls(
-            electron_energy=primary_energy,
-            working_distance=working_distance,
-            magnification=magnification,
-            acquisition_duration=acquisition_time,
-            charac=charac,
-        )
-        parsed.elements = ChemicalElementEdx.from_dict(results_dict)
-        return parsed
+        return {
+            'settings': {
+                'electron_energy': float(to_db_magnitude(primary_energy)),
+                'working_distance': float(to_db_magnitude(working_distance)),
+                'magnification': float(to_db_magnitude(magnification)),
+                'acquisition_duration': float(
+                    to_db_magnitude(acquisition_time)),
+            },
+            'elements': results_dict,
+        }
 
     @staticmethod
-    def check_can_parse(file_path: Path):
-        with h5py.File(file_path, "r") as hdf5_file:
+    def _read_atom_percent(results_group: h5py.Group, element: str,
+                           buffer: np.ndarray) -> float | None:
+        """Read the atomic percent of one element at one position.
+
+        Uses h5py's low-level interface, which skips the creation of the
+        `Dataset` object that `group[...][()]` builds for every read.
+
+        Args:
+            results_group: The `results` group of the position.
+            element: Name of the element's group in `results_group`.
+            buffer: A 0-d float64 array to read into (reused by the
+                caller, to avoid allocating one per read).
+
+        Returns:
+            The atomic percent, or None if the element has no
+            `AtomPercent` at this position (detected, not quantified).
+        """
+        try:
+            dataset_id = h5py.h5d.open(
+                results_group.id, f"{element}/AtomPercent".encode())
+        except KeyError:
+            return None
+        if dataset_id.shape == ():
+            dataset_id.read(h5py.h5s.ALL, h5py.h5s.ALL, buffer)
+            return float(buffer)
+        # Unusual shape, e.g. (1,): let h5py handle it.
+        return float(np.ravel(h5py.Dataset(dataset_id)[()])[0])
+
+    @classmethod
+    def from_parsed(cls, charac: Charac, parsed: dict) -> Edx:
+        """Build an unsaved EDX row, with its elements, from parsed data.
+
+        Args:
+            charac: The characterization it's linked to.
+            parsed: What `read_hdf5` returned.
+
+        Returns:
+            The unsaved `Edx`, with its `ChemicalElementEdx` parts
+            attached in `elements`.
+        """
+        edx = cls(**parsed['settings'], charac=charac)
+        elements = ChemicalElementEdx.from_dict(parsed['elements'])
+        # Peewee gives each element the id of its EDX when it is saved,
+        # but only if the unsaved object was set as its foreign key.
+        for element in elements:
+            element.edx = edx
+        edx.elements = elements
+        return edx
+
+    @classmethod
+    def from_hdf5(cls, charac: Charac, source: Path | BinaryIO,
+                  progress: Callable[[int, int], None] | None = None) -> Edx:
+        """Build an unsaved EDX row from a high-throughput HDF5 file.
+
+        Args:
+            charac: The characterization it's linked to.
+            source: See `read_hdf5`.
+            progress: See `read_hdf5`.
+
+        Returns:
+            The unsaved `Edx` (see `from_parsed`).
+
+        Raises:
+            Exception: Those of `read_hdf5`.
+        """
+        return cls.from_parsed(charac, cls.read_hdf5(source, progress))
+
+    @staticmethod
+    def check_can_parse(source: Path | BinaryIO):
+        """Check that an HDF5 file has exactly one EDX dataset.
+
+        Args:
+            source: Path of the HDF5 file, or an open binary file. A
+                file object is left at an unknown position.
+
+        Raises:
+            OSError: `source` is not an HDF5 file.
+            FileNotFoundError: No EDX dataset in the file.
+            FileExistsError: More than one EDX dataset in the file.
+        """
+        with h5py.File(source, "r") as hdf5_file:
             # Get all EDX type HDF5 datasets
             dataset_list = Charac.get_hdf5_datasets(hdf5_file,
                                                     dataset_type="edx")
             # If no datasets, raise error
             if len(dataset_list) == 0:
-                raise FileNotFoundError(f"No edx datasets found in {file_path}")
+                raise FileNotFoundError("No EDX dataset found in the file.")
             # If more than one dataset, raise error
             elif len(dataset_list) > 1:
                 raise FileExistsError(
-                    f"Multiple edx datasets found in {file_path}")
+                    "Several EDX datasets found in the file.")
 
 
 class ChemicalElementEdx(_BaseModel):
@@ -3602,24 +3837,29 @@ class ChemicalElementEdx(_BaseModel):
 
     @classmethod
     def from_dict(cls, elements_dict: dict) -> list[Self]:
-        """Build unsaved element results from `Edx.from_hdf5`'s dict.
+        """Build unsaved element results from `Edx.read_hdf5`'s dict.
 
         Args:
-            elements: Element symbol → dict with keys `min`, `max`,
-                `sum`, `count`, `Xline` and `quantified`.
+            elements_dict: Element symbol → dict with keys `min`, `max`,
+                `sum`, `count`, `Xline` and `quantified`. For an element
+                that was detected but not quantified, `min`, `max`, `sum`
+                and `count` are None.
 
         Returns:
             One unsaved row per element, without `edx` set.
         """
         return_list = []
         for element in elements_dict:
+            if elements_dict[element]["quantified"]:
+                mean = (elements_dict[element]["sum"]
+                        / elements_dict[element]["count"])
+            else:
+                mean = None
             element_class = cls(
                 element=element,
                 min_atom_percent=elements_dict[element]["min"],
                 max_atom_percent=elements_dict[element]["max"],
-                # TODO Fix None case:
-                mean_atom_percent=elements_dict[element]["sum"] /
-                                  elements_dict[element]["count"],
+                mean_atom_percent=mean,
                 quantified=elements_dict[element]["quantified"],
                 x_line=elements_dict[element]["Xline"],
             )

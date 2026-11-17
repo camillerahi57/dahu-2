@@ -107,6 +107,13 @@ class SessionKeys(StrEnum):
     CURRENT_FILM = 'current_film_key'
     # URL path of the page currently shown, to detect a page change.
     CURRENT_PATH = 'current_path_key'
+    # Id of the `Charac` whose deletion (or reference removal) the user
+    # started in the library page's dialog and has not confirmed yet.
+    CONFIRM_CHARAC_ACTION = 'confirm_charac_action_key'
+    # What the new charac form read from the uploaded data file, so the
+    # (slow) reading is done once per file and not at every rerun. See
+    # `read_upload_once` in `forms/new_charac/sub_forms.py`.
+    PARSED_UPLOAD = 'parsed_upload_key'
 
     # Target photo upload (`UploadAndCropForm`):
     CROPPED_TARGET_IMG = 'cropped_target_key'  # Cropped image (PIL).

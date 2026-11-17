@@ -19,6 +19,13 @@ imports work: `python -m logic.migrations.<script name without .py>`.
   Never run it on an existing installation, and never in a dev setup that
   points at the production Restic repository.**
 
+- **`2026_11_charac_file.py`**: gives each characterization its own data
+  file table (`charac_file`, model `CharacFile`) instead of pointing to
+  `library_file`. Run it once on every existing installation, from the
+  repo root (`python -m logic.migrations.2026_11_charac_file`). It
+  refuses to run if the `charac` table has rows (none are expected: the
+  feature could not add any before).
+
 ## Common tasks
 
 ### Write a migration after changing a model

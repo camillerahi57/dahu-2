@@ -12,8 +12,6 @@ from logic.page_list import pages
 def file_list_item(uploaded: LibraryFile, key: int):
     """Draw one file of the list: download button, label, Delete button.
 
-    Files that hold the data of a characterization also show its type.
-
     Args:
         uploaded: The file.
         key: Makes the widget keys (the names Streamlit uses to tell
@@ -28,11 +26,7 @@ def file_list_item(uploaded: LibraryFile, key: int):
             icon=':material/download:',
             key=f'download_bttn_{key}',
         )
-        if uploaded.is_a_charac_file:
-            charac_type = uploaded.charac.type_
-            st.write(f"{uploaded.label} · 📊 _{charac_type} measurement_")
-        else:
-            st.write(uploaded.label)
+        st.write(uploaded.label)
         with st.container(horizontal_alignment='right'):
             if st.button('Delete ❌', key=f'del_bttn_{key}'):
                 delete_dialog(uploaded)
@@ -45,8 +39,7 @@ def delete_dialog(uploaded: LibraryFile):
 
     Opens as a dialog (pop-up window). On confirmation, deletes the row
     and the stored file, then reruns the page (re-executes its script)
-    to refresh the list. A file that holds a `Charac`'s data can't be
-    deleted this way: see `DOC_NOTES.md`.
+    to refresh the list.
 
     Side effects: DB delete, which writes an `AppLog` row; deletes the
     file from `user_data/`.
@@ -54,11 +47,6 @@ def delete_dialog(uploaded: LibraryFile):
     Args:
         uploaded: The file to delete.
     """
-    # TODO calls
-    #   `LibraryFile.delete_with_parts()`, but `LibraryFile` does not override
-    #   `delete_parts` (it does nothing), while `Charac.file` is a foreign key
-    #   with `on_delete='RESTRICT'`. Deleting a file that holds a
-    #   characterization's data should then fail with an integrity error.
     st.error(f"Are you sure you want to **permanently** delete "
              f"**{uploaded.label}**?")
     if st.button('Confirm'):

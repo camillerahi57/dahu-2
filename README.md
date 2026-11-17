@@ -34,7 +34,9 @@ Dahu DB is the web app of the thin-film deposition lab of Institut Néel
   used and the sputtering parameters (magnetron or triode);
 - **film modifications**: annealings and etchings (ion beam, wet,
   lift-off), with the etching patterns and recipes;
-- **characterizations** (the EDX feature is still in development);
+- **characterizations** (the EDX feature is still in development): each
+  has its data file (HDF5 for EDX), and a library can also reuse a
+  measurement made on another film made with the same targets;
 - uploaded files attached to all of the above.
 
 It is written in Python with [Streamlit](https://streamlit.io) (the
@@ -351,8 +353,9 @@ in short:
   list of named constants). The database stores the string value.
   Adding a value is safe; renaming or deleting one needs a migration.
 - **Uploaded files.** Each kind of uploaded file (`Pattern`, `Recipe`,
-  `LibraryFile`, `TargetPhoto`) is a model whose row holds the metadata,
-  while the file itself is stored as `user_data/<internal_file_name>`.
+  `LibraryFile`, `CharacFile`, `TargetPhoto`) is a model whose row holds
+  the metadata, while the file itself is stored as
+  `user_data/<internal_file_name>`.
 - **Compositions.** Chemical formulas are stored as `StoichioElement`
   rows, one per element.
 - **Logs and settings.** `AppLog` holds the event log (saves, deletions,
