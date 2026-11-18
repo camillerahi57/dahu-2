@@ -50,7 +50,6 @@ from random import Random
 from time import sleep
 from typing import Self, Iterable, Any, cast, BinaryIO, Callable
 
-import astropy
 import chemparse
 import h5py
 import numpy as np
@@ -1572,6 +1571,7 @@ class FilmModification(_BaseModel):
 
     annealings: DependentBackref[Annealing]
     etchings: DependentBackref[Etching]
+    characs: DependentBackref[Charac]
 
     log_db_write = True
 
@@ -2756,8 +2756,11 @@ class TargetPhoto(UserUploadedFile):
 
     Other columns: see `UserUploadedFile`.
     """
-    target_state: DeteriorationState = cast(Any, ForeignKeyField(
-        DeteriorationState, backref='photos', on_delete='RESTRICT', unique=True))
+    target_state: DeteriorationState = cast(
+        Any, ForeignKeyField(
+            DeteriorationState, backref='photos', on_delete='RESTRICT',
+            unique=True)
+    )
 
     log_db_write = True
 

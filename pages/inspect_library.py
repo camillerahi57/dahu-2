@@ -399,11 +399,11 @@ def characs_available_for_reference(other_film: Film) -> list[Charac]:
         Its own characterizations (not the ones it references), minus
         those this library already references, oldest first.
     """
-    already_referenced = [ref.charac_id for ref in lib.refs]
+    already_referenced = [ref.charac.id for ref in lib.refs]
     return list(
         Charac.select()
         .where(Charac.film == other_film,
-               Charac.id.not_in(already_referenced))
+               Charac.id.not_in(already_referenced))  # noqa Weird warning
         .order_by(Charac.made_on, Charac.id))
 
 
@@ -538,20 +538,6 @@ def film_modif_info(modif_: FilmModification):
         st.rerun()
 
 
-def charac_card(label_: str):
-    """Draw a bordered box with a centred title.
-
-    Not called anywhere at the moment.
-
-    Args:
-        label_: Title written in the box.
-    """
-    with st.container(border=True, horizontal_alignment='center'):
-        st.space()
-        st.subheader(label_, text_alignment='center')
-        st.space()
-
-
 @st.dialog(title='Archive?')
 def archive_dialog():
     """Ask for confirmation, then mark the library as archived.
@@ -621,7 +607,7 @@ def charac_section():
 
         for charac in characs:
             # "own" means made on this library's film, not a reference.
-            is_own = charac.film_id == film.id
+            is_own = charac.film.id == film.id
             name = CHARAC_TYPES[charac.type_].name
             # Emoji of the last modification before the measurement;
             # nothing if the film was measured as deposited.
@@ -637,7 +623,7 @@ def charac_section():
         if st.button('**Add**', type='tertiary', icon=icon('add_2'),
                      key='charac_add_btn'):
             add_charac_dialog()
-    if any(charac.film_id != film.id for charac in characs):
+    if any(charac.film.id != film.id for charac in characs):
         st.write("_* reference characterisation (made on another film)_")
 
 
