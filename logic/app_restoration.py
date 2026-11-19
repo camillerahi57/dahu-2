@@ -147,8 +147,8 @@ class Snapshot:
         # extra threads give up instead of queueing.
         available = cls._backup_lock.acquire(blocking=False)
         if not available:
-            print("Backup not available.")
-            return  # Another thread is already backing up.
+            print("Backup not available. Another thread is already backing up.")
+            return
 
         try:
             command = ["restic", "backup", user_files_abs_path,
