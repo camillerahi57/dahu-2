@@ -75,7 +75,10 @@ def restore_process_dialog(snap: Snapshot):
         RuntimeError: If Restic fails (raised by `Snapshot.restore`).
     """
     # Removed first so that the next rerun does not restore again.
-    del sess[Sk.SNAP_TO_RESTORE]
+    # `pop` (not `del`): if the restore raises, the dialog fragment
+    # reruns and the key is already gone, which would hide the real error
+    # behind a KeyError.
+    sess.pop(Sk.SNAP_TO_RESTORE, None)
     # `Snapshot.restore` closes the DB connection after Restic runs and
     # reloads `app_metadata` from the restored DB.
     snap.restore()

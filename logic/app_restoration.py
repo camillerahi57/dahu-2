@@ -192,6 +192,15 @@ class Snapshot:
         """
         subsequent_snaps = [s for s in Snapshot.list_available()
                             if s.time > self.time]
+        if subsequent_snaps:
+            # A Restic process killed mid-run (e.g. app restarted during
+            # a backup) leaves a stale lock that blocks `forget`.
+            # `unlock` only removes stale locks, never live ones.
+            subprocess.run(
+                ["restic", "unlock", "--repo", RESTIC_REPO_PATH],
+                capture_output=True, text=True,
+                env={"RESTIC_PASSWORD": RESTIC_PASSWORD, **os.environ},
+            )
         for s in subsequent_snaps:
             s.delete()
 
