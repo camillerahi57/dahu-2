@@ -76,9 +76,8 @@ def restore_process_dialog(snap: Snapshot):
     """
     # Removed first so that the next rerun does not restore again.
     del sess[Sk.SNAP_TO_RESTORE]
-    # TODO Can `restic restore --delete` overwrite
-    #   `user_data/dahu_2.db` while Peewee holds it open (Windows file locks)?
-    #   And `app_metadata` keeps its pre-restore values in memory.
+    # `Snapshot.restore` closes the DB connection after Restic runs and
+    # reloads `app_metadata` from the restored DB.
     snap.restore()
     st.success(f"**Dahu DB data was restored successfully.**")
     # Leaves the message on screen for 5 s; the rerun closes the dialog.

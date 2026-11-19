@@ -24,9 +24,9 @@ from dahu_2_config import (RESTIC_PASSWORD, RESTIC_REPO_PATH,
                            DAHU_2_CODE_BASE_PATH, BackupsToKeep,
                            BACKUP_INTERVAL)
 from logic.constants import USER_DATA_PATH
-from logic.lab_modelization.base_classes import Event
+from logic.lab_modelization.base_classes import Event, db
 from logic.lab_modelization.db_enums import EventType, LogSeverity
-from logic.lab_modelization.db_models import AppLog
+from logic.lab_modelization.db_models import AppLog, AppMetadata
 
 # Absolute path of `user_data/`, the folder that is backed up. Restic
 # stores absolute paths, so the relative `USER_DATA_PATH` is not enough.
@@ -221,8 +221,9 @@ class Snapshot:
 
         Called from the admin page. `--delete` removes files that are
         not in the snapshot. Shows a Streamlit progress bar. Then deletes
-        every later snapshot, sets the next backup time to now +
-        `BACKUP_INTERVAL` and saves `AppMetadata` (in the restored DB).
+        every later snapshot, closes this thread's DB connection,
+        reloads `app_metadata` from the restored DB, sets the next backup
+        time to now + `BACKUP_INTERVAL` and saves it.
 
         Raises:
             RuntimeError: Restic failed (an `AppLog` row is written
@@ -268,7 +269,18 @@ class Snapshot:
 
         self.delete_subsequent()
 
+        # The DB file was replaced under the open connection: drop it so
+        # Peewee reconnects (autoconnect) and sees the restored file.
+        if not db.is_closed():
+            db.close()
+
         from logic.meta_data_init import app_metadata
+        # `app_metadata` still holds the pre-restore values, and saving
+        # it would overwrite the restored row with them. Reload the row
+        # from the restored DB, in place (other modules share the object).
+        restored = AppMetadata.get_or_new()
+        app_metadata.__data__.update(restored.__data__)
+        app_metadata._dirty.clear()  # noqa Peewee's modified-fields set
         app_metadata.next_backup_at = datetime.now() + BACKUP_INTERVAL
         app_metadata.save()
 
