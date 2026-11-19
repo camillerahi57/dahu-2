@@ -35,12 +35,6 @@ from logic.lab_modelization.db_models import FilmModification, Patch, \
 from logic.units import ur
 from logic.utils import is_valid_email_address, all_email_addresses
 
-# TODO `IonDurationField`,
-#   `PreEtchDurationField`, `DcGridCurrentField`, `HardBakeTempField`,
-#   `AcidEtchingDurationField` and `DevelopmentDurationField` pass
-#   `min_value=0` (an int) to `st.number_input`, so Streamlit most likely
-#   accepts only whole numbers (no 0.5 A grid current, no 1.5 min).
-
 # TODO `MadeOnField`,
 #   `FurnaceField` (line 518), `PlasmaFormulaField` (line 696),
 #   `PlasmaProportionField` (line 718) and `ConstituentCountField`
@@ -907,7 +901,7 @@ class IonDurationField(UnitField):
         """Draw a number input (>= 0). See `Field._streamlit_input`."""
         # `min_value=0` is an int, so Streamlit only accepts whole
         # numbers here (see DOC_NOTES.md).
-        return st.number_input(f'Duration (**{self.ui_unit}**)', min_value=0,
+        return st.number_input(f'Duration (**{self.ui_unit}**)', min_value=0.,
                                value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
@@ -933,7 +927,7 @@ class PreEtchDurationField(UnitField):
         `Field._streamlit_input`.
         """
         return st.number_input(f'Pre-etching duration (**{self.ui_unit}**)',
-                               min_value=0, value=prefill, key=key)
+                               min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         """Refuse 0. See `Field._validate`."""
@@ -959,7 +953,7 @@ class DcGridCurrentField(UnitField):
         `Field._streamlit_input`.
         """
         return st.number_input(f'DC grid current (**{self.ui_unit}**)',
-                               min_value=0, value=prefill, key=key)
+                               min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         """Refuse 0. See `Field._validate`."""
@@ -985,7 +979,7 @@ class HardBakeTempField(UnitField):
         `Field._streamlit_input`.
         """
         return st.number_input(f'Hard bake temperature (**{self.ui_unit}**)',
-                               min_value=0, value=prefill, key=key)
+                               min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         """Refuse 0 °C. See `Field._validate`."""
@@ -1011,7 +1005,7 @@ class AcidEtchingDurationField(UnitField):
         `Field._streamlit_input`.
         """
         return st.number_input(f'Acid etching duration (**{self.ui_unit}**)',
-                               min_value=0, value=prefill, key=key)
+                               min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         """Refuse 0. See `Field._validate`."""
@@ -1037,7 +1031,7 @@ class DevelopmentDurationField(UnitField):
         `Field._streamlit_input`.
         """
         return st.number_input(f'Development duration (**{self.ui_unit}**)',
-                               min_value=0, value=prefill, key=key)
+                               min_value=0., value=prefill, key=key)
 
     def _validate(self, input_) -> tuple[bool, str]:
         """Refuse 0. See `Field._validate`."""

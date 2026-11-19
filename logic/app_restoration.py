@@ -93,7 +93,7 @@ class Snapshot:
         return snap_list
 
     @classmethod
-    def get_latest(cls) -> Self:
+    def get_latest(cls) -> Self|None:
         """Returns the most recent snapshot.
 
         Returns:
@@ -103,8 +103,9 @@ class Snapshot:
             IndexError: There is no snapshot, or Restic failed (not on
                 purpose; see DOC_NOTES.md).
         """
-        # TODO What if there are no snapshots?
         all_ = cls.list_available()
+        if len(all_) == 0:
+            return None
         return sorted(all_, key=lambda x: x.time)[-1]
 
     @classmethod

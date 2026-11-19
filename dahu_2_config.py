@@ -35,7 +35,10 @@ if ON_PRODUCTION:
     RESTIC_PASSWORD = 'no_password'  # Password of the Restic repository,
     # probably 'no_password' as suggested in the Dahu DB setup manual.
 
-    RESTIC_REPO_PATH = r'O:\DAHU2\prod\backups\restic_snapshot_repo'
+    RESTIC_REPO_PATH = r'\\SRV-DATA2.neel.cnrs.fr\Partages\DAHU2\prod\backups\restic_snapshot_repo'  # noqa line too long.
+    # Don't put "O:", because it's an alias accessible only after loging in.
+    # Put the real path of "O:", that you can se by entering the `net use`
+    # command.
     # Path to the Restic repository (on the server where the backups
     # are stored).
 

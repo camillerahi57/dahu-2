@@ -181,12 +181,8 @@ class LayerListForm(Form):
                     # the substrate had (IndexError) or on the "new"
                     # page, where `default_sub` is None
                     # (AttributeError).
-                    # TODO layer i is
-                    #   prefilled from `default_sub.layers[i]`, but the `layers` backref has
-                    #   no `order_by(position_from_back)`; the order relies on SQLite
-                    #   returning rows in insertion order.
                     try:
-                        default_layer = default_sub.layers[i]
+                        default_layer = default_sub.ordered_layers[i]
                     except IndexError, AttributeError:
                         default_layer = None
                     layer_form = LayerForm(

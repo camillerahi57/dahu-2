@@ -817,13 +817,8 @@ class LayerListForm(Form):
                 default_layer = None
             else:
                 try:
-                    # TODO   `default_film.layers[i]` uses the backref query's order, not
-                    #   `Film.ordered_layers` (sorted by `position_from_buffer`). With no
-                    #   `ORDER BY`, SQLite doesn't guarantee the order, so the edit page could
-                    #   prefill layers in the wrong order.
-                    # `layers` is a backref query; indexing runs it.
-                    default_layer = default_film.layers[i]
-                except IndexError, AttributeError:  # TODO Remove AttributeError?
+                    default_layer = default_film.ordered_layers[i]
+                except IndexError:
                     default_layer = None
             form = LayerForm(default_layer=default_layer, key=f'{i}')
             layer_forms.append(form)

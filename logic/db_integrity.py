@@ -43,7 +43,11 @@ def get_problems() -> Iterable[Event]:
 
     # With timezone for difference between two tz-aware date-times:
     paris_now = datetime.now(tz=ZoneInfo(DAHU_2_TIMEZONE))
-    last_backup_timedelta = paris_now - Snapshot.get_latest().time
+    last_snap = Snapshot.get_latest()
+    if last_snap is None:
+        last_backup_timedelta = 99999999999  # Infinite
+    else:
+        last_backup_timedelta = paris_now - last_snap.time
     if last_backup_timedelta > NO_RECENT_BACKUP_WARNING_TIMEDELTA:
         yield Event.from_no_recent_backup()
 

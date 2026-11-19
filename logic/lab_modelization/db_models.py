@@ -197,6 +197,13 @@ class Substrate(_BaseModel):
         """
         return Substrate.get(Substrate.label == label)
 
+    @property
+    def ordered_layers(self) -> list[SubstrateLayer]:
+        layers = [l for l in self.layers]
+        def position(layer: SubstrateLayer):
+            return layer.position_from_back
+        return sorted(layers, key=position)
+
 
 class SubstrateLayer(_BaseModel):
     """One layer of a `Substrate`, with its composition and orientation.
@@ -221,7 +228,7 @@ class SubstrateLayer(_BaseModel):
     h: IntegerField|None = IntegerField(null=True)
     k: IntegerField|None = IntegerField(null=True)
     l: IntegerField|None = IntegerField(null=True)
-    position_from_back = IntegerField()
+    position_from_back: int = cast(Any, IntegerField())
     # We use cast to tell the IDE that the output of the ForeignKeyField is a
     # Model.
     substrate: Substrate = cast(Any, ForeignKeyField(
