@@ -3424,6 +3424,10 @@ class Charac(_BaseModel):
 
     def figures(self, size: int) -> list[Figure]:
         h5_path = self.file.get_path()
+        try:
+            open(h5_path, "r")
+        except FileNotFoundError:
+            return []
         to_heatmap_types = {
             CharacType.EDX: 'edx',
             CharacType.PROFILO: 'profil',
