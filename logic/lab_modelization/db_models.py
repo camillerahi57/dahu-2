@@ -64,6 +64,7 @@ from plotly import express as px
 from plotly.graph_objs import Scatter, Figure
 from pyparsing import alphanums
 
+from components.heatmaps import make_heatmaps_from_hdf5
 from dahu_2_config import DOMAIN, PROBLEM_CHECK_INTERVAL, APP_VERSION
 from logic.constants import (ROOM_TEMPERATURE_CELSIUS, IdType,
                              USER_DATA_PATH, CookieKeys as Ck)
@@ -3421,6 +3422,15 @@ class Charac(_BaseModel):
 
             return dataset_list
 
+    def figures(self, size: int) -> list[Figure]:
+        h5_path = self.file.get_path()
+        to_heatmap_types = {
+            CharacType.EDX: 'edx',
+            CharacType.PROFILO: 'profil',
+            CharacType.MOKE: 'moke',
+        }
+        heatmap_type = to_heatmap_types[self.type_]
+        return make_heatmaps_from_hdf5(h5_path, heatmap_type, size)
 
 class CharacReference(_BaseModel):
     """Link letting a `Library` reuse a `Charac` made on another film.

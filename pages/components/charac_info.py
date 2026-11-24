@@ -119,3 +119,8 @@ def edx_charac_info(charac: Charac):
         charac: A characterization of type EDX.
     """
     edx_info(charac.edx)
+    with st.container(horizontal=True, horizontal_alignment='distribute'):
+        size = 600
+        for fig in charac.figures(size=size):
+            with st.container(width=size, height=size):
+                st.plotly_chart(fig)
