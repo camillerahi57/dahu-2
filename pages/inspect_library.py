@@ -302,8 +302,7 @@ def charac_delete_section(charac: Charac):
     st.error(
         f"⚠️ **The data file \"{charac.file.original_file_name}\" and all "
         f"the data extracted from it will be PERMANENTLY deleted from the "
-        f"server.** This cannot be undone, except by restoring a backup "
-        f"(which would also undo everything done since).")
+        f"server.**")
     libs = charac.referencing_libs()
     if libs:
         # Markdown links open in a new tab, so the dialog stays open.
