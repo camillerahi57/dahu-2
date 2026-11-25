@@ -101,6 +101,9 @@ class _Pages:
     edit_substrate: StreamlitPage = Page(
         '../pages/edit_substrate.py', url_path='edit_substrate',
         title='Edit Substrate', icon='🐐')
+    edit_charac: StreamlitPage = Page(
+        '../pages/edit_charac.py', url_path='edit_charac',
+        title='Edit Characterisation', icon='🐐')
 
     admin: StreamlitPage = Page(
         '../pages/admin.py', url_path='admin',

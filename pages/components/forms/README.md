@@ -92,6 +92,8 @@ forms, ending with `RootForm`), and has its own `README.md`.
   subfolder per kind.
 - **`new_charac/`**: a characterization of a film (EDX for now), with
   its data file.
+- **`edit_charac/`**: change an existing characterization; reuses the
+  forms of `new_charac/`.
 
 ## Common tasks
 

@@ -86,8 +86,6 @@ A few words used below:
 - Saving or deleting rows of a model with `log_db_write = True` writes an
   `AppLog` row, which reads the browser cookies and so needs a running
   Streamlit page. Scripts run outside the app must use raw SQL instead.
-- The EDX models (`Edx`, `ChemicalElementEdx`) belong to a feature that is
-  still in development.
 
 ## Common tasks
 

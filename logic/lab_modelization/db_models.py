@@ -3265,7 +3265,6 @@ class Charac(_BaseModel):
     """A characterization (measurement) made on a `Film`.
 
     Its kind is given by `type_`; only EDX has a subtype table (`Edx`).
-    The EDX feature is still in development.
 
     To add a new kind of characterization: add its subtype model (with
     a unique foreign key to `Charac`) and a `DependentBackref` list
@@ -3341,6 +3340,16 @@ class Charac(_BaseModel):
         """
         for r in self.refs:
             r.delete_with_parts()
+        self.delete_subtype_rows()
+
+    def delete_subtype_rows(self):
+        """Delete the subtype rows (e.g. the `Edx` and its elements).
+
+        Unlike `delete_parts`, keeps the references: used when the data
+        file is replaced, so the results are extracted again from the
+        new file while other libraries keep pointing to this charac.
+        Call it inside `with db.atomic():`.
+        """
         for e in self.edxs:
             e.delete_with_parts()
 
@@ -3476,8 +3485,8 @@ class CharacReference(_BaseModel):
 class Edx(_BaseModel):
     """EDX subtype of a `Charac` (energy-dispersive X-ray spectroscopy).
 
-    In development: the values are read from the characterization's
-    high-throughput HDF5 file (the `CharacFile`) by `from_hdf5`.
+    The values are read from the characterization's high-throughput
+    HDF5 file (the `CharacFile`) by `from_hdf5`.
 
     Attributes:
         electron_energy: Primary electron beam energy, in J (read in

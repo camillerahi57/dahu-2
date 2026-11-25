@@ -35,8 +35,7 @@ from logic.lab_modelization.db_models import FilmModification, Patch, \
 from logic.units import ur
 from logic.utils import is_valid_email_address, all_email_addresses
 
-# TODO `MadeOnField`,
-#   `FurnaceField` (line 518), `PlasmaFormulaField` (line 696),
+# TODO `FurnaceField` (line 518), `PlasmaFormulaField` (line 696),
 #   `PlasmaProportionField` (line 718) and `ConstituentCountField`
 #   (line 855) ignore `prefill`, so an edit page would not prefill them.
 
@@ -78,12 +77,12 @@ class MadeOnField(Field):
     type = Ft.MANDATORY
 
     def _streamlit_input(self, prefill, key: str):
-        """Draw a date picker, starting at today.
+        """Draw a date picker, starting at `prefill`, else at today.
 
-        `prefill` and `key` are not used (see DOC_NOTES.md). See
-        `Field._streamlit_input`.
+        `key` is not used. See `Field._streamlit_input`.
         """
         return st.date_input("Made on",
+                             value='today' if prefill is None else prefill,
                              max_value='today')
 
     def _validate(self, input_) -> tuple[bool, str]:

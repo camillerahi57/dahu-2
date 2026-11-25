@@ -34,7 +34,7 @@ Dahu DB is the web app of the thin-film deposition lab of Institut Néel
   used and the sputtering parameters (magnetron or triode);
 - **film modifications**: annealings and etchings (ion beam, wet,
   lift-off), with the etching patterns and recipes;
-- **characterizations** (the EDX feature is still in development): each
+- **characterizations**: each
   has its data file (HDF5 for EDX), and a library can also reuse a
   measurement made on another film made with the same targets;
 - uploaded files attached to all of the above.
