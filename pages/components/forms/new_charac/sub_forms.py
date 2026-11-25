@@ -5,6 +5,10 @@
 for an EDX). Its `charac` and `charac_file` attributes are the unsaved
 objects that `pages/new_charac.py` saves.
 
+`CharacBaseInfoForm` and `EdxForm` are also used by the edit page (see
+`edit_charac/sub_forms.py`), which gives them the existing
+characterization as `old_charac`.
+
 `CHARAC_TYPES` is the list of the kinds of characterization the app can
 handle. **To add a new kind**, write a `CharacDataForm` subclass like
 `EdxForm`, a drawing function like `components.charac_info.edx_info`,
@@ -19,10 +23,11 @@ from typing import Any, BinaryIO, Callable
 
 import streamlit as st
 
-from components.charac_info import edx_charac_info, edx_info, modif_label
+from components.charac_info import (
+    edx_charac_info, edx_info, modif_label, file_size_str)
 from components.forms.base_classes import Form, PausePageRun
 from components.forms.new_charac.fields import (
-    CharacTypeField, LastModifField, CharacFileField)
+    CharacTypeField, LastModifField, CharacFileField, AS_DEPOSITED)
 from components.forms.new_film_modif.fields import (
     MadeOnField, MadeByField, CommentField)
 from logic.constants import CookieKeys as Ck, SessionKeys as Sk
@@ -45,9 +50,10 @@ class CharacDataForm(Form):
 
     Attributes:
         file_stream: The data file as an open binary file (Streamlit's
-            `UploadedFile`), or None if not given yet.
+            `UploadedFile`), or None if not given yet (on the edit page:
+            if the current file is kept).
         original_file_name: Name of the data file on the user's
-            computer, or None if not given yet.
+            computer, or None if not given yet (same remark).
     """
 
     file_stream: BinaryIO | None
@@ -119,15 +125,31 @@ class EdxForm(CharacDataForm):
     Shows the file picker, then a preview of what was read from the
     file. The form is invalid while the file is missing or unreadable;
     the reason is shown to the user.
+
+    On the edit page (`old_charac` given) the picker is optional: without
+    a file, the current one is kept, unless it is missing from the
+    server, in which case a warning asks for a new one (but the form is
+    still valid, so the other fields can be edited).
     """
 
-    def __init__(self):
-        """Draw the file picker and read the file, if any."""
+    def __init__(self, old_charac: Charac | None = None):
+        """Draw the file picker and read the file, if any.
+
+        Args:
+            old_charac: The characterization being edited, or None on
+                the new page.
+        """
         st.subheader('EDX data')
+        label = 'EDX data file (HDF5)'
+        if old_charac is not None:
+            file_exists = self._show_current_file(old_charac)
+            label = ('Replace the EDX data file (HDF5)' if file_exists
+                     else 'Add the EDX data file (HDF5)')
         file_fld = CharacFileField(
-            label='EDX data file (HDF5)',
+            label=label,
             accepted_extensions=['h5', 'hdf5'],
             form_default=None,
+            optional=old_charac is not None,
         )
 
         self.file_stream = None
@@ -147,7 +169,33 @@ class EdxForm(CharacDataForm):
             with st.expander('Data read from the file', expanded=True):
                 edx_info(Edx.from_parsed(None, self._parsed))  # noqa
 
+        if old_charac is not None and self._parsed is not None:
+            st.warning(
+                'The current data file will be deleted, and the EDX '
+                'data above will replace the values extracted from it.')
+
         super().__init__(fields=[file_fld], sub_forms=[])
+
+    @staticmethod
+    def _show_current_file(old_charac: Charac) -> bool:
+        """Say which file is stored now, or that it is missing.
+
+        Args:
+            old_charac: The characterization being edited.
+
+        Returns:
+            True if the file is on the server.
+        """
+        file = old_charac.file
+        path = file.get_path()
+        if path.is_file():
+            st.write(f'Current file: **{file.original_file_name}** '
+                     f'({file_size_str(path.stat().st_size)}). Leave the '
+                     f'picker empty to keep it.')
+            return True
+        st.warning('The data file is missing from the server. You '
+                   'can add it below.')
+        return False
 
     def _is_coherent(self) -> tuple[bool, str]:
         """Refuse a file that cannot be read. See `Form._is_coherent`."""
@@ -205,7 +253,7 @@ class CharacBaseInfoForm(Form):
         comment: The comment; `''` or None if empty.
     """
 
-    def __init__(self, film: Film):
+    def __init__(self, film: Film, old_charac: Charac | None = None):
         """Draw the common fields.
 
         Reads the "last email used" cookie (a small value the browser
@@ -213,20 +261,41 @@ class CharacBaseInfoForm(Form):
 
         Args:
             film: The measured film.
+            old_charac: The characterization being edited, to prefill
+                the fields from. Its type is then kept: the type field
+                is not drawn. None on the new page.
         """
         self.film = film
-        type_fld = CharacTypeField(
-            form_default=None,
-            names={type_: spec.name for type_, spec in CHARAC_TYPES.items()},
-        )
+        if old_charac is None:
+            type_fld = CharacTypeField(
+                form_default=None,
+                names={type_: spec.name
+                       for type_, spec in CHARAC_TYPES.items()},
+            )
+            charac_type = type_fld.value
+            made_on_default = made_by_default = comment_default = None
+            last_modif_default = None
+        else:
+            type_fld = None
+            charac_type = old_charac.type_
+            made_on_default = old_charac.made_on
+            made_by_default = old_charac.made_by_email
+            comment_default = old_charac.comment
+            last_modif_default = (
+                AS_DEPOSITED if old_charac.last_modif is None
+                else old_charac.last_modif.id)
         with st.container(horizontal=True):
-            made_on_fld = MadeOnField(form_default=None)
+            made_on_fld = MadeOnField(
+                form_default=None, db_default=made_on_default)
             made_by_fld = MadeByField(
-                form_default=new_controller().get(Ck.LAST_EMAIL_USED))
-        last_modif_fld = LastModifField(form_default=None, film=film)
-        comment_fld = CommentField(form_default='')
+                form_default=new_controller().get(Ck.LAST_EMAIL_USED),
+                db_default=made_by_default)
+        last_modif_fld = LastModifField(
+            form_default=None, db_default=last_modif_default, film=film)
+        comment_fld = CommentField(
+            form_default='', db_default=comment_default)
 
-        self.charac_type = type_fld.value
+        self.charac_type = charac_type
         self.made_on = made_on_fld.value
         self.made_by = made_by_fld.value
         self.last_modif = last_modif_fld.selected_modif
@@ -270,16 +339,21 @@ class CharacBaseInfoForm(Form):
                 f"modification, or fix the dates.")
         return True, ''
 
-    def to_charac(self) -> Charac:
+    def to_charac(self, id_: int | None = None) -> Charac:
         """Build the unsaved `Charac` row, without its file or subtype.
 
         Doesn't check validity: `RootForm` calls it right away, so
         columns can be None while the form is incomplete.
 
+        Args:
+            id_: Id of the characterization being edited, so that
+                `save()` updates that row instead of inserting a new
+                one. None for a new characterization.
+
         Returns:
             The characterization.
         """
-        return Charac(
+        charac = Charac(
             made_on=self.made_on,
             made_by_email=self.made_by,
             comment=self.comment,
@@ -287,6 +361,9 @@ class CharacBaseInfoForm(Form):
             film=self.film,
             last_modif=self.last_modif,
         )
+        if id_ is not None:
+            charac.id = id_
+        return charac
 
 
 class RootForm(Form):

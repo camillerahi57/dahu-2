@@ -128,11 +128,12 @@ class LastModifField(Field):
 
 
 class CharacFileField(Field):
-    """Mandatory file picker for the data file of a characterization.
+    """File picker for the data file of a characterization.
 
-    Its value is Streamlit's `UploadedFile` object. Unlike
-    `FileUploadForm`, the file stays in the picker on reruns, so no
-    session state is needed. See `Field._validate`.
+    Mandatory, except on the edit page where the current file can be
+    kept (see `optional`). Its value is Streamlit's `UploadedFile`
+    object. Unlike `FileUploadForm`, the file stays in the picker on
+    reruns, so no session state is needed. See `Field._validate`.
 
     Attributes:
         label: Text shown above the picker.
@@ -142,7 +143,8 @@ class CharacFileField(Field):
     type = Ft.MANDATORY
 
     def __init__(self, key: str | int = 'default_key', *, form_default,
-                 db_default=None, label: str, accepted_extensions: list[str]):
+                 db_default=None, label: str, accepted_extensions: list[str],
+                 optional: bool = False):
         """Store the picker settings, then draw the field.
 
         Args:
@@ -152,9 +154,14 @@ class CharacFileField(Field):
             label: Text shown above the picker.
             accepted_extensions: Extensions the picker accepts, without
                 the dot, e.g. `['h5', 'hdf5']`.
+            optional: True if the form is valid without a file.
         """
         self.label = label  # Set before the widget is drawn.
         self.accepted_extensions = accepted_extensions
+        if optional:
+            # Instance attribute shadowing the class attribute, set before
+            # `Field.__init__` reads it to validate.
+            self.type = Ft.OPTIONAL
         super().__init__(key=key, form_default=form_default,
                          db_default=db_default)
 

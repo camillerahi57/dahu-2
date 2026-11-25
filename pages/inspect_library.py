@@ -8,8 +8,9 @@ pair after the `?` of the URL, see `IdType.LIB`). The page shows:
 - the film modifications (annealing, etchings) in order, each opening
   a dialog (a pop-up window) with its details;
 - the characterizations, own (in bold) and referenced (marked `*`, see
-  `CharacReference`), each opening a dialog with its details and a
-  Delete or Remove reference button; "Add" opens a dialog to record a
+  `CharacReference`), each opening a dialog with its details and an
+  Edit and Delete, or Remove reference, button (referenced ones are
+  edited from the library they were made on); "Add" opens a dialog to record a
   new one or to reference one made on another film;
 - the uploaded files;
 - the film's info and its layer table, bottom (buffer side) layer
@@ -360,13 +361,14 @@ def charac_unreference_section(charac: Charac):
 
 @st.dialog(title='Characterisation', width='large')
 def charac_dialog(charac: Charac):
-    """Show a characterization's details, with its Delete or Remove
-    reference button.
+    """Show a characterization's details, with its Edit and Delete, or
+    Remove reference, buttons.
 
     Opens as a dialog (a pop-up window), through `open_charac_dialog`.
     Draws the details, the download button for the data file, then:
 
-    - if the characterization was made on this film: Delete, see
+    - if the characterization was made on this film: a link to the edit
+      page (`pages/edit_charac.py`), and Delete, see
       `charac_delete_section`;
     - if it was made on another film: Remove reference, see
       `charac_unreference_section`. The details then link to the
@@ -381,6 +383,14 @@ def charac_dialog(charac: Charac):
     is_own = charac.film.id == film.id
     charac_details(charac, is_own)
     charac_download_button(charac)
+    if is_own:
+        switch_page_bttn(
+            pages.edit_charac, label='Edit', icon_='✏️',
+            q_params={IdType.CHARAC: charac.id},
+            key=f'charac_edit_{charac.id}')
+    else:
+        st.write("✏️ *You cannot edit a characterization made on another film."
+                 " Please go to the library of that film to edit it.*")
     st.divider()
     if is_own:
         charac_delete_section(charac)

@@ -16,7 +16,8 @@ page references the existing one instead (`CharacReference`).
 - **`fields.py`**: the fields specific to characterizations.
   `CharacTypeField` (which kind), `LastModifField` (the last film
   modification before the measurement, asked explicitly even though the
-  dates would let us guess it) and `CharacFileField` (the file picker).
+  dates would let us guess it) and `CharacFileField` (the file picker,
+  optional on the edit page).
 - **`sub_forms.py`**: the forms, and the list of supported kinds.
   - `RootForm` draws `CharacBaseInfoForm`, then the data form of the
     chosen kind. Once valid, its `charac`, `charac_file` and `file_stream`
@@ -75,10 +76,9 @@ at every click. So:
 4. Click through the library page ("Add" then the dialog of a saved
    charac) and the new charac page.
 
-### Make characterizations editable
+### Editing a characterization
 
-`Charac` has parts (its subtype rows), so an edit page replaces it as a
-whole, following "Editing" in `../README.md`. `CharacBaseInfoForm`,
-`LastModifField` and `CharacTypeField` already take a `db_default`; keep
-the same `CharacFile` row (or delete the old one with its file) when the
-file is replaced.
+Done by `pages/edit_charac.py` and `../edit_charac/`. `CharacBaseInfoForm`
+and `EdxForm` take the existing `Charac` as `old_charac` to prefill
+themselves (the type field is then not drawn, and the file picker is
+optional).

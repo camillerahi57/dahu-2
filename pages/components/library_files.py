@@ -12,6 +12,10 @@ from logic.page_list import pages
 def file_list_item(uploaded: LibraryFile, key: int):
     """Draw one file of the list: download button, label, Delete button.
 
+    If the file is missing from `user_data/`, "_File missing_" is shown
+    instead of the download button: `file_bytes` is then None, which
+    `st.download_button` refuses (it would crash the whole page).
+
     Args:
         uploaded: The file.
         key: Makes the widget keys (the names Streamlit uses to tell
@@ -19,13 +23,17 @@ def file_list_item(uploaded: LibraryFile, key: int):
     """
     with st.container(horizontal=True, vertical_alignment='center',
                       border=True):
-        st.download_button(
-            label='Download',
-            data=uploaded.file_bytes,
-            file_name=uploaded.download_file_name,
-            icon=':material/download:',
-            key=f'download_bttn_{key}',
-        )
+        file_bytes = uploaded.file_bytes
+        if file_bytes is None:
+            st.write('_File missing_')
+        else:
+            st.download_button(
+                label='Download',
+                data=file_bytes,
+                file_name=uploaded.download_file_name,
+                icon=':material/download:',
+                key=f'download_bttn_{key}',
+            )
         st.write(uploaded.label)
         with st.container(horizontal_alignment='right'):
             if st.button('Delete ❌', key=f'del_bttn_{key}'):

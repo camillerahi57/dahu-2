@@ -73,8 +73,9 @@ concerned):
 
 - **`inspect_library.py`**: one library: its film modifications and
   characterizations (each opens a dialog with its details, a download
-  button for its data file, and a Delete button, or a Remove reference
-  button for a measurement made on another film), its uploaded files,
+  button for its data file, and Edit and Delete buttons, or a Remove
+  reference button for a measurement made on another film), its uploaded
+  files,
   the film and its layer table. Archive, Edit and Delete buttons.
   Opening it updates `Library.last_inspected_at`, the sort order of the
   home page. Key
@@ -127,6 +128,13 @@ Edit pages reuse the forms of the "new" pages, prefilled from the object.
 - **`edit_deterioration_state.py`** (`state_id`): deletes the state with
   its patches and photo, then saves the new one. **The state gets a new
   id, and its photo a new file in `user_data/`.**
+- **`edit_charac.py`** (`charac_id`): updates the characterization row in
+  place (the id is kept, so references from other libraries stay valid).
+  The film and the type cannot change. If the data file is replaced (or
+  added, when it is missing from the server), the EDX rows are deleted and
+  read again from the new file, and the old file is deleted once the
+  transaction has succeeded. Reached from the "✏️ Edit" link of the
+  library page's characterization dialog.
 
 ### Other pages
 

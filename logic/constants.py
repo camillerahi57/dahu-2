@@ -33,6 +33,7 @@ class IdType(StrEnum):
     TARGET = 'target_id'  # A `Target`.
     SUB = 'substrate_id'  # A `Substrate`.
     STATE = 'state_id'  # A target's `DeteriorationState`.
+    CHARAC = 'charac_id'  # A `Charac`.
 
 
 # Option of the "made after" selectbox of the film modification form that
@@ -110,8 +111,8 @@ class SessionKeys(StrEnum):
     # Id of the `Charac` whose deletion (or reference removal) the user
     # started in the library page's dialog and has not confirmed yet.
     CONFIRM_CHARAC_ACTION = 'confirm_charac_action_key'
-    # What the new charac form read from the uploaded data file, so the
-    # (slow) reading is done once per file and not at every rerun. See
+    # What the new or edit charac form read from the uploaded data file, so
+    # the (slow) reading is done once per file and not at every rerun. See
     # `read_upload_once` in `forms/new_charac/sub_forms.py`.
     PARSED_UPLOAD = 'parsed_upload_key'
 
